@@ -1,9 +1,10 @@
 #!/bin/sh
 # FalconSDR one-line installer:
 #
-#   curl -fsSL https://raw.githubusercontent.com/rafafunt/FalconSDR/master/packaging/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --with-dab
 #
-# Picks the right artifact for the machine it runs on:
+# Installs the fork from source by default. With FALCONSDR_REPO set to a
+# repository that publishes releases, picks the matching artifact:
 #   - Debian/Ubuntu  -> official .deb from GitHub Releases
 #   - Fedora/openSUSE -> official .rpm from GitHub Releases
 #   - Arch/CachyOS   -> AUR package `falconsdr` (yay/paru/pacman+makepkg fallback)
@@ -22,23 +23,27 @@
 #     (apt: libhackrf0 libairspy0, dnf: hackrf airspyone_host; uses sudo).
 #   - `--server` -> headless receiver: a checkout in /opt/falconsdr-src,
 #     packaging/remote-server/install.sh, systemd service started (Debian,
-#     Ubuntu, Raspberry Pi OS). The latest release unless FALCONSDR_REF=
-#     <branch|tag> picks another version; re-run to update.
+#     Ubuntu, Raspberry Pi OS). Use FALCONSDR_REF=<branch|tag> to pick a
+#     version; re-run to update.
+#   - `--with-dab` -> install welle-cli via apt where available (optional).
 #
 # After installing, unplug and replug the RTL-SDR dongle once (udev rule),
 # then run `falconsdr` - the UI opens at http://127.0.0.1:8765.
 set -eu
 
-REPO="${FALCONSDR_REPO:-rafafunt/FalconSDR}"
+FORK="PW00X/FalconSDR"
+REPO="${FALCONSDR_REPO:-$FORK}"
 VERSION="${FALCONSDR_VERSION:-latest}"
 REF="${FALCONSDR_REF:-}"
 FROM_SOURCE=0
 SERVER=0
 WITH_SDR_LIBS=0
+WITH_DAB=0
 for a in "$@"; do
   [ "$a" = "--with-sdr-libs" ] && WITH_SDR_LIBS=1
   [ "$a" = "--from-source" ] && FROM_SOURCE=1
   [ "$a" = "--server" ] && SERVER=1
+  [ "$a" = "--with-dab" ] && WITH_DAB=1
 done
 
 say() { printf '%s\n' "$*"; }
@@ -102,6 +107,30 @@ have_apt() { command -v apt-get >/dev/null 2>&1; }
 have_dnf() { command -v dnf >/dev/null 2>&1; }
 have_zypper() { command -v zypper >/dev/null 2>&1; }
 have_pacman() { command -v pacman >/dev/null 2>&1; }
+
+install_dab() {
+  [ "$WITH_DAB" = "1" ] || return 0
+  command -v welle-cli >/dev/null 2>&1 && return 0
+  if have_apt; then
+    dab_sudo=""
+    if [ "$(id -u)" != "0" ]; then dab_sudo=sudo; fi
+    if [ -z "$dab_sudo" ] || command -v sudo >/dev/null 2>&1; then
+      say "Installing welle-cli for DAB/DAB+ (welle.io)..."
+      if $dab_sudo apt-get update -qq && $dab_sudo apt-get install -y welle.io; then
+        command -v welle-cli >/dev/null 2>&1 && return 0
+      fi
+    fi
+  fi
+  say "welle-cli is unavailable. Install it from your distribution or https://github.com/AlbrechtL/welle.io and add it to PATH for DAB/DAB+."
+}
+
+check_origin() {
+  checkout="$1"; shift
+  case "$("$@" git -C "$checkout" remote get-url origin 2>/dev/null || true)" in
+    "https://github.com/$REPO"|"https://github.com/$REPO.git"|"git@github.com:$REPO.git") ;;
+    *) die "expected $REPO at $checkout. Move the existing checkout aside before installing this fork." ;;
+  esac
+}
 
 install_deb() {
   tag="$1"
@@ -199,13 +228,14 @@ install_from_source() {
   say "Installing FalconSDR from source (SoapySDR-capable path)..."
   need python3; need git
   # Started from inside a checkout (the folder the program runs from): use it, never clone a copy into it.
-  if [ -f main.py ] && [ -d falconsdr ] && [ -d .git ]; then :
+  if [ -f main.py ] && [ -d falconsdr ] && [ -e .git ]; then :
   else
-    if [ ! -d FalconSDR ]; then git clone "https://github.com/$REPO.git"; fi
+    if [ ! -d FalconSDR ]; then git clone "https://github.com/$REPO.git" FalconSDR; fi
     cd FalconSDR
   fi
   # A checkout that already exists is updated, not just reinstalled: this is also the update command.
-  if [ -d .git ]; then
+  if [ -e .git ]; then
+    check_origin .
     if git pull --ff-only -q 2>/dev/null; then :
     else say "Could not update the checkout (local changes, or not on a branch) - keeping the code as it is."; fi
   fi
@@ -215,6 +245,7 @@ install_from_source() {
   python3 -m venv --system-site-packages .venv
   .venv/bin/pip install -r requirements.txt
   if [ "$WITH_SDR_LIBS" = "1" ]; then install_sdr_libs; fi
+  install_dab
   cat <<EOF
 
 FalconSDR $version is ready. Start it with:
@@ -236,15 +267,21 @@ install_server() {
   if ! command -v git >/dev/null 2>&1; then
     $SUDO apt-get update -qq && $SUDO apt-get install -y -qq git ca-certificates
   fi
-  ref="${REF:-$(release_tag)}"
+  if [ "$REPO" = "$FORK" ] && [ -z "$REF" ] && [ "$VERSION" = "latest" ]; then
+    ref=master
+  else
+    ref="${REF:-$(release_tag)}"
+  fi
   [ -n "$ref" ] || die "couldn't find the latest release (GitHub API) - set FALCONSDR_REF=v1.1.0 or similar"
   say "Fetching FalconSDR ($ref)..."
   if [ -d "$src/.git" ]; then
+    check_origin "$src" $SUDO
     $SUDO git -C "$src" fetch -q --depth 1 origin "$ref"
     $SUDO git -C "$src" checkout -q --force FETCH_HEAD
   else
     $SUDO git -c advice.detachedHead=false clone -q --depth 1 --branch "$ref" "https://github.com/$REPO.git" "$src"
   fi
+  install_dab
   $SUDO sh "$src/packaging/remote-server/install.sh" >/dev/null
   # Also here: releases up to 1.1.0 leave the service stopped on a first install.
   $SUDO systemctl enable --quiet --now falconsdr-receiver.service
@@ -261,7 +298,10 @@ install_server() {
 
 main() {
   if [ "$SERVER" = "1" ]; then install_server; return; fi
-  if [ "$FROM_SOURCE" = "1" ]; then install_from_source; return; fi
+  if [ "$FROM_SOURCE" = "1" ] || { [ "$REPO" = "$FORK" ] && [ "$VERSION" = "latest" ]; }; then
+    install_from_source
+    return
+  fi
   # No prebuilt bundle runs here: musl-based distros (Alpine, ...) can't
   # execute the glibc-linked AppImage, and there is no musl asset.
   if is_musl; then
@@ -273,6 +313,7 @@ main() {
   elif have_dnf || have_zypper; then install_rpm "$(release_tag)"
   elif have_pacman; then install_aur
   else install_appimage "$(release_tag)"; fi
+  install_dab
   cat <<EOF
 
 Unplug and replug the RTL-SDR dongle once (USB permission rule), then run:

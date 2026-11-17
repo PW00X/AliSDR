@@ -196,17 +196,21 @@ one run each.
 
 ### One-line installer (Linux)
 
-Detects your distribution and installs the matching package:
+Installs this fork from source, including **Manual tuning**. On Debian or
+Ubuntu, make sure `git`, `python3` and `python3-venv` are installed. Run the
+command from a directory where you want the `FalconSDR` checkout:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/rafafunt/FalconSDR/master/packaging/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --with-dab
 ```
 
-Debian/Ubuntu get the `.deb`, Fedora/openSUSE the `.rpm`, Arch the AUR
-package, anything else the AppImage. Add `--from-source` to install from a
-git checkout instead: the way to get SoapySDR support (LimeSDR, SDRplay,
-USRP, …, and HackRF/Airspy through SoapySDR instead of the built-in access)
-and the fallback for other CPU architectures or musl distros such as Alpine.
+The optional `--with-dab` flag installs `welle-cli` on apt-based distributions
+that package it. Elsewhere, install `welle-cli` separately and put it on the
+receiver's `PATH`. Run the same command again from the same directory to update
+the fork. Restart FalconSDR after updating.
+
+The source install supports SoapySDR hardware (LimeSDR, SDRplay, USRP, and
+others) when you install the relevant SoapySDR modules for your distribution.
 The built-in HackRF/Airspy access needs their system libraries, which a source
 install does not bring along: add `--with-sdr-libs` (installs `libhackrf0` and
 `libairspy0` with apt, or `hackrf` and `airspyone_host` with dnf, using sudo):
@@ -367,10 +371,10 @@ recordings and settings stay on disk (see
 On a Linux machine with the SDR attached (Debian, Ubuntu, Raspberry Pi OS):
 
 ```
-curl -fsSL https://raw.githubusercontent.com/rafafunt/FalconSDR/master/packaging/install.sh | bash -s -- --server
+curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --server --with-dab
 ```
 
-It installs the latest release as a service that starts on boot and ends
+It installs this fork's `master` branch as a service that starts on boot and ends
 with the address to open from any device on your network
 (`http://<receiver-ip>:8765`). Run the same line again to update - settings
 and recordings are kept. Details, other versions and helper computers for
