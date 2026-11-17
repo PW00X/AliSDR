@@ -413,7 +413,7 @@ Good to know:
 
 ## First steps
 
-1. **Listen** page: pick your SDR, then add a band (or a preset) and press
+1. **Scan** page: pick your SDR, then add a band (or a preset) and press
    Start.
 2. Raise or lower the **trigger level** until real transmissions open and
    noise doesn't.
@@ -423,9 +423,9 @@ Good to know:
 
 ### Manual tuning and DAB/DAB+
 
-Open **Manual tuning** between **Listen** and **Recordings**. If a desktop
-copy of FalconSDR was running during an update, quit it from Settings and
-start the updated copy. Closing the browser leaves the receiver running.
+Open **Manual** between **Scan** and **Recordings**. For a headless receiver,
+run the [headless installer](#headless-receiver) on the receiver host. It
+restarts the service and checks that the updated navigation is being served.
 
 Select a receiver and enter a frequency in MHz. Use WFM for broadcast FM,
 or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then

@@ -275,8 +275,14 @@ install_server() {
   [ -n "$ref" ] || die "couldn't find the latest release (GitHub API) - set FALCONSDR_REF=v1.1.0 or similar"
   say "Fetching FalconSDR ($ref)..."
   if [ -d "$src/.git" ]; then
-    check_origin "$src" $SUDO
-    $SUDO git -C "$src" fetch -q --depth 1 origin "$ref"
+    previous_origin="$($SUDO git -C "$src" remote get-url origin)"
+    case "$REPO:$previous_origin" in
+      "$FORK:https://github.com/rafafunt/FalconSDR"|"$FORK:https://github.com/rafafunt/FalconSDR.git"|"$FORK:git@github.com:rafafunt/FalconSDR.git")
+        say "Updating the existing upstream receiver from $FORK."
+        ;;
+      *) check_origin "$src" $SUDO ;;
+    esac
+    $SUDO git -C "$src" fetch -q --depth 1 "https://github.com/$REPO.git" "$ref"
     $SUDO git -C "$src" checkout -q --force FETCH_HEAD
   else
     $SUDO git -c advice.detachedHead=false clone -q --depth 1 --branch "$ref" "https://github.com/$REPO.git" "$src"
@@ -287,7 +293,22 @@ install_server() {
   $SUDO systemctl enable --quiet --now falconsdr-receiver.service
   version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$src/falconsdr/__init__.py")
   ip=$(hostname -I 2>/dev/null | awk '{print $1}')
-  sleep 2
+  if [ "$REPO" = "$FORK" ] && [ "$ref" = "master" ]; then
+    retries=10
+    while :; do
+      session="$(curl --noproxy '*' -fsS --max-time 2 http://127.0.0.1:8765/api/session 2>/dev/null || true)"
+      if printf '%s\n' "$session" | grep -Eq '"navigation"[[:space:]]*:[[:space:]]*"scan-manual"' &&
+         printf '%s\n' "$session" | grep -Eq '"mode"[[:space:]]*:[[:space:]]*"server"'; then
+        break
+      fi
+      retries=$((retries - 1))
+      [ "$retries" -gt 0 ] ||
+        die "Port 8765 is not serving the updated headless UI. Check for an older FalconSDR process and run: journalctl -u falconsdr-receiver -n 50 --no-pager"
+      sleep 2
+    done
+  else
+    sleep 2
+  fi
   systemctl is-active --quiet falconsdr-receiver.service ||
     die "FalconSDR $version is installed, but the service didn't start - see: journalctl -u falconsdr-receiver"
   say ""

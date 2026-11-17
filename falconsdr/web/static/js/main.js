@@ -13,8 +13,8 @@ import { statsView } from './views/stats.js';
 const app = document.getElementById('app');
 
 const ROUTES = {
-  listen: { label: () => t('Listen'), icon: 'listen', view: listenView },
-  manual: { label: () => t('Manual tuning'), shortLabel: () => t('Tune'), icon: 'headphones', view: manualView, show: () => S.settings.capabilities?.manual_tuning !== false },
+  listen: { label: () => t('Scan'), icon: 'listen', view: listenView },
+  manual: { label: () => t('Manual'), icon: 'headphones', view: manualView },
   recordings: { label: () => t('Recordings'), icon: 'library', view: recordingsView },
   // What the add-on decoders found. Shown once add-ons are in use (Add-ons is the always-visible showcase); with
   // nothing received yet it explains itself and points to Add-ons.
@@ -124,9 +124,7 @@ function shell() {
   };
   const renderNav = () => {
     nav.replaceChildren(...Object.entries(ROUTES).filter(([, r]) => !r.show || r.show())
-      .map(([key, r]) => h('a', { href: `#/${key}`, 'data-route': key, 'aria-label': r.label() }, icon(r.icon),
-        h('span', { class: r.shortLabel ? 'nav-label-wide' : '' }, r.label()),
-        r.shortLabel ? h('span.nav-label-short', r.shortLabel()) : null)));
+      .map(([key, r]) => h('a', { href: `#/${key}`, 'data-route': key }, icon(r.icon), h('span', r.label()))));
     markActive();
   };
   renderNav();

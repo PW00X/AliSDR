@@ -225,6 +225,7 @@ def make_handler(app: App):
                 return self._json({
                     "authenticated": self._token_ok(), "mode": app.mode,
                     "remote": cfg.remote_receiver.url if app.mode == "client" else "",
+                    "navigation": "scan-manual",
                 })
             if path == "/api/i18n":
                 lang = cfg.language

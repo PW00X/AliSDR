@@ -886,7 +886,7 @@ function settings() {
     // Like Controller.devices(): the network entry carries the typed address while it is the chosen one, or the UI loses it.
     devices: DEVICES.map((d) => ({ driver: d.driver, args: d.driver === 'rtl_tcp' && st.config.device.driver === 'rtl_tcp' ? st.config.device.device_args || '' : '', label: tr(d.label), rate: d.rate })),
     languages: FX.languages,
-    capabilities: { ffmpeg: true, transcription_installed: true, digital: false, platform: 'linux', autostart: null, manual_tuning: false },
+    capabilities: { ffmpeg: true, transcription_installed: true, digital: false, platform: 'linux', autostart: null },
     curated: FX.curated, mode: 'local', password_set: false,
   };
 }
@@ -928,6 +928,7 @@ const ROUTES = {
   'POST /api/logout': () => ({ ok: true }),
   'GET /api/live': (req, q) => live(+(q.get('since_log') || 0)),
   'GET /api/audio': () => audioStream(),
+  'GET /api/manual': notInDemo,
   'POST /api/scanner/start': () => { startScanner(); return live(); },
   'POST /api/scanner/stop': () => { stopScanner(); return live(); },
   'POST /api/scanner/skip': () => { skip(false); return live(); },
