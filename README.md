@@ -16,7 +16,7 @@ receiver at [falconsdr.com](https://falconsdr.com).
 > Listening to and recording some radio services is restricted or illegal in
 > many countries - see [Legal](#legal).
 
-![Listen page: frequency display, live spectrum and waterfall, receiver settings](docs/screenshot-listen.png)
+![Scan page: frequency display, live spectrum and waterfall, receiver settings](docs/screenshot-listen.png)
 
 
 ## Features
@@ -41,7 +41,7 @@ receiver at [falconsdr.com](https://falconsdr.com).
   10 MHz); the plan is shared in proportion to their capture widths.
 - Optional **antenna range** per dongle (SDR device card): one on a 2 m
   antenna scans only 144-146 MHz, one on a 70 cm antenna only 430-440 MHz.
-  What no range reaches is listed on the Listen page.
+  What no range reaches is listed on the Scan page.
 - Optional, experimental digital voice: DMR and Yaesu System Fusion (C4FM)
   through [dsd-fme](https://github.com/lwvmobile/dsd-fme), installed from
   Add-ons → Digital voice. Encrypted calls stay muted.
@@ -142,7 +142,7 @@ tested yet - reports are welcome.
 **Testing a receiver:** stop the scanner and run `falconsdr --probe-sdr`
 (from source: `python main.py --probe-sdr`; add `hackrf_native` / `hackrf` /
 `airspy_native` / `airspy` to pick the way it is opened, or `rtl_tcp` to
-measure the server whose address is saved on the Listen page; on Windows the output
+measure the server whose address is saved on the Scan page; on Windows the output
 goes to `%USERPROFILE%\.config\FalconSDR\falconsdr.log`). It measures the
 gain steps, the DC spike, how many blocks after a retune still hold the old
 frequency, and sample losses, and prints one `RESULT {...}`
@@ -389,7 +389,7 @@ falconsdr-receiver`), then pick the access method under *SDR device*.
 New in 1.5.0. An RTL-SDR plugged into another computer (a Raspberry Pi at the antenna, a
 box in the attic, a phone running an `rtl_tcp` app) can be the receiver of
 the scanner: on that computer run `rtl_tcp -a 0.0.0.0` (package `rtl-sdr`),
-then on the Listen page choose *SDR device → Network receiver (rtl_tcp)* and
+then on the Scan page choose *SDR device → Network receiver (rtl_tcp)* and
 type its address (`192.168.1.20` or `192.168.1.20:1234`). Scanning, recording,
 transcription and the web interface stay on the computer running FalconSDR.
 

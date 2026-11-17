@@ -1666,8 +1666,8 @@ msgstr "Szukaj częstotliwości, nazwy, folderu…"
 msgid "{n} channels, {e} scanned"
 msgstr "kanałów: {n}, skanowanych: {e}"
 
-msgid "The Memory List is switched off on the Listen page"
-msgstr "Lista pamięci jest wyłączona na stronie Nasłuch"
+msgid "The Memory List is switched off on the Scan page"
+msgstr "Lista pamięci jest wyłączona na stronie Skanowanie"
 
 msgid "Add Polish military frequencies"
 msgstr "Dodaj polskie częstotliwości wojskowe"
@@ -1687,14 +1687,14 @@ msgstr "Margines ± (kHz)"
 msgid "Search blacklist…"
 msgstr "Szukaj na czarnej liście…"
 
-msgid "The scanner never stops on these frequencies. “Skip + blacklist” on the Listen page adds them here."
-msgstr "Skaner nigdy nie zatrzymuje się na tych częstotliwościach. „Pomiń + czarna lista” na stronie Nasłuch dodaje je tutaj."
+msgid "The scanner never stops on these frequencies. “Skip + blacklist” on the Scan page adds them here."
+msgstr "Skaner nigdy nie zatrzymuje się na tych częstotliwościach. „Pomiń + czarna lista” na stronie Skanowanie dodaje je tutaj."
 
 msgid "Margin"
 msgstr "Margines"
 
-msgid "Skipped from the Listen page"
-msgstr "Pominięta na stronie Nasłuch"
+msgid "Skipped from the Scan page"
+msgstr "Pominięta na stronie Skanowanie"
 
 msgid "Remove from blacklist"
 msgstr "Usuń z czarnej listy"
@@ -2008,8 +2008,8 @@ msgstr "± kHz wokół częstotliwości dodanej przez „Pomiń + czarna lista�
 msgid "Imported {n} presets"
 msgstr "Zaimportowano presety: {n}"
 
-msgid "The ready-made bands offered on the Listen page. Removing one doesn't touch bands you already added."
-msgstr "Gotowe pasma proponowane na stronie Nasłuch. Usunięcie presetu nie zmienia pasm już dodanych."
+msgid "The ready-made bands offered on the Scan page. Removing one doesn't touch bands you already added."
+msgstr "Gotowe pasma proponowane na stronie Skanowanie. Usunięcie presetu nie zmienia pasm już dodanych."
 
 msgid "custom"
 msgstr "własny"

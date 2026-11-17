@@ -19,7 +19,7 @@ const SORTS = {
   blacklist: { storage: 'blacklistSort', cols: {
     freq: { get: (b) => b.freq_hz, dir: 1 },
     margin: { get: (b) => b.margin_hz, dir: -1 },
-    label: { get: (b) => (b.label === 'Auto-lockout (SKIP)' ? t('Skipped from the Listen page') : b.label || ''), text: true, dir: 1 },
+    label: { get: (b) => (b.label === 'Auto-lockout (SKIP)' ? t('Skipped from the Scan page') : b.label || ''), text: true, dir: 1 },
     added: { get: (b) => b.date_added || '', text: true, dir: -1 },
   } },
 };
@@ -303,7 +303,7 @@ export function channelsView(root) {
         S.settings.channels.length ? h('button.ghost.danger', { onclick: deleteAll }, icon('trash'), t('Delete all')) : null),
       h('div.row.wrap.small.muted',
         t('{n} channels, {e} scanned', { n: S.settings.channels.length, e: enabled }),
-        cfg().memory_list_enabled ? null : h('span.chip.warn', t('The Memory List is switched off on the Listen page')),
+        cfg().memory_list_enabled ? null : h('span.chip.warn', t('The Memory List is switched off on the Scan page')),
         h('span.spacer'),
         h('button.ghost.small', { onclick: () => loadCurated('military') }, t('Add Polish military frequencies')),
         h('button.ghost.small', { onclick: () => loadCurated('fire') }, t('Add Polish fire brigade frequencies'))),
@@ -335,7 +335,7 @@ export function channelsView(root) {
     return h('section.card',
       h('div.row.wrap', h('div.grow', search), h('button.primary', { onclick: addBlacklist }, icon('plus'), t('Add')),
         S.settings.blacklist.length ? h('button.ghost.danger', { onclick: deleteAll }, icon('trash'), t('Delete all')) : null),
-      h('p.small.muted', { style: { margin: 0 } }, t('The scanner never stops on these frequencies. “Skip + blacklist” on the Listen page adds them here.')),
+      h('p.small.muted', { style: { margin: 0 } }, t('The scanner never stops on these frequencies. “Skip + blacklist” on the Scan page adds them here.')),
       h('div.setting', h('div', h('b', t('Default blacklist margin')), h('p', t('± kHz around a frequency added with “Skip + blacklist”.'))),
         h('input', { type: 'number', value: cfg().default_blacklist_margin_hz / 1000, min: 0, step: 0.5, style: { width: '110px' }, onchange: (e) => patchConfig({ default_blacklist_margin_hz: Math.round(Math.max(0, +e.target.value) * 1000) }) })),
       bulkBox,
@@ -346,7 +346,7 @@ export function channelsView(root) {
             checkbox(b),
             h('td.mono', fmtChannel(b.freq_hz)),
             h('td.mono', `±${(b.margin_hz / 1000).toFixed(1)} kHz`),
-            h('td', b.label === 'Auto-lockout (SKIP)' ? t('Skipped from the Listen page') : b.label),
+            h('td', b.label === 'Auto-lockout (SKIP)' ? t('Skipped from the Scan page') : b.label),
             h('td.mono.small', b.date_added),
             h('td', h('div.actions', h('button.icon.ghost', {
               title: t('Remove from blacklist'), onclick: async () => { await saveBlacklist(S.settings.blacklist.filter((x) => x !== b)); render(); },

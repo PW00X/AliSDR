@@ -466,7 +466,7 @@ export function settingsView(root, hash, scope = 'settings') {
       a.click();
     };
     mount(body('presets'),
-      h('p.muted', { style: { margin: 0 } }, t('The ready-made bands offered on the Listen page. Removing one doesn\'t touch bands you already added.')),
+      h('p.muted', { style: { margin: 0 } }, t('The ready-made bands offered on the Scan page. Removing one doesn\'t touch bands you already added.')),
       h('div.table-wrap', h('table', h('tbody', presets.map((p) => h('tr',
         h('td', t(p.label), p.user ? h('span.chip', { style: { marginLeft: '8px' } }, t('custom')) : null),
         h('td.mono.small', p.start_hz === p.stop_hz ? fmtMHz(p.start_hz, 3) : `${fmtMHz(p.start_hz, 3)}–${fmtMHz(p.stop_hz, 3)}`),
