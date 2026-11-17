@@ -423,8 +423,13 @@ Good to know:
 
 ### Manual tuning and DAB/DAB+
 
-Open **Manual tuning**, select a receiver, enter a frequency in MHz and choose
-AM, NFM, WFM, SSB, USB or LSB. Press **Tune**, then **Listen live**. Analog
+Open **Manual tuning** between **Listen** and **Recordings**. If a desktop
+copy of FalconSDR was running during an update, quit it from Settings and
+start the updated copy. Closing the browser leaves the receiver running.
+
+Select a receiver and enter a frequency in MHz. Use WFM for broadcast FM,
+or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
+**Listen live**. Click the spectrum to fill in a nearby frequency. Analog
 tuning plays continuously, even below the scanner's trigger level. WFM uses
 the app's mono live-audio stream.
 

@@ -597,7 +597,7 @@ export function listenView(root) {
 }
 
 // Spectrum line + scrolling waterfall of the current capture window.
-function spectrumPainter(canvas, axis) {
+export function spectrumPainter(canvas, axis, emptyLabel = t('No data - start the scanner')) {
   const SPEC_H = 140;
   const ctx = canvas.getContext('2d');
   const water = document.createElement('canvas');
@@ -634,7 +634,9 @@ function spectrumPainter(canvas, axis) {
     if (!sp || !sp.db.length) {
       ctx.fillStyle = '#5f6b85';
       ctx.font = `${12 * dpr}px system-ui`;
-      ctx.fillText(t('No data - start the scanner'), 14 * dpr, 24 * dpr);
+      last = null;
+      window_ = '';
+      ctx.fillText(emptyLabel, 14 * dpr, 24 * dpr);
       axis.replaceChildren();
       return;
     }
@@ -642,7 +644,7 @@ function spectrumPainter(canvas, axis) {
     const db = sp.db;
     const key = `${sp.f0}-${sp.f1}`;
     if (key !== window_) { window_ = key; wctx.clearRect(0, 0, water.width, water.height); }
-    const mn = Math.min(...db), mx = Math.max(...db, sp.trigger);
+    const mn = Math.min(...db), mx = Math.max(...db, sp.trigger ?? -Infinity);
     lo += ((mn - 6) - lo) * 0.2;
     hi += ((mx + 8) - hi) * 0.2;
     const y = (v) => SH - ((v - lo) / (hi - lo)) * SH;
@@ -667,11 +669,18 @@ function spectrumPainter(canvas, axis) {
     ctx.lineWidth = 1.5 * dpr;
     ctx.stroke();
     // trigger
-    ctx.setLineDash([6 * dpr, 4 * dpr]);
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1.2 * dpr;
-    ctx.beginPath(); ctx.moveTo(0, y(sp.trigger)); ctx.lineTo(W, y(sp.trigger)); ctx.stroke();
-    ctx.setLineDash([]);
+    if (sp.trigger != null) {
+      ctx.setLineDash([6 * dpr, 4 * dpr]);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.beginPath(); ctx.moveTo(0, y(sp.trigger)); ctx.lineTo(W, y(sp.trigger)); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (sp.tuned != null && sp.f1 > sp.f0) {
+      const x = W * (sp.tuned - sp.f0) / (sp.f1 - sp.f0);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, SH); ctx.stroke();
+    }
     // waterfall: shift down one row, paint the new one on top
     if (!redrawOnly) {
       const row = wctx.createImageData(water.width, 1);

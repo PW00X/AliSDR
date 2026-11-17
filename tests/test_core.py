@@ -2588,10 +2588,17 @@ class ManualTuningTest(unittest.TestCase):
         ctl.start()
         audio = ctl.subscribe_audio()
         self.addCleanup(ctl.unsubscribe_audio, audio)
-        ctl.tune_manual({"receiver": 0, "mode": "AM", "frequency_hz": 121_500_000})
+        ctl.tune_manual({"receiver": 0, "mode": "WFM", "frequency_hz": 99_500_000})
         session = ctl.manual_session
         self.assertFalse(ctl.running)
         self.assertTrue(audio.get(timeout=5))
+        deadline = time.monotonic() + 5
+        while session.spectrum is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+        spectrum = ctl.manual_status()["spectrum"]
+        self.assertIsNotNone(spectrum)
+        self.assertLess(spectrum["f0"], 99_500_000)
+        self.assertGreater(spectrum["f1"], 99_500_000)
         ctl.tune_manual({"receiver": 0, "mode": "NFM", "frequency_hz": 145_500_000})
         self.assertIs(ctl.manual_session, session)
         self.assertEqual(ctl.manual_status()["tuning"]["frequency_hz"], 145_500_000)

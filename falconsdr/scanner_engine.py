@@ -274,14 +274,14 @@ def _wide_anchor_windows(freqs: list[int], band: VfoRangeConfig, sample_rate: fl
     return [left] if left.freqs == right.freqs else [left, right]
 
 
-class _SpectrumWorker:
+class SpectrumWorker:
     """Runs spectrum_snapshot() - a large FFT over the whole IQ block - on its
     own thread, so a slow frame never delays live audio. Keeps only the
     latest job: a dropped spectrum frame is invisible, dropped audio isn't.
     """
 
-    def __init__(self, signals: "ScannerSignals"):
-        self._signals = signals
+    def __init__(self, on_spectrum):
+        self._on_spectrum = on_spectrum
         self._lock = threading.Lock()
         self._pending: tuple | None = None
         self._wake = threading.Event()
@@ -315,7 +315,7 @@ class _SpectrumWorker:
             iq, sample_rate, center_hz, trigger_dbfs, custom = job
             try:
                 freqs, db = spectrum_snapshot(iq, sample_rate, center_hz)
-                self._signals.spectrum_ready.emit(freqs, db, trigger_dbfs, custom)
+                self._on_spectrum(freqs, db, trigger_dbfs, custom)
             except Exception:
                 pass
 
@@ -499,7 +499,7 @@ class ScannerEngine(threading.Thread):
         self._hold = False  # "Hold" - stay on the current window; a plain bool, read once per tick
 
         self._backend = None
-        self._spectrum_worker: _SpectrumWorker | None = None
+        self._spectrum_worker: SpectrumWorker | None = None
         self._last_spectrum_submit_at = 0.0
         self._edge_compensation: EdgeCompensation | None = None
         self._actual_rate: float | None = None   # what the open receiver really captures (backend.sample_rate)
@@ -854,8 +854,8 @@ class ScannerEngine(threading.Thread):
 
     def _setup_static(self) -> None:
         """Everything that doesn't depend on the SDR hardware being present."""
-        self._spectrum_worker = _SpectrumWorker(self.signals)
-        _checkpoint("_SpectrumWorker thread started")
+        self._spectrum_worker = SpectrumWorker(self.signals.spectrum_ready.emit)
+        _checkpoint("SpectrumWorker thread started")
         # Loaded once per start - the tuner's roll-off doesn't change.
         self._edge_compensation = EdgeCompensation(self.config.device.gain_mode)
         _checkpoint(f"EdgeCompensation loaded, buckets={self._edge_compensation.bucket_count}")
@@ -1408,7 +1408,7 @@ class ScannerEngine(threading.Thread):
     def _submit_spectrum(
         self, iq: np.ndarray, sample_rate: float, center_hz: float, trigger_dbfs: float, custom: bool = False,
     ) -> None:
-        """Hands the IQ block to _SpectrumWorker, at most _SPECTRUM_FPS times
+        """Hands the IQ block to SpectrumWorker, at most _SPECTRUM_FPS times
         a second - a skipped frame only affects the display."""
         now = time.monotonic()
         if now - self._last_spectrum_submit_at < 1.0 / self._SPECTRUM_FPS:

@@ -346,6 +346,8 @@ class Controller:
             "tuning": asdict(session.tuning) if session else None,
             "state": session.state if session else "idle",
             "stations": [],
+            "spectrum": session.spectrum if session and session.state == "listening" else None,
+            "level": session.level if session and session.spectrum is not None else None,
         }
         if session and session.tuning.mode == "DAB":
             try:

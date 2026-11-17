@@ -91,6 +91,7 @@ p { margin: 0; }
 }
 .nav a:hover { color: var(--label); background: var(--fill); }
 .nav a.active { color: var(--accent); background: var(--accent-tint); }
+.nav-label-short { display: none; }
 /* Eight tabs (with Messages and Add-ons) no longer fit with icons on a mid-size desktop window: labels only. */
 @media (min-width: 861px) and (max-width: 1500px) { .nav a { padding: 6px 9px; } .nav a svg.ic { display: none; } }
 .topbar .status { margin-left: auto; display: flex; align-items: center; gap: 8px; }
@@ -112,6 +113,8 @@ main { overflow: auto; padding: 24px 24px 40px; }
   }
   .nav a { flex: 1; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 500; padding: 6px 2px; min-height: 48px; justify-content: center; }
   .nav a.active { background: none; }
+  .nav-label-wide { display: none; }
+  .nav-label-short { display: inline; }
   .nav a { min-width: 0; }
   .nav a span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }  /* 6 tabs on a 320px screen: cut with an ellipsis, not off the edge */
   .nav a svg.ic { width: 24px; height: 24px; }
@@ -176,6 +179,8 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 label.field > span.hint { color: var(--secondary); font-weight: 400; }
 .manual-tuning [hidden] { display: none; }
 .manual-tuning audio { max-width: 100%; }
+.manual-tuning .hero .field { color: #c7c7cc; }
+.manual-tuning .hero .state { white-space: normal; }
 .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 12px; }
 
 /* switch - only ever in a row next to what it controls */

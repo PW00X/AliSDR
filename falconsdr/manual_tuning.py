@@ -8,15 +8,16 @@ import shutil
 import socket
 import subprocess
 import threading
+import time
 from dataclasses import dataclass
 
 import numpy as np
 
 from .agc import SoftwareAgc
-from .dsp import Demodulator
+from .dsp import Demodulator, WFM_DISCRIMINATOR_RATE, level_dbfs
 from .i18n import tr
 from .models import Modulation, resolve_ssb_sideband
-from .scanner_engine import AUDIO_RATE
+from .scanner_engine import AUDIO_RATE, SpectrumWorker
 from .sdr_backend import AcquisitionThread, SoapyBackend, create_backend, device_family, parse_rtl_tcp_args
 
 DAB_CHANNELS = tuple(f"{n}{suffix}" for n in range(5, 14) for suffix in ("ABCDEF" if n == 13 else "ABCD"))
@@ -104,6 +105,11 @@ class ManualSession(threading.Thread):
         self.stop_requested = threading.Event()
         self.port = None
         self.state = "starting"
+        self.spectrum = None
+        self.level = None
+
+    def _update_spectrum(self, freqs, db, _trigger, _custom):
+        self.spectrum = {"f0": float(freqs[0]), "f1": float(freqs[-1]), "db": np.round(db, 1).tolist()}
 
     def run(self):
         error = ""
@@ -128,18 +134,21 @@ class ManualSession(threading.Thread):
             debug_mode=self.debug, bias_tee=bool(dev.get("bias_tee")), async_read=dev["async_read"],
         )
         acquisition = None
+        spectrum = SpectrumWorker(self._update_spectrum)
         try:
             rate = float(getattr(raw, "sample_rate", 0) or dev["sample_rate_hz"])
             chunk = max(4096, round(rate * 0.03 / 4096) * 4096)
             acquisition = AcquisitionThread(raw, chunk, max_queued=8, debug=self.debug)
             current = None
+            next_frame = 0
             while not self.stop_requested.is_set():
                 tuning = self.tuning
                 if tuning != current:
                     current = tuning
                     freq = tuning.frequency_hz
                     # Keep the station off the SDR's DC spike.
-                    offset = min(125_000, rate / 4)
+                    room = max(0, (rate - WFM_DISCRIMINATOR_RATE) / 2) if tuning.mode == "WFM" else rate / 4
+                    offset = min(125_000, rate / 4, room)
                     if freq <= offset:
                         offset = -offset
                     acquisition.set_frequency(freq - offset)
@@ -157,7 +166,13 @@ class ManualSession(threading.Thread):
                     continue
                 self.state = "listening"
                 self.on_audio(demod.demod(iq, mode, offset))
+                now = time.monotonic()
+                if now >= next_frame:
+                    next_frame = now + 0.35
+                    self.level = level_dbfs(iq)
+                    spectrum.submit(iq, rate, freq - offset, 0)
         finally:
+            spectrum.stop()
             (acquisition if acquisition is not None else raw).close()
 
     def _dab(self):

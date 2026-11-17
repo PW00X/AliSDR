@@ -3893,6 +3893,21 @@ msgstr "Ten odbiornik jest już użyty wyżej - można go otworzyć tylko raz."
 msgid "Manual tuning"
 msgstr "Strojenie ręczne"
 
+msgid "DAB/DAB+ stations"
+msgstr "Stacje DAB/DAB+"
+
+msgid "Live spectrum and waterfall around the tuned frequency."
+msgstr "Widmo i wykres wodospadowy wokół dostrojonej częstotliwości."
+
+msgid "Click the spectrum to select a frequency"
+msgstr "Kliknij widmo, aby wybrać częstotliwość"
+
+msgid "No data. Tune to a frequency."
+msgstr "Brak danych. Dostrój odbiornik do częstotliwości."
+
+msgid "FM broadcast"
+msgstr "Radio FM"
+
 msgid "Tune"
 msgstr "Dostrój"
 

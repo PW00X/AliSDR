@@ -1,31 +1,49 @@
-import { api, errorToast, h, mount, t } from '../core.js';
+import { api, errorToast, fmtMHz, h, icon, mount, t } from '../core.js';
 import { liveAudio } from '../live-audio.js';
 import { on } from '../state.js';
+import { spectrumPainter } from './listen.js';
 
 const analogModes = ['AM', 'NFM', 'WFM', 'SSB', 'USB', 'LSB'];
 
 export function manualView(root) {
   const receiver = h('select', { required: true });
   const mode = h('select', {}, ...[...analogModes, 'DAB'].map((value) =>
-    h('option', { value }, value === 'DAB' ? 'DAB/DAB+' : value)));
+    h('option', { value }, value === 'DAB' ? 'DAB/DAB+' : value === 'WFM' ? `${t('FM broadcast')} (WFM)` : value)));
   const frequency = h('input', {
     type: 'number', inputmode: 'decimal', min: '0.000001', max: '6000', step: '0.000001',
-    value: '121.5', required: true,
+    value: '99.5', required: true,
   });
   const channel = h('select');
   const frequencyField = h('label.field', t('Frequency (MHz)'), frequency);
   const channelField = h('label.field', t('DAB channel'), channel);
-  const tune = h('button.primary', { type: 'submit', disabled: true }, t('Tune'));
-  const stop = h('button.ghost', { type: 'button', disabled: true }, t('Stop tuning'));
-  const listen = h('button.ghost', { type: 'button', hidden: true, onclick: () => liveAudio.toggle().catch(errorToast) });
-  const status = h('p.muted', { role: 'status', 'aria-live': 'polite' }, t('Loading…'));
+  const tune = h('button.primary.big', { type: 'submit', disabled: true }, icon('play'), t('Tune'));
+  const stop = h('button.big', { type: 'button', disabled: true }, icon('stop'), t('Stop tuning'));
+  const listen = h('button.big', { type: 'button', hidden: true, onclick: () => liveAudio.toggle().catch(errorToast) });
+  const status = h('span.chip.state', { role: 'status' }, t('Loading…'));
+  const readout = h('div.freq', '—');
+  const detail = h('div.freq-name');
+  const rfLevel = h('span.mono');
+  const meterFill = h('div.fill');
+  const meter = h('div.col', { hidden: true }, h('div.meter', meterFill),
+    h('div.meter-legend', h('span', '-100'), rfLevel, h('span', '0 dBFS')));
+  const volume = h('input', { type: 'range', min: 0, max: 1.5, step: 0.05, value: liveAudio.volume,
+    title: t('Volume'), oninput: (event) => liveAudio.setVolume(+event.target.value) });
+  const analogAudio = h('div.row', { hidden: true }, listen, h('div.volume', icon('volume'), volume));
   const stationList = h('select');
   const audio = h('audio', { controls: true, preload: 'none', 'aria-label': t('DAB audio') });
   const play = h('button.primary', { type: 'button' }, t('Play station'));
   const playbackError = h('p.muted', { role: 'status', hidden: true },
     t('This DAB station is unavailable. Try playing it again.'));
-  const stations = h('div.col', { hidden: true },
-    h('label.field', t('DAB station'), stationList), h('div.row.wrap', play, audio), playbackError);
+  const stations = h('section.card.col', { hidden: true },
+    h('div.card-head', h('h2', t('DAB/DAB+ stations'))),
+    h('div.row.wrap', h('label.field', t('DAB station'), stationList), play), audio, playbackError);
+  const canvas = h('canvas', { height: 260, role: 'img', 'aria-label': t('Live spectrum and waterfall around the tuned frequency.') });
+  const axis = h('div.spectrum-axis');
+  const spectrumCard = h('section.card.spectrum-card',
+    h('div.card-head', h('h2', t('Spectrum')), h('span.faint.small', t('Click the spectrum to select a frequency'))),
+    h('div.spectrum-wrap', canvas), axis);
+  const spectrum = spectrumPainter(canvas, axis, t('No data. Tune to a frequency.'));
+  let frame = null;
 
   let destroyed = false;
   let busy = false;
@@ -36,6 +54,7 @@ export function manualView(root) {
   let receiverKey = '';
   let revision = 0;
   let timer;
+  mode.value = 'WFM';
   const updateMode = () => {
     const dab = mode.value === 'DAB';
     frequencyField.hidden = frequency.disabled = dab;
@@ -50,8 +69,10 @@ export function manualView(root) {
     }
   };
   const updateListen = () => {
-    listen.hidden = !active || active.mode === 'DAB';
-    listen.textContent = liveAudio.playing ? t('Stop listening') : t('Listen live');
+    analogAudio.hidden = !active || active.mode === 'DAB';
+    listen.hidden = analogAudio.hidden;
+    mount(listen, icon(liveAudio.playing ? 'mute' : 'headphones'),
+      liveAudio.playing ? t('Stop listening') : t('Listen live'));
   };
   const render = (data) => {
     const initial = !ready;
@@ -89,6 +110,19 @@ export function manualView(root) {
       if (data.stations.some(({ id }) => String(id) === selected)) stationList.value = selected;
     }
     stations.hidden = !data.stations.length;
+    spectrumCard.hidden = active?.mode === 'DAB';
+    readout.textContent = active?.mode === 'DAB' ? active.channel
+      : active ? `${fmtMHz(active.frequency_hz, 3)} MHz` : '—';
+    detail.textContent = active?.mode === 'DAB' ? 'DAB/DAB+' : active?.mode === 'WFM' ? t('FM broadcast') : active?.mode || '';
+    meter.hidden = data.level == null || !active || active.mode === 'DAB';
+    if (!meter.hidden) {
+      meterFill.style.width = `${Math.max(0, Math.min(100, 100 + data.level))}%`;
+      rfLevel.textContent = `${data.level.toFixed(1)} dBFS`;
+    }
+    if (data.spectrum || frame) {
+      frame = data.spectrum ? { ...data.spectrum, tuned: active?.frequency_hz } : null;
+      spectrum.draw(frame);
+    }
     const statusText = {
       idle: () => t('Ready to tune.'),
       starting: () => t('Opening receiver…'),
@@ -98,7 +132,8 @@ export function manualView(root) {
         : t('Tuned to {frequency} MHz ({mode})', { frequency: active.frequency_hz / 1e6, mode: active.mode }),
     };
     const message = data.error || statusText[data.state]();
-    if (status.textContent !== message) status.textContent = message;
+    if (status.textContent !== message) mount(status, h('span.dot'), message);
+    status.className = `chip state ${data.error ? 'bad' : data.state === 'listening' ? 'good live' : active ? 'accent' : ''}`;
     tune.disabled = busy;
     stop.disabled = busy || !active;
     updateListen();
@@ -113,7 +148,7 @@ export function manualView(root) {
     } catch (e) {
       if (!destroyed) status.textContent = e.message;
     } finally {
-      if (!destroyed) timer = setTimeout(refresh, 1500);
+      if (!destroyed) timer = setTimeout(refresh, active && active.mode !== 'DAB' ? 500 : 1500);
     }
   };
   const change = async (path, body) => {
@@ -134,6 +169,14 @@ export function manualView(root) {
     }
   };
   mode.addEventListener('change', updateMode);
+  canvas.addEventListener('click', (event) => {
+    if (!frame) return;
+    mode.value = mode.value === 'DAB' ? 'WFM' : mode.value;
+    updateMode();
+    const hz = frame.f0 + (frame.f1 - frame.f0) * event.offsetX / canvas.clientWidth;
+    frequency.value = (hz / 1e6).toFixed(6);
+    frequency.focus();
+  });
   stop.addEventListener('click', () => change('/api/manual/stop', {}));
   play.addEventListener('click', () => {
     if (!stationList.value) return;
@@ -147,7 +190,9 @@ export function manualView(root) {
   });
   mount(root, h('div.page.manual-tuning',
     h('div.page-head', h('h1', t('Manual tuning'))),
-    h('section.card.col',
+    h('div.grid.listen',
+    h('div.col',
+    h('section.card.hero', h('div.row', status), h('div', readout, detail), meter,
       h('form.col', { onsubmit: (event) => {
         event.preventDefault();
         change('/api/manual/tune', {
@@ -155,12 +200,15 @@ export function manualView(root) {
           frequency_hz: Math.round(Number(frequency.value) * 1e6), channel: channel.value,
         });
       } },
-      h('div.row.wrap', h('label.field', t('Receiver'), receiver), h('label.field', t('Modulation'), mode),
+      h('div.row.wrap', h('label.field', t('Modulation'), mode),
         frequencyField, channelField),
-      h('div.row.wrap', tune, stop, listen)),
-      status, stations)));
+      h('div.controls', tune, stop, analogAudio))),
+    spectrumCard),
+    h('div.col',
+      h('section.card.col', h('div.card-head', h('h2', t('SDR device'))), h('label.field', t('Receiver'), receiver)),
+      stations))));
   updateMode();
   const offAudio = on('audio', updateListen);
   refresh();
-  return { destroy() { destroyed = true; clearTimeout(timer); stopAudio(); offAudio(); } };
+  return { destroy() { destroyed = true; clearTimeout(timer); stopAudio(); offAudio(); spectrum.destroy(); } };
 }
