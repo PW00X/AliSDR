@@ -14,7 +14,7 @@ fi
 sudo_cmd=""
 if [ "$(id -u)" != 0 ]; then sudo_cmd=sudo; fi
 $sudo_cmd apt-get update -qq
-$sudo_cmd apt-get install -y build-essential cmake pkg-config patch python3 libfftw3-dev libfaad-dev zlib1g-dev
+$sudo_cmd apt-get install -y build-essential cmake git pkg-config python3 libfftw3-dev libfaad-dev zlib1g-dev
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -22,7 +22,7 @@ curl -fsSL "https://codeload.github.com/JvanKatwijk/dab-cmdline/tar.gz/$commit" 
 printf '%s  %s\n' "$archive_hash" "$tmp/source.tar.gz" | sha256sum -c -
 tar -xzf "$tmp/source.tar.gz" -C "$tmp"
 upstream="$tmp/dab-cmdline-$commit"
-patch -d "$upstream" -p1 < "$src/upstream-fixes.patch"
+git -C "$upstream" apply --unidiff-zero "$src/upstream-fixes.patch"
 cp "$src/bridge.cpp" "$upstream/library/falconsdr-bridge.cpp"
 cat >> "$upstream/library/CMakeLists.txt" <<'EOF'
 
