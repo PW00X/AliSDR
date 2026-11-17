@@ -284,6 +284,7 @@ install_server() {
     while :; do
       session="$(curl --noproxy '*' -fsS --max-time 2 http://127.0.0.1:8765/api/session 2>/dev/null || true)"
       if printf '%s\n' "$session" | grep -Eq '"navigation"[[:space:]]*:[[:space:]]*"scan-manual"' &&
+         printf '%s\n' "$session" | grep -Eq '"dab_backend"[[:space:]]*:[[:space:]]*"in-process"' &&
          printf '%s\n' "$session" | grep -Eq '"mode"[[:space:]]*:[[:space:]]*"server"'; then
         break
       fi
