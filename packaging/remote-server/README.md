@@ -11,12 +11,14 @@ On the receiver (Debian, Ubuntu, Raspberry Pi OS - 64-bit recommended),
 one line installs or updates it and starts the service:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rafafunt/FalconSDR/master/packaging/install.sh | bash -s -- --server
+curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --server --with-dab
 ```
 
-It installs the latest release (`FALCONSDR_REF=<tag or branch>` in front of
-`bash` picks another), keeps its checkout in `/opt/falconsdr-src` and runs
-`install.sh` from it. Or, from a checkout of this repository:
+It installs this fork's `master` branch and keeps its checkout in
+`/opt/falconsdr-src`. Set `FALCONSDR_REF=<tag or branch>` before `bash` to
+choose a different ref. The optional `--with-dab` flag installs `welle-cli`
+when the configured apt repositories provide it. Or, from a checkout of
+this repository:
 
 ```sh
 sudo packaging/remote-server/install.sh
