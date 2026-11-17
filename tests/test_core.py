@@ -2575,6 +2575,89 @@ class ControllerStartTest(unittest.TestCase):
         self.assertEqual(len(started), 1)
 
 
+class ManualTuningTest(unittest.TestCase):
+    def test_analog_retunes_in_place_and_restores_scan(self) -> None:
+        from falconsdr.controller import Controller
+
+        cfg = AppConfig()
+        cfg.device.driver = "simulated"
+        cfg.recording.enabled = False
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        ctl.start()
+        audio = ctl.subscribe_audio()
+        self.addCleanup(ctl.unsubscribe_audio, audio)
+        ctl.tune_manual({"receiver": 0, "mode": "AM", "frequency_hz": 121_500_000})
+        session = ctl.manual_session
+        self.assertFalse(ctl.running)
+        self.assertTrue(audio.get(timeout=5))
+        ctl.tune_manual({"receiver": 0, "mode": "NFM", "frequency_hz": 145_500_000})
+        self.assertIs(ctl.manual_session, session)
+        self.assertEqual(ctl.manual_status()["tuning"]["frequency_hz"], 145_500_000)
+        ctl.stop_manual()
+        self.assertIsNone(ctl.manual_status()["tuning"])
+        self.assertTrue(ctl.running)
+
+    def test_dab_discovers_audio_services_and_relays_mp3_through_auth(self) -> None:
+        from contextlib import ExitStack
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        from unittest.mock import patch
+
+        from falconsdr.controller import Controller
+        from falconsdr.manual_tuning import ManualSession, Tuning
+        from falconsdr.web.server import App, serve
+
+        class Decoder(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == "/mux.json":
+                    payload = json.dumps({"services": [
+                        {"sid": "0x1234", "label": {"label": "Radio One"},
+                         "components": [{"transportmode": "audio", "ascty": "DAB"}]},
+                        {"sid": "0xabcd", "label": {"label": "Radio Plus"},
+                         "components": [{"transportmode": "audio", "ascty": "DAB+"}]},
+                        {"sid": "0x4321", "components": [{"transportmode": "packetdata"}]},
+                    ]}).encode()
+                elif self.path == "/mp3/43981":
+                    payload = b"ID3sample"
+                else:
+                    self.send_error(404)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *args):
+                pass
+
+        cleanup = ExitStack()
+        self.addCleanup(cleanup.close)
+        decoder = cleanup.enter_context(ThreadingHTTPServer(("127.0.0.1", 0), Decoder))
+        threading.Thread(target=decoder.serve_forever, daemon=True).start()
+        cleanup.callback(decoder.shutdown)
+        cfg = AppConfig()
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        ctl = Controller(cfg)
+        session = ManualSession(Tuning(0, "DAB", channel="12A"), {}, False, None, None)
+        session.port = decoder.server_port
+        cleanup.enter_context(patch.object(ctl, "manual_session", session))
+        web = cleanup.enter_context(serve(App(cfg, ctl, "secret", "server"), "127.0.0.1", 0))
+        cleanup.callback(web.shutdown)
+        url = f"http://127.0.0.1:{web.server_port}/api/manual"
+        headers = {"Authorization": "Bearer secret"}
+        with urlopen(Request(url, headers=headers), timeout=5) as response:
+            stations = json.load(response)["stations"]
+        self.assertEqual([s["codec"] for s in stations], ["DAB", "DAB+"])
+        audio_url = url + "/dab-audio?sid=43981"
+        with self.assertRaises(HTTPError) as exc:
+            urlopen(audio_url, timeout=5)
+        self.assertEqual(exc.exception.code, 401)
+        with urlopen(Request(audio_url, headers=headers), timeout=5) as response:
+            self.assertEqual(response.headers.get_content_type(), "audio/mpeg")
+            self.assertEqual(response.read(), b"ID3sample")
+
+
 @unittest.skipUnless(hasattr(time, "tzset"), "needs time.tzset (not Windows)")
 class FilenameTimeZoneTest(unittest.TestCase):
     def test_a_filename_is_local_time_of_this_computer_not_of_poland(self) -> None:

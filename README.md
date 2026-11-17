@@ -417,6 +417,35 @@ Good to know:
 4. Name the frequencies you hear in the **Channels** page (or straight from a
    recording) - names show up everywhere, including search.
 
+### Manual tuning and DAB/DAB+
+
+Open **Manual tuning**, select a receiver, enter a frequency in MHz and choose
+AM, NFM, WFM, SSB, USB or LSB. Press **Tune**, then **Listen live**. Analog
+tuning plays continuously, even below the scanner's trigger level. WFM uses
+the app's mono live-audio stream.
+
+For digital broadcast radio, install `welle-cli` on the FalconSDR receiver
+computer and make it available on FalconSDR's `PATH`. Where packaged on
+Debian or Ubuntu, install it with `sudo apt install welle.io`.
+[welle-cli documentation](https://github.com/AlbrechtL/welle.io#welle-cli)
+
+In **Manual tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
+**Tune**. Wait for the ensemble's stations to appear, select one, and press
+**Play station**.
+
+The decoder needs a build that supports your receiver. A default RTL-SDR,
+Airspy, or IPv4/hostname `rtl_tcp` receiver uses the corresponding welle-cli
+input. Selecting a specific RTL-SDR by serial or a SoapySDR receiver needs
+welle-cli built with SoapySDR support. DAB tuning requires Bias-T off in
+FalconSDR. FalconSDR proxies decoder audio through its normal web interface.
+Standard welle-cli also opens its own unauthenticated HTTP listener on a
+temporary port. On a network receiver, restrict inbound access to that
+listener with the receiver computer's firewall.
+
+Manual tuning takes over the selected receiver. Other available receivers
+can keep scanning. **Stop tuning** releases the receiver and restores its
+previous scan when one was active.
+
 ## Tips for good recordings
 
 - **Trigger level** decides what counts as a transmission. Lower = weaker

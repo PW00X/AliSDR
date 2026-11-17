@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import http.client
 import queue
 import sys
 import threading
@@ -26,6 +27,7 @@ import numpy as np
 from . import __version__, antenna_range, autostart, digital_voice, i18n, military_presets, schedule, storage
 from .audio_transcode import ffmpeg_available
 from .config import DEFAULT_RECORDINGS_DIR, AppConfig, ScheduleEntry, VfoRangeConfig, _from_dict
+from .manual_tuning import DAB_CHANNELS, ManualSession, Tuning, dab_command
 from .models import BlacklistEntry, Channel, Modulation, snap_airband_hz
 from .playback.index import Library
 from .playback.transcription_availability import is_transcription_installed
@@ -140,7 +142,9 @@ class Controller:
         self._sched_suppressed: dict[str, tuple] = {}  # stopped by the user while scheduled: not restarted until the range ends
         self._bg_stop = threading.Event()
         self._shared: Optional[SharedFrequencies] = None
-        self._resume = False    # one receiver only: the scanner was running when an add-on took it
+        self._resume = False    # the scanner was running when its last receiver was taken
+        self.manual_session: ManualSession | None = None
+        self._manual_error = ""
         self.log(i18n.tr("Ready."))
 
     @staticmethod
@@ -161,6 +165,10 @@ class Controller:
 
     def shutdown(self) -> None:
         self._bg_stop.set()
+        try:
+            self.stop_manual()
+        except RuntimeError as exc:
+            self.log(str(exc))
         self.addons.stop_external()
         self.addons.stats.flush(force=True)
         engines = self._engines
@@ -207,6 +215,8 @@ class Controller:
         devices = self._devices()
         held = {k for k in self._held if k < len(devices)}
         if held and len(held) >= len(devices):
+            if self.manual_session is not None:
+                raise RuntimeError(i18n.tr("Stop manual tuning to start scanning on this receiver."))
             raise RuntimeError(i18n.tr("An add-on is using the receiver - stop it first."))
         with self._lock:
             existing = list(self._engines)
@@ -259,8 +269,109 @@ class Controller:
         s.finished.connect(lambda: self._on_finished(k, engine))
 
     def stop(self) -> None:
-        for engine in self._engines:
+        with self._start_lock:
+            self._resume = False
+            for engine in self._engines:
+                engine.request_stop()
+
+    def tune_manual(self, body: dict) -> None:
+        tuning = Tuning.from_request(body)
+        with self._start_lock:
+            devices = self._devices()
+            k = tuning.receiver
+            if not 0 <= k < len(devices):
+                raise ValueError(i18n.tr("Invalid receiver."))
+            device = asdict(self.config.device)
+            if devices[k] is not None:
+                device.update({"device_args": "", "bias_tee": False, **devices[k]})
+            device["sample_rate_hz"] = antenna_range.device_rates(self.config)[k]
+            command = dab_command(device, tuning.channel) if tuning.mode == "DAB" else None
+            old = self.manual_session
+            if old is not None and old.tuning == tuning and old.is_alive() and not old.stop_requested.is_set():
+                return
+            same_receiver = old is not None and old.tuning.receiver == k
+            if same_receiver and command is None and old.command is None and old.is_alive() and not old.stop_requested.is_set():
+                old.state = "starting"
+                old.tuning = tuning
+                return
+            if not same_receiver and k in self._held:
+                raise RuntimeError(i18n.tr("The selected receiver is already in use."))
+            self._stop_manual_locked(release=not same_receiver)
+            if not same_receiver:
+                self._pause_receiver(k)
+            self._manual_error = ""
+            session = ManualSession(tuning, device, self.config.debug_mode, self._publish_audio, self._manual_ended, command)
+            self.manual_session = session
+            try:
+                session.start()
+            except Exception:
+                self.manual_session = None
+                self._release_receiver(k)
+                raise
+
+    def stop_manual(self) -> None:
+        with self._start_lock:
+            self._stop_manual_locked()
+            self._manual_error = ""
+
+    def _stop_manual_locked(self, release=True) -> None:
+        session = self.manual_session
+        if session is None:
+            return
+        session.stop_requested.set()
+        session.join(timeout=8)
+        if session.is_alive():
+            raise RuntimeError(i18n.tr("The receiver is still stopping. Try again."))
+        self.manual_session = None
+        if release:
+            self._release_receiver(session.tuning.receiver)
+
+    def _manual_ended(self, session: ManualSession, error: str) -> None:
+        def release() -> None:
+            with self._start_lock:
+                if self.manual_session is session:
+                    self.manual_session = None
+                    self._manual_error = error
+                    self._release_receiver(session.tuning.receiver)
+        threading.Thread(target=release, daemon=True, name="manual-release").start()
+
+    def manual_status(self) -> dict:
+        session = self.manual_session
+        devices = self._devices()
+        result = {
+            "receivers": [{"id": k, "driver": (dev or {}).get("driver", self.config.device.driver)}
+                          for k, dev in enumerate(devices)],
+            "channels": DAB_CHANNELS,
+            "error": self._manual_error,
+            "tuning": asdict(session.tuning) if session else None,
+            "state": session.state if session else "idle",
+            "stations": [],
+        }
+        if session and session.tuning.mode == "DAB":
+            try:
+                result["stations"] = session.stations()
+            except (OSError, ValueError, http.client.HTTPException):
+                pass  # the web server is still starting up, or the session is ending
+            else:
+                result["state"] = "listening" if result["stations"] else "discovering"
+        return result
+
+    def _pause_receiver(self, dongle: int) -> None:
+        with self._lock:
+            engines = list(self._engines)
+        targets = engines[dongle:dongle + 1]
+        resume = any(e.is_alive() and not e._stop_evt.is_set() for e in targets)
+        for engine in targets:
             engine.request_stop()
+        for engine in targets:
+            self._join(engine, 8.0)
+        if any(e.is_alive() for e in targets):
+            raise RuntimeError(i18n.tr("Scanner is still stopping - try again"))
+        others = [e for e in engines if e not in targets and e.is_alive() and not e._stop_evt.is_set()]
+        self._resume = (resume and not others) or self._resume
+        self._held.add(dongle)
+        for e in others:
+            e.request_rebuild()
 
     # -- external add-ons (rtl_433, dumpvdl2): they hold one receiver instead of the scanner -----------
     def run_addon(self, addon_id: str, dongle: Optional[int] = None) -> None:
@@ -279,22 +390,8 @@ class Controller:
             if dongle in self._held:
                 other = next((a for a, d in self._addon_dongles.items() if d == dongle), "")
                 raise RuntimeError(i18n.tr("Receiver {n} is already used by {name} - stop it first.").format(n=dongle + 1, name=other))
-            with self._lock:
-                engines = list(self._engines)
-            targets = engines if len(devices) == 1 else engines[dongle:dongle + 1]
-            targets = [e for e in targets if e.is_alive() and not e._stop_evt.is_set()]
-            for engine in targets:
-                engine.request_stop()
-            for engine in targets:
-                self._join(engine, 8.0)
-            if any(e.is_alive() for e in targets):
-                raise RuntimeError(i18n.tr("Scanner is still stopping - try again"))
-            self._resume = (bool(targets) and len(devices) == 1) or self._resume
+            self._pause_receiver(dongle)
             self._addon_dongles[addon_id] = dongle
-            self._held.add(dongle)
-            for e in engines:
-                if e not in targets and e.is_alive():
-                    e.request_rebuild()       # they take over what this receiver scanned
             try:
                 self.addons.start_external(addon_id, asdict(self.config.device) if devices[dongle] is None else devices[dongle])
             except Exception:
@@ -325,20 +422,22 @@ class Controller:
         self._sched_started.pop(addon_id, None)
         if dongle is None:
             return
+        self._release_receiver(dongle)
+
+    def _release_receiver(self, dongle: int) -> None:
         self._held.discard(dongle)
-        devices = self._devices()
-        if len(devices) == 1:
-            resume, self._resume = self._resume, False
-            if resume:
-                self._start()
+        if self._bg_stop.is_set():
             return
         with self._lock:
-            running = bool(self._engines)
+            running = any(e.is_alive() and not e._stop_evt.is_set() for e in self._engines)
         if running:
             self._restart_engine(dongle)
             for e in list(self._engines):
                 if e.is_alive():
                     e.request_rebuild()       # they give the share back
+        elif self._resume:
+            self._resume = False
+            self._start()
 
     def _restart_engine(self, k: int) -> None:
         """Starts the engine of one receiver again while the others keep scanning."""
@@ -367,14 +466,14 @@ class Controller:
 
     def _scheduled_receiver(self, addon_id: str) -> Optional[int]:
         """The receiver the schedule wants this add-on on right now, or None."""
-        manual = {d for a, d in self._addon_dongles.items() if a not in self._sched_started}
+        manual = self._held - set(self._sched_started.values())
         for k, p in enumerate(self._plans(manual)):
             if p.addon == addon_id:
                 return k
         return None
 
     def _schedule_key(self, addon_id: str) -> tuple:
-        manual = {d for a, d in self._addon_dongles.items() if a not in self._sched_started}
+        manual = self._held - set(self._sched_started.values())
         return next((p.entries for p in self._plans(manual) if p.addon == addon_id), ())
 
     def _schedule_loop(self) -> None:
@@ -387,7 +486,7 @@ class Controller:
     def reconcile_schedule(self) -> None:
         """Brings the running add-ons in line with the schedule (called every few seconds)."""
         addons = self.addons
-        manual = {d for a, d in self._addon_dongles.items() if a not in self._sched_started}
+        manual = self._held - set(self._sched_started.values())
         sched = self.config.schedule
         # What the entries ask for, whether or not it can run - failures are forgotten once the entry is over.
         wanted = {e.addon for i, e in enumerate(sched.entries) if sched.enabled and e.addon and i in schedule.active_indices(self.config)}
@@ -535,6 +634,12 @@ class Controller:
             if k != owner and owner < len(self._lives) and self._lives[owner]["state"] in _ACTIVE:
                 return
             self._audible = k
+        session = self.manual_session
+        if session is not None and session.tuning.mode != "DAB":
+            return
+        self._publish_audio(mono)
+
+    def _publish_audio(self, mono: Any) -> None:
         pcm16 = (np.clip(np.asarray(mono, dtype=np.float32), -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
         with self._audio_lock:
             for q in self._audio_subscribers:
@@ -587,7 +692,8 @@ class Controller:
             return {
                 **self._merged_live_locked(),
                 "running": bool(self._engines),
-                "stopping": any(e._stop_evt.is_set() for e in self._engines),
+                "stopping": any(e._stop_evt.is_set() for k, e in enumerate(self._engines) if k not in self._held),
+                "manual_tuning": self.manual_session is not None,
                 "solo_band": self._solo_band,
                 "uncovered": self._uncovered(),
                 "schedule_active": schedule.active_indices(self.config),
@@ -644,6 +750,7 @@ class Controller:
             "devices": self.devices(),
             "languages": [{"code": c, "name": i18n.LANGUAGE_NAMES.get(c, c)} for c in i18n.available_languages()],
             "capabilities": {
+                "manual_tuning": True,
                 "ffmpeg": ffmpeg_available(),
                 "addon_messages": bool(self.addons.hub.since(0, limit=1)),     # something was decoded: Messages is worth showing
                 "transcription_installed": is_transcription_installed(),
@@ -762,6 +869,7 @@ class Controller:
         and connected computers are kept - a reset must never lock anyone out
         or orphan a library."""
         self.stop()
+        self.stop_manual()
         fresh = AppConfig()
         fresh.recording.output_dir = self.config.recording.output_dir
         fresh.access_token = self.config.access_token

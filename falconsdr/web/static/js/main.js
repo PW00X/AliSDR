@@ -3,6 +3,7 @@ import { liveAudio } from './live-audio.js';
 import { S, addonsInUse, emit, loadSettings, maybeShowLaunchNotice, on, startPolling } from './state.js';
 import { channelsView } from './views/channels.js';
 import { listenView } from './views/listen.js';
+import { manualView } from './views/manual.js';
 import { messagesView } from './views/messages.js';
 import { recordingsView } from './views/recordings.js';
 import { scheduleView } from './views/schedule.js';
@@ -13,6 +14,7 @@ const app = document.getElementById('app');
 
 const ROUTES = {
   listen: { label: () => t('Listen'), icon: 'listen', view: listenView },
+  manual: { label: () => t('Manual tuning'), icon: 'headphones', view: manualView, show: () => S.settings.capabilities?.manual_tuning },
   recordings: { label: () => t('Recordings'), icon: 'library', view: recordingsView },
   // What the add-on decoders found. Shown once add-ons are in use (Add-ons is the always-visible showcase); with
   // nothing received yet it explains itself and points to Add-ons.
@@ -133,7 +135,9 @@ function shell() {
     const signal = live && (live.state === 'SIGNAL_DETECTED' || live.state === 'LINGER');
     mount(status,
       live && live.recording ? h('span.chip.bad.live', { title: t('Recording') }, h('span.dot'), 'REC') : null,
-      live && live.addon
+      live && live.manual_tuning
+        ? h('span.chip.good.live', h('span.dot'), t('Manual tuning'))
+        : live && live.addon
         ? h('span.chip.good.live', h('span.dot'), t('Add-on running'))
         : h('span.chip', { class: running ? (signal ? 'good live' : 'accent') : '' }, h('span.dot'),
           running ? (live.stopping ? t('Stopping…') : signal ? t('Signal') : t('Scanning')) : t('Stopped')),

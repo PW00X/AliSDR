@@ -284,7 +284,7 @@ export function listenView(root) {
     iqBtn.classList.toggle('on', !!live.raw_iq);
     spectrum.draw(live.spectrum);
     gainSlider && gainSlider.input && (gainSlider.input.min = live.gain_range[0], gainSlider.input.max = live.gain_range[1]);
-    lockDevice(live.running);
+    lockDevice(live.running || live.manual_tuning);
     renderFeed();
   }
 
@@ -471,7 +471,7 @@ export function listenView(root) {
       // Picked by USB order (no serial of its own) - that order can change when dongles are replugged.
       devices.some((d) => /(^|,)index=/.test(d.args)) ? h('span.faint.small', t('Some dongles share a serial number (often 00000001) and are told apart only by USB order, which can change after replugging. To keep your choice for good, give each one its own serial with rtl_eeprom -s.')) : null,
       isWindows() ? h('button.ghost.small', { onclick: () => driverHelp() }, t('Dongle not detected? Driver (Zadig) instructions')) : null);
-    lockDevice(S.live && S.live.running);
+    lockDevice(S.live && (S.live.running || S.live.manual_tuning));
   }
   // Antenna range: optional and per dongle; 0 in the config = no limit on that side. Applies live
   // (the scan plan is rebuilt), so unlike the device itself it stays editable while scanning.

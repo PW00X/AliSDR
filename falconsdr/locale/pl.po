@@ -3890,3 +3890,74 @@ msgstr "Ten odbiornik jest już używany przez dodatkowy dongiel."
 
 msgid "This receiver is already used above - it can only be opened once."
 msgstr "Ten odbiornik jest już użyty wyżej - można go otworzyć tylko raz."
+msgid "Manual tuning"
+msgstr "Strojenie ręczne"
+
+msgid "Tune"
+msgstr "Dostrój"
+
+msgid "Stop tuning"
+msgstr "Zakończ strojenie"
+
+msgid "DAB channel"
+msgstr "Kanał DAB"
+
+msgid "DAB channel {channel}"
+msgstr "Kanał DAB {channel}"
+
+msgid "DAB station"
+msgstr "Stacja DAB"
+
+msgid "DAB audio"
+msgstr "Dźwięk DAB"
+
+msgid "Play station"
+msgstr "Odtwórz stację"
+
+msgid "Ready to tune."
+msgstr "Gotowość do strojenia."
+
+msgid "Opening receiver…"
+msgstr "Otwieranie odbiornika…"
+
+msgid "Waiting for DAB stations on {channel}…"
+msgstr "Wyszukiwanie stacji DAB na kanale {channel}…"
+
+msgid "Tuned to {frequency} MHz ({mode})"
+msgstr "Dostrojono do {frequency} MHz ({mode})"
+
+msgid "This DAB station is unavailable. Try playing it again."
+msgstr "Ta stacja DAB jest niedostępna. Spróbuj odtworzyć ją ponownie."
+
+msgid "Invalid receiver."
+msgstr "Nieprawidłowy odbiornik."
+
+msgid "Choose a DAB channel."
+msgstr "Wybierz kanał DAB."
+
+msgid "Enter a frequency between 0 and 6000 MHz and select a modulation."
+msgstr "Wpisz częstotliwość większą od 0 i nie większą niż 6000 MHz oraz wybierz modulację."
+
+msgid "Stop manual tuning to start scanning on this receiver."
+msgstr "Zakończ strojenie ręczne, aby rozpocząć skanowanie na tym odbiorniku."
+
+msgid "The selected receiver is already in use."
+msgstr "Wybrany odbiornik jest już używany."
+
+msgid "The receiver is still stopping. Try again."
+msgstr "Trwa zatrzymywanie odbiornika. Spróbuj ponownie."
+
+msgid "Install welle-cli on the receiver computer to listen to DAB/DAB+."
+msgstr "Zainstaluj welle-cli na komputerze odbiornika, aby słuchać DAB/DAB+."
+
+msgid "DAB tuning requires a receiver with Bias-T off in FalconSDR."
+msgstr "Strojenie DAB wymaga wyłączenia Bias-T dla odbiornika w FalconSDR."
+
+msgid "welle-cli requires an IPv4 address or hostname for rtl_tcp."
+msgstr "welle-cli wymaga adresu IPv4 lub nazwy hosta dla rtl_tcp."
+
+msgid "welle-cli cannot select this receiver. Try its SoapySDR access method or an rtl_tcp receiver."
+msgstr "welle-cli nie może wybrać tego odbiornika. Spróbuj użyć metody SoapySDR lub odbiornika rtl_tcp."
+
+msgid "welle-cli stopped (exit {code}). Check the receiver and decoder installation."
+msgstr "welle-cli zakończył pracę (kod {code}). Sprawdź odbiornik i instalację dekodera."
