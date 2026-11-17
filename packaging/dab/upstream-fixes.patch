@@ -1,0 +1,25 @@
+diff --git a/library/includes/backend/audio/faad-decoder.h b/library/includes/backend/audio/faad-decoder.h
+index 3e85bb5..6de1aa3 100644
+--- a/library/includes/backend/audio/faad-decoder.h
++++ b/library/includes/backend/audio/faad-decoder.h
+@@ -139 +138,0 @@ NeAACDecFrameInfo	hInfo;
+-	      NeAACDecClose (aacHandle);
+@@ -173 +172 @@ NeAACDecFrameInfo	hInfo;
+-	   int16_t *buffer = (int16_t *)alloca (2 * samples);
++	   int16_t *buffer = (int16_t *)alloca (2 * samples * sizeof(int16_t));
+diff --git a/library/src/dab-processor.cpp b/library/src/dab-processor.cpp
+index 62c8118..265cd0e 100644
+--- a/library/src/dab-processor.cpp
++++ b/library/src/dab-processor.cpp
+@@ -81,0 +82,2 @@ void	dabProcessor::start		() {
++	running.store(true);
++	myReader.setRunning(true);
+@@ -107 +108,0 @@ int		startIndex		= -1;
+-	running. store (true);
+@@ -109 +109,0 @@ int		startIndex		= -1;
+-	myReader. setRunning (true);
+@@ -303 +303 @@ void	dabProcessor::stop		() {
+-	if (running. load ()) {
++	if (threadHandle.joinable()) {
+@@ -306 +305,0 @@ void	dabProcessor::stop		() {
+-	   sleep (1);

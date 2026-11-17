@@ -204,9 +204,8 @@ command from a directory where you want the `FalconSDR` checkout:
 curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --with-dab
 ```
 
-The optional `--with-dab` flag installs `welle-cli` on apt-based distributions
-that package it. Elsewhere, install `welle-cli` separately and put it on the
-receiver's `PATH`. Run the same command again from the same directory to update
+The optional `--with-dab` flag builds the DAB decoder on apt-based distributions.
+Run the same command again from the same directory to update
 the fork. Restart FalconSDR after updating.
 
 The source install supports SoapySDR hardware (LimeSDR, SDRplay, USRP, and
@@ -433,27 +432,22 @@ or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
 tuning plays continuously, even below the scanner's trigger level. WFM uses
 the app's mono live-audio stream.
 
-For digital broadcast radio, install `welle-cli` on the FalconSDR receiver
-computer and make it available on FalconSDR's `PATH`. Where packaged on
-Debian or Ubuntu, install it with `sudo apt install welle.io`.
-[welle-cli documentation](https://github.com/AlbrechtL/welle.io#welle-cli)
+For digital broadcast radio on the Linux receiver, run the headless installer
+with `--server --with-dab`. FalconSDR's Python receiver feeds IQ from the
+selected SDR to the [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline)
+shared library and sends decoded audio through FalconSDR's live audio stream.
 
 In **Manual tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
 **Tune**. Wait for the ensemble's stations to appear, select one, and press
 **Play station**.
 
-The decoder needs a build that supports your receiver. A default RTL-SDR,
-Airspy, or IPv4/hostname `rtl_tcp` receiver uses the corresponding welle-cli
-input. Selecting a specific RTL-SDR by serial or a SoapySDR receiver needs
-welle-cli built with SoapySDR support. DAB tuning requires Bias-T off in
-FalconSDR. FalconSDR proxies decoder audio through its normal web interface.
-Standard welle-cli also opens its own unauthenticated HTTP listener on a
-temporary port. On a network receiver, restrict inbound access to that
-listener with the receiver computer's firewall.
+The SDR must capture the Band III ensemble with about 2 MHz of bandwidth.
+If reception fails, the receiver reports whether it synchronized or found
+audio stations. Browser audio is mono, like the analog live stream.
 
-Manual tuning takes over the selected receiver. Other available receivers
-can keep scanning. **Stop tuning** releases the receiver and restores its
-previous scan when one was active.
+**Tune** pauses scanning across all receivers. **Start** on the Scan tab
+ends manual tuning before scanning. **Stop tuning** restores the previous
+scan when one was active.
 
 ## Tips for good recordings
 

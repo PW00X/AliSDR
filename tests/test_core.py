@@ -2606,63 +2606,110 @@ class ManualTuningTest(unittest.TestCase):
         self.assertIsNone(ctl.manual_status()["tuning"])
         self.assertTrue(ctl.running)
 
-    def test_dab_discovers_audio_services_and_relays_mp3_through_auth(self) -> None:
+    def test_scan_and_manual_are_exclusive_across_receivers(self) -> None:
+        from falconsdr.controller import Controller
+
+        cfg = AppConfig()
+        cfg.device.driver = "simulated"
+        cfg.device.extra_devices = [{"driver": "simulated"}]
+        cfg.recording.enabled = False
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        ctl.start()
+        self.assertEqual(len(ctl._engines), 2)
+        ctl.tune_manual({"receiver": 1, "mode": "WFM", "frequency_hz": 99_500_000})
+        session = ctl.manual_session
+        self.assertFalse(ctl.running)
+        ctl.start()
+        self.assertFalse(session.is_alive())
+        self.assertIsNone(ctl.manual_session)
+        self.assertEqual(len(ctl._engines), 2)
+
+    def test_dab_station_selection_and_native_pcm_through_auth(self) -> None:
         from contextlib import ExitStack
-        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
         from unittest.mock import patch
 
+        import numpy as np
+
+        from falconsdr import manual_tuning
         from falconsdr.controller import Controller
-        from falconsdr.manual_tuning import ManualSession, Tuning
+        from falconsdr.sdr_backend import SimulatedBackend
         from falconsdr.web.server import App, serve
 
-        class Decoder(BaseHTTPRequestHandler):
-            def do_GET(self):
-                if self.path == "/mux.json":
-                    payload = json.dumps({"services": [
-                        {"sid": "0x1234", "label": {"label": "Radio One"},
-                         "components": [{"transportmode": "audio", "ascty": "DAB"}]},
-                        {"sid": "0xabcd", "label": {"label": "Radio Plus"},
-                         "components": [{"transportmode": "audio", "ascty": "DAB+"}]},
-                        {"sid": "0x4321", "components": [{"transportmode": "packetdata"}]},
-                    ]}).encode()
-                elif self.path == "/mp3/43981":
-                    payload = b"ID3sample"
-                else:
-                    self.send_error(404)
-                    return
-                self.send_response(200)
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
+        class Library:
+            def falcon_dab_open(self, station, audio, reception):
+                self.audio = audio
+                self.sid = 0
+                reception(True, 20, 0)
+                station(0x1234, b"Radio One", 0)
+                station(0xabcd, b"Radio Plus", 63)
+                return 1
 
-            def log_message(self, *args):
+            def falcon_dab_select(self, _handle, sid):
+                self.sid = sid
+
+            def falcon_dab_push(self, _handle, _pointer, count):
+                if self.sid:
+                    from ctypes import c_int16
+                    self.audio((c_int16 * 960)(*[10000] * 960), 960, 48000)
+                return count
+
+            def falcon_dab_close(self, _handle):
                 pass
 
         cleanup = ExitStack()
         self.addCleanup(cleanup.close)
-        decoder = cleanup.enter_context(ThreadingHTTPServer(("127.0.0.1", 0), Decoder))
-        threading.Thread(target=decoder.serve_forever, daemon=True).start()
-        cleanup.callback(decoder.shutdown)
+        cleanup.enter_context(patch("falconsdr.controller.load_decoder", return_value=Library()))
+        cleanup.enter_context(patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2_048_000)))
         cfg = AppConfig()
         cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
         ctl = Controller(cfg)
-        session = ManualSession(Tuning(0, "DAB", channel="12A"), {}, False, None, None)
-        session.port = decoder.server_port
-        cleanup.enter_context(patch.object(ctl, "manual_session", session))
+        cleanup.callback(ctl.shutdown)
         web = cleanup.enter_context(serve(App(cfg, ctl, "secret", "server"), "127.0.0.1", 0))
         cleanup.callback(web.shutdown)
-        url = f"http://127.0.0.1:{web.server_port}/api/manual"
-        headers = {"Authorization": "Bearer secret"}
-        with urlopen(Request(url, headers=headers), timeout=5) as response:
-            stations = json.load(response)["stations"]
-        self.assertEqual([s["codec"] for s in stations], ["DAB", "DAB+"])
-        audio_url = url + "/dab-audio?sid=43981"
+        url = f"http://127.0.0.1:{web.server_port}/api"
+        headers = {"Authorization": "Bearer secret", "X-FalconSDR": "1", "Content-Type": "application/json"}
+        ctl.tune_manual({"mode": "DAB", "channel": "12A"})
+        deadline = time.monotonic() + 5
+        while not ctl.manual_status()["stations"] and time.monotonic() < deadline:
+            time.sleep(0.01)
+        with urlopen(Request(url + "/manual", headers=headers), timeout=5) as response:
+            self.assertEqual([station["codec"] for station in json.load(response)["stations"]], ["DAB", "DAB+"])
+        station_url = url + "/manual/dab-station"
+        payload = b'{"sid":43981}'
         with self.assertRaises(HTTPError) as exc:
-            urlopen(audio_url, timeout=5)
+            urlopen(Request(station_url, payload, {"X-FalconSDR": "1"}), timeout=5)
         self.assertEqual(exc.exception.code, 401)
-        with urlopen(Request(audio_url, headers=headers), timeout=5) as response:
-            self.assertEqual(response.headers.get_content_type(), "audio/mpeg")
-            self.assertEqual(response.read(), b"ID3sample")
+        with urlopen(Request(station_url, payload, headers), timeout=5) as response:
+            self.assertEqual(json.load(response)["station"], 0xabcd)
+        with urlopen(Request(url + "/audio", headers=headers), timeout=5) as response:
+            self.assertTrue(np.any(np.frombuffer(response.read(120), dtype="<i2")))
+
+    def test_empty_dab_channel_times_out_and_releases_receiver(self) -> None:
+        from unittest.mock import Mock, patch
+
+        from falconsdr import manual_tuning
+        from falconsdr.controller import Controller
+        from falconsdr.sdr_backend import SimulatedBackend
+
+        cfg = AppConfig()
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        decoder = Mock()
+        decoder.drain_audio.return_value = ()
+        with patch("falconsdr.controller.load_decoder"), patch.object(manual_tuning, "Decoder", return_value=decoder), \
+                patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2_048_000)), \
+                patch.object(manual_tuning, "DAB_DISCOVERY_TIMEOUT", 0.1):
+            ctl.tune_manual({"mode": "DAB", "channel": "12A"})
+            deadline = time.monotonic() + 5
+            while ctl.manual_session is not None and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertIsNone(ctl.manual_session)
+        self.assertNotIn(0, ctl._held)
+        self.assertIn("No DAB signal could be synchronized on channel 12A", ctl.manual_status()["error"])
+        decoder.close.assert_called_once()
 
 
 @unittest.skipUnless(hasattr(time, "tzset"), "needs time.tzset (not Windows)")

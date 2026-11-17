@@ -3923,9 +3923,6 @@ msgstr "Kanał DAB {channel}"
 msgid "DAB station"
 msgstr "Stacja DAB"
 
-msgid "DAB audio"
-msgstr "Dźwięk DAB"
-
 msgid "Play station"
 msgstr "Odtwórz stację"
 
@@ -3941,9 +3938,6 @@ msgstr "Wyszukiwanie stacji DAB na kanale {channel}…"
 msgid "Tuned to {frequency} MHz ({mode})"
 msgstr "Dostrojono do {frequency} MHz ({mode})"
 
-msgid "This DAB station is unavailable. Try playing it again."
-msgstr "Ta stacja DAB jest niedostępna. Spróbuj odtworzyć ją ponownie."
-
 msgid "Invalid receiver."
 msgstr "Nieprawidłowy odbiornik."
 
@@ -3953,26 +3947,35 @@ msgstr "Wybierz kanał DAB."
 msgid "Enter a frequency between 0 and 6000 MHz and select a modulation."
 msgstr "Wpisz częstotliwość większą od 0 i nie większą niż 6000 MHz oraz wybierz modulację."
 
-msgid "Stop manual tuning to start scanning on this receiver."
-msgstr "Zakończ strojenie ręczne, aby rozpocząć skanowanie na tym odbiorniku."
-
 msgid "The selected receiver is already in use."
 msgstr "Wybrany odbiornik jest już używany."
 
 msgid "The receiver is still stopping. Try again."
 msgstr "Trwa zatrzymywanie odbiornika. Spróbuj ponownie."
 
-msgid "Install welle-cli on the receiver computer to listen to DAB/DAB+."
-msgstr "Zainstaluj welle-cli na komputerze odbiornika, aby słuchać DAB/DAB+."
+msgid "DAB decoder unavailable. Run the receiver installer with --server --with-dab."
+msgstr "Dekoder DAB jest niedostępny. Uruchom instalator odbiornika z opcjami --server --with-dab."
 
-msgid "DAB tuning requires a receiver with Bias-T off in FalconSDR."
-msgstr "Strojenie DAB wymaga wyłączenia Bias-T dla odbiornika w FalconSDR."
+msgid "The DAB decoder could not start."
+msgstr "Nie udało się uruchomić dekodera DAB."
 
-msgid "welle-cli requires an IPv4 address or hostname for rtl_tcp."
-msgstr "welle-cli wymaga adresu IPv4 lub nazwy hosta dla rtl_tcp."
+msgid "The DAB decoder could not keep up with the receiver."
+msgstr "Dekoder DAB nie nadąża z przetwarzaniem danych odbiornika."
 
-msgid "welle-cli cannot select this receiver. Try its SoapySDR access method or an rtl_tcp receiver."
-msgstr "welle-cli nie może wybrać tego odbiornika. Spróbuj użyć metody SoapySDR lub odbiornika rtl_tcp."
+msgid "DAB station is unavailable."
+msgstr "Stacja DAB jest niedostępna."
 
-msgid "welle-cli stopped (exit {code}). Check the receiver and decoder installation."
-msgstr "welle-cli zakończył pracę (kod {code}). Sprawdź odbiornik i instalację dekodera."
+msgid "Tune a DAB channel first."
+msgstr "Najpierw dostrój odbiornik do kanału DAB."
+
+msgid "The receiver capture bandwidth is too narrow for DAB/DAB+."
+msgstr "Pasmo odbiornika jest zbyt wąskie dla DAB/DAB+."
+
+msgid "DAB channel {channel} synchronized, but no audio stations were decoded."
+msgstr "Zsynchronizowano kanał DAB {channel}, ale nie zdekodowano żadnej stacji audio."
+
+msgid "No DAB signal could be synchronized on channel {channel}."
+msgstr "Nie udało się zsynchronizować sygnału DAB na kanale {channel}."
+
+msgid "The DAB station is selected, but no audio is being decoded."
+msgstr "Wybrano stację DAB, ale dekoder nie odbiera dźwięku."

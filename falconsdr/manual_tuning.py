@@ -1,12 +1,6 @@
-"""Continuous analog listening and a welle-cli DAB/DAB+ session."""
+"""Continuous analog listening and native DAB/DAB+ listening."""
 from __future__ import annotations
 
-import http.client
-import json
-import re
-import shutil
-import socket
-import subprocess
 import threading
 import time
 from dataclasses import dataclass
@@ -14,13 +8,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from .agc import SoftwareAgc
-from .dsp import Demodulator, WFM_DISCRIMINATOR_RATE, level_dbfs
+from .dab import CHANNELS, SAMPLE_RATE, Decoder
+from .dsp import Demodulator, StreamResampler, WFM_DISCRIMINATOR_RATE, level_dbfs
 from .i18n import tr
 from .models import Modulation, resolve_ssb_sideband
 from .scanner_engine import AUDIO_RATE, SpectrumWorker
-from .sdr_backend import AcquisitionThread, SoapyBackend, create_backend, device_family, parse_rtl_tcp_args
+from .sdr_backend import AcquisitionThread, create_backend, open_real_backend
 
-DAB_CHANNELS = tuple(f"{n}{suffix}" for n in range(5, 14) for suffix in ("ABCDEF" if n == 13 else "ABCD"))
+DAB_CHANNELS = tuple(CHANNELS)
+DAB_DISCOVERY_TIMEOUT = 20
 ANALOG_MODES = ("AM", "NFM", "WFM", "SSB", "USB", "LSB")
 
 
@@ -50,60 +46,20 @@ class Tuning:
         return cls(receiver, mode, frequency_hz=frequency)
 
 
-def dab_command(device: dict, channel: str) -> list[str]:
-    exe = shutil.which("welle-cli")
-    if exe is None:
-        raise RuntimeError(tr("Install welle-cli on the receiver computer to listen to DAB/DAB+."))
-    driver = device["driver"]
-    args = device.get("device_args", "")
-    gain = device["gain_db"] if device["gain_mode"] == "manual" else -1
-    command = [exe, "-c", channel, "-g", str(gain), "-T"]
-    if device.get("bias_tee"):
-        raise ValueError(tr("DAB tuning requires a receiver with Bias-T off in FalconSDR."))
-    if driver == "rtl_tcp":
-        host, port = parse_rtl_tcp_args(args)
-        if ":" in host:
-            raise ValueError(tr("welle-cli requires an IPv4 address or hostname for rtl_tcp."))
-        return command + ["-F", f"rtl_tcp,{host}:{port}"]
-    if (driver in ("", "auto") and not args) or (device_family(driver) == "rtl" and args in ("", "index=0")):
-        return command + ["-F", "rtl_sdr"]
-    if device_family(driver) == "airspy" and not args:
-        return command + ["-F", "airspy"]
-    if (driver in ("", "auto") or device_family(driver) == "rtl") and args.startswith("serial="):
-        return command + ["-F", "soapysdr", "-s", f"driver=rtlsdr,{args}"]
-    if driver not in ("", "auto", "simulated") and not driver.endswith("_native"):
-        return command + ["-F", "soapysdr", "-s", ",".join(filter(None, (f"driver={driver}", args)))]
-    raise ValueError(tr("welle-cli cannot select this receiver. Try its SoapySDR access method or an rtl_tcp receiver."))
-
-
-def dab_services(data: dict) -> list[dict]:
-    stations = []
-    for service in data.get("services", []):
-        sid = service.get("sid", "")
-        if not re.fullmatch(r"0x[0-9a-fA-F]{1,8}", sid):
-            continue
-        codecs = [c.get("ascty") for c in service.get("components", []) if c.get("transportmode") == "audio"]
-        codec = next((c for c in codecs if c in ("DAB", "DAB+")), None)
-        # Older versions advertise playable stations with url_mp3.
-        if not codec and not service.get("url_mp3"):
-            continue
-        label = service.get("label") or {}
-        name = (label.get("fig2label") or label.get("label") or "").strip()
-        stations.append({"id": int(sid, 16), "name": name or sid, "codec": codec or ""})
-    return sorted(stations, key=lambda station: (station["name"].casefold(), station["id"]))
-
-
 class ManualSession(threading.Thread):
-    def __init__(self, tuning, device, debug, on_audio, on_end, command=None):
+    def __init__(self, tuning, device, debug, on_audio, on_end, dab_library=None):
         super().__init__(daemon=True, name="manual-tuning")
         self.tuning = tuning
         self.device = device
         self.debug = debug
         self.on_audio = on_audio
         self.on_end = on_end
-        self.command = command
+        self.dab_library = dab_library
         self.stop_requested = threading.Event()
-        self.port = None
+        self.stations = {}
+        self.station = 0
+        self.dab_error = ""
+        self.synced = False
         self.state = "starting"
         self.spectrum = None
         self.level = None
@@ -114,7 +70,7 @@ class ManualSession(threading.Thread):
     def run(self):
         error = ""
         try:
-            if self.command:
+            if self.tuning.mode == "DAB":
                 self._dab()
             else:
                 self._analog()
@@ -175,43 +131,77 @@ class ManualSession(threading.Thread):
             spectrum.stop()
             (acquisition if acquisition is not None else raw).close()
 
+    def select_station(self, sid):
+        if sid not in self.stations or self.stop_requested.is_set():
+            raise ValueError(tr("DAB station is unavailable."))
+        self.station = sid
+
+    def _dab_station(self, sid, name, codec):
+        label = name.decode("utf-8", errors="replace").strip()
+        self.stations[sid] = {"id": sid, "name": label or f"{sid:04X}", "codec": "DAB+" if codec == 63 else "DAB"}
+
+    def _dab_reception(self, synced, _snr, _offset):
+        self.synced = synced
+
     def _dab(self):
-        SoapyBackend._wait_for_reopen_cooldown()
-        if self.stop_requested.is_set():
-            return
-        with socket.socket() as sock:
-            sock.bind(("0.0.0.0", 0))
-            self.port = sock.getsockname()[1]
-        proc = subprocess.Popen(
-            [*self.command, "-w", str(self.port)], stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        dev = self.device
+        gain = dev["gain_db"]
+        agc = SoftwareAgc(gain) if dev["gain_mode"] == "sw_auto" else None
+        raw = open_real_backend(
+            dev["driver"], dev.get("device_args", ""), SAMPLE_RATE,
+            "manual" if agc else dev["gain_mode"], gain,
+            bias_tee=bool(dev.get("bias_tee")), async_read=dev["async_read"],
         )
+        acquisition = decoder = None
         try:
-            while not self.stop_requested.wait(0.25):
-                if proc.poll() is not None:
-                    raise RuntimeError(tr("welle-cli stopped (exit {code}). Check the receiver and decoder installation.").format(code=proc.returncode))
-        finally:
-            if proc.poll() is None:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait()
+            rate = float(getattr(raw, "sample_rate", 0) or SAMPLE_RATE)
+            if rate < 1_536_000:
+                raise RuntimeError(tr("The receiver capture bandwidth is too narrow for DAB/DAB+."))
+            chunk = max(4096, round(rate * .03 / 4096) * 4096)
+            resample = StreamResampler(rate, SAMPLE_RATE) if rate != SAMPLE_RATE else None
+            acquisition = AcquisitionThread(raw, chunk, max_queued=12, debug=self.debug)
+            acquisition.set_frequency(CHANNELS[self.tuning.channel])
+            acquisition.read(chunk)
+            decoder = Decoder(self.dab_library, self._dab_station, self._dab_reception)
+            self.state = "discovering"
+            started = time.monotonic()
+            previous_sid = previous_rate = 0
+            last_audio = started
+            audio_resampler = None
+            while not self.stop_requested.is_set():
+                iq = acquisition.read(chunk)
+                now = time.monotonic()
+                if agc:
+                    new_gain = agc.step(float(np.max(np.abs(iq))), acquisition.gain_range_db)
+                    if new_gain is not None:
+                        acquisition.set_gain("manual", new_gain)
+                decoder.push(resample.process(iq) if resample else iq)
+                if self.stations:
+                    self.state = "listening"
+                elif now - started >= DAB_DISCOVERY_TIMEOUT:
+                    message = ("DAB channel {channel} synchronized, but no audio stations were decoded."
+                               if self.synced else "No DAB signal could be synchronized on channel {channel}.")
+                    raise RuntimeError(tr(message).format(channel=self.tuning.channel))
 
-    def connection(self, timeout=3):
-        if self.port is None or self.stop_requested.is_set():
-            raise ConnectionError("DAB decoder is unavailable")
-        return http.client.HTTPConnection("127.0.0.1", self.port, timeout=timeout)
-
-    def stations(self):
-        conn = self.connection()
-        try:
-            conn.request("GET", "/mux.json")
-            with conn.getresponse() as response:
-                if response.status != 200:
-                    raise ConnectionError("DAB decoder returned an error")
-                return dab_services(json.loads(response.read(2 * 1024 * 1024)))
+                sid = self.station
+                if sid != previous_sid:
+                    decoder.select(sid)
+                    previous_sid, previous_rate = sid, 0
+                    last_audio = now
+                    self.dab_error = ""
+                for audio_rate, pcm in decoder.drain_audio():
+                    if sid != self.station or self.stop_requested.is_set():
+                        break
+                    if audio_rate != previous_rate:
+                        audio_resampler = StreamResampler(audio_rate, AUDIO_RATE)
+                        previous_rate = audio_rate
+                    mono = pcm.reshape(-1, 2).mean(axis=1, dtype=np.float32) / 32768.0
+                    self.on_audio(audio_resampler.process(mono).real)
+                    last_audio = now
+                    self.dab_error = ""
+                if sid and now - last_audio >= 12:
+                    self.dab_error = tr("The DAB station is selected, but no audio is being decoded.")
         finally:
-            conn.close()
+            if decoder is not None:
+                decoder.close()
+            (acquisition if acquisition is not None else raw).close()

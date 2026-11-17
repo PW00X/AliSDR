@@ -16,8 +16,8 @@ curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/in
 
 It installs this fork's `master` branch and keeps its checkout in
 `/opt/falconsdr-src`. Set `FALCONSDR_REF=<tag or branch>` before `bash` to
-choose a different ref. The optional `--with-dab` flag installs `welle-cli`
-when the configured apt repositories provide it. Or, from a checkout of
+choose a different ref. The optional `--with-dab` flag builds FalconSDR's
+in-process DAB/DAB+ decoder on the receiver. Or, from a checkout of
 this repository:
 
 ```sh

@@ -25,7 +25,7 @@
 #     packaging/remote-server/install.sh, systemd service started (Debian,
 #     Ubuntu, Raspberry Pi OS). Use FALCONSDR_REF=<branch|tag> to pick a
 #     version; re-run to update.
-#   - `--with-dab` -> install welle-cli via apt where available (optional).
+#   - `--with-dab` -> build the native DAB decoder on Debian-based systems.
 #
 # After installing, unplug and replug the RTL-SDR dongle once (udev rule),
 # then run `falconsdr` - the UI opens at http://127.0.0.1:8765.
@@ -107,22 +107,6 @@ have_apt() { command -v apt-get >/dev/null 2>&1; }
 have_dnf() { command -v dnf >/dev/null 2>&1; }
 have_zypper() { command -v zypper >/dev/null 2>&1; }
 have_pacman() { command -v pacman >/dev/null 2>&1; }
-
-install_dab() {
-  [ "$WITH_DAB" = "1" ] || return 0
-  command -v welle-cli >/dev/null 2>&1 && return 0
-  if have_apt; then
-    dab_sudo=""
-    if [ "$(id -u)" != "0" ]; then dab_sudo=sudo; fi
-    if [ -z "$dab_sudo" ] || command -v sudo >/dev/null 2>&1; then
-      say "Installing welle-cli for DAB/DAB+ (welle.io)..."
-      if $dab_sudo apt-get update -qq && $dab_sudo apt-get install -y welle.io; then
-        command -v welle-cli >/dev/null 2>&1 && return 0
-      fi
-    fi
-  fi
-  say "welle-cli is unavailable. Install it from your distribution or https://github.com/AlbrechtL/welle.io and add it to PATH for DAB/DAB+."
-}
 
 check_origin() {
   checkout="$1"; shift
@@ -245,7 +229,7 @@ install_from_source() {
   python3 -m venv --system-site-packages .venv
   .venv/bin/pip install -r requirements.txt
   if [ "$WITH_SDR_LIBS" = "1" ]; then install_sdr_libs; fi
-  install_dab
+  if [ "$WITH_DAB" = 1 ]; then sh packaging/dab/install.sh .venv/lib; fi
   cat <<EOF
 
 FalconSDR $version is ready. Start it with:
@@ -287,7 +271,9 @@ install_server() {
   else
     $SUDO git -c advice.detachedHead=false clone -q --depth 1 --branch "$ref" "https://github.com/$REPO.git" "$src"
   fi
-  install_dab
+  if [ "$WITH_DAB" = 1 ]; then
+    $SUDO sh "$src/packaging/dab/install.sh" /opt/falconsdr/.venv/lib
+  fi
   $SUDO sh "$src/packaging/remote-server/install.sh" >/dev/null
   # Also here: releases up to 1.1.0 leave the service stopped on a first install.
   $SUDO systemctl enable --quiet --now falconsdr-receiver.service
@@ -323,6 +309,7 @@ main() {
     install_from_source
     return
   fi
+  [ "$WITH_DAB" = 0 ] || die "--with-dab requires --server or --from-source"
   # No prebuilt bundle runs here: musl-based distros (Alpine, ...) can't
   # execute the glibc-linked AppImage, and there is no musl asset.
   if is_musl; then
@@ -334,7 +321,6 @@ main() {
   elif have_dnf || have_zypper; then install_rpm "$(release_tag)"
   elif have_pacman; then install_aur
   else install_appimage "$(release_tag)"; fi
-  install_dab
   cat <<EOF
 
 Unplug and replug the RTL-SDR dongle once (USB permission rule), then run:

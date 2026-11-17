@@ -12,7 +12,6 @@ Bearer token.
 from __future__ import annotations
 
 import hmac
-import http.client
 import json
 import mimetypes
 import os
@@ -291,48 +290,13 @@ def make_handler(app: App):
             path = urlparse(self.path).path
             if path == "/api/manual/tune":
                 ctl.tune_manual(self._body())
+            elif path == "/api/manual/dab-station":
+                ctl.select_dab_station(self._body().get("sid"))
             elif path == "/api/manual/stop":
                 self._body()
                 ctl.stop_manual()
             self._json(ctl.manual_status())
 
-        def dab_audio(self, query: dict) -> None:
-            sid = int(_qs(query, "sid", "0"))
-            if not 0 < sid <= 0xFFFFFFFF:
-                return self._error(400, "Invalid DAB service ID")
-            session = ctl.manual_session
-            if session is None or session.tuning.mode != "DAB":
-                return self._error(409, "Tune a DAB channel first")
-            conn = None
-            streaming = False
-            try:
-                conn = session.connection(timeout=15)
-                conn.request("GET", f"/mp3/{sid}")
-                with conn.getresponse() as response:
-                    if response.status != 200:
-                        return self._error(502, "DAB station is unavailable")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "audio/mpeg")
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("Connection", "close")
-                    self.close_connection = True
-                    self.end_headers()
-                    streaming = True
-                    if self.command == "HEAD":
-                        return
-                    while ctl.manual_session is session and not session.stop_requested.is_set():
-                        chunk = response.read1(8192)
-                        if not chunk:
-                            break
-                        self.wfile.write(chunk)
-            except (OSError, http.client.HTTPException):
-                if not streaming:
-                    self._error(502, "DAB station is unavailable")
-            finally:
-                if conn is not None:
-                    conn.close()
-
-        # -- settings -------------------------------------------------------
         def settings(self, _query: dict) -> None:
             data = ctl.settings()
             data["curated"] = {
@@ -740,7 +704,7 @@ def make_handler(app: App):
         ("GET", "/api/manual"): Handler.manual,
         ("POST", "/api/manual/tune"): Handler.manual,
         ("POST", "/api/manual/stop"): Handler.manual,
-        ("GET", "/api/manual/dab-audio"): Handler.dab_audio,
+        ("POST", "/api/manual/dab-station"): Handler.manual,
         ("POST", "/api/scanner/start"): Handler.scanner,
         ("POST", "/api/scanner/stop"): Handler.scanner,
         ("POST", "/api/scanner/skip"): Handler.scanner,

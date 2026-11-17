@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
-import http.client
 import queue
 import sys
 import threading
@@ -27,7 +26,8 @@ import numpy as np
 from . import __version__, antenna_range, autostart, digital_voice, i18n, military_presets, schedule, storage
 from .audio_transcode import ffmpeg_available
 from .config import DEFAULT_RECORDINGS_DIR, AppConfig, ScheduleEntry, VfoRangeConfig, _from_dict
-from .manual_tuning import DAB_CHANNELS, ManualSession, Tuning, dab_command
+from .dab import load_decoder
+from .manual_tuning import DAB_CHANNELS, ManualSession, Tuning
 from .models import BlacklistEntry, Channel, Modulation, snap_airband_hz
 from .playback.index import Library
 from .playback.transcription_availability import is_transcription_installed
@@ -209,14 +209,16 @@ class Controller:
 
     def start(self) -> None:
         with self._start_lock:
+            if self.manual_session is not None:
+                self._resume = False
+                self._stop_manual_locked()
+                self._manual_error = ""
             self._start()
 
     def _start(self) -> None:
         devices = self._devices()
         held = {k for k in self._held if k < len(devices)}
         if held and len(held) >= len(devices):
-            if self.manual_session is not None:
-                raise RuntimeError(i18n.tr("Stop manual tuning to start scanning on this receiver."))
             raise RuntimeError(i18n.tr("An add-on is using the receiver - stop it first."))
         with self._lock:
             existing = list(self._engines)
@@ -285,22 +287,34 @@ class Controller:
             if devices[k] is not None:
                 device.update({"device_args": "", "bias_tee": False, **devices[k]})
             device["sample_rate_hz"] = antenna_range.device_rates(self.config)[k]
-            command = dab_command(device, tuning.channel) if tuning.mode == "DAB" else None
             old = self.manual_session
             if old is not None and old.tuning == tuning and old.is_alive() and not old.stop_requested.is_set():
                 return
             same_receiver = old is not None and old.tuning.receiver == k
-            if same_receiver and command is None and old.command is None and old.is_alive() and not old.stop_requested.is_set():
+            if same_receiver and tuning.mode != "DAB" and old.tuning.mode != "DAB" and old.is_alive() and not old.stop_requested.is_set():
                 old.state = "starting"
                 old.tuning = tuning
                 return
             if not same_receiver and k in self._held:
                 raise RuntimeError(i18n.tr("The selected receiver is already in use."))
-            self._stop_manual_locked(release=not same_receiver)
+            library = load_decoder() if tuning.mode == "DAB" else None
+            with self._lock:
+                engines = list(self._engines)
+            resume = any(e.is_alive() and not e._stop_evt.is_set() for e in engines)
+            for engine in engines:
+                engine.request_stop()
+            for engine in engines:
+                self._join(engine, 8)
+            if any(e.is_alive() for e in engines):
+                raise RuntimeError(i18n.tr("Scanner is still stopping - try again"))
+            self._resume = self._resume or resume
+            self._stop_manual_locked(release=False)
+            if old is not None and not same_receiver:
+                self._held.discard(old.tuning.receiver)
             if not same_receiver:
-                self._pause_receiver(k)
+                self._held.add(k)
             self._manual_error = ""
-            session = ManualSession(tuning, device, self.config.debug_mode, self._publish_audio, self._manual_ended, command)
+            session = ManualSession(tuning, device, self.config.debug_mode, self._publish_audio, self._manual_ended, library)
             self.manual_session = session
             try:
                 session.start()
@@ -313,6 +327,15 @@ class Controller:
         with self._start_lock:
             self._stop_manual_locked()
             self._manual_error = ""
+
+    def select_dab_station(self, sid: int) -> None:
+        if type(sid) is not int:
+            raise ValueError("Invalid DAB service ID")
+        with self._start_lock:
+            session = self.manual_session
+            if session is None or session.tuning.mode != "DAB":
+                raise RuntimeError(i18n.tr("Tune a DAB channel first."))
+            session.select_station(sid)
 
     def _stop_manual_locked(self, release=True) -> None:
         session = self.manual_session
@@ -350,12 +373,9 @@ class Controller:
             "level": session.level if session and session.spectrum is not None else None,
         }
         if session and session.tuning.mode == "DAB":
-            try:
-                result["stations"] = session.stations()
-            except (OSError, ValueError, http.client.HTTPException):
-                pass  # the web server is still starting up, or the session is ending
-            else:
-                result["state"] = "listening" if result["stations"] else "discovering"
+            result["stations"] = sorted(session.stations.copy().values(), key=lambda station: (station["name"].casefold(), station["id"]))
+            result["station"] = session.station
+            result["error"] = session.dab_error
         return result
 
     def _pause_receiver(self, dongle: int) -> None:
@@ -428,7 +448,7 @@ class Controller:
 
     def _release_receiver(self, dongle: int) -> None:
         self._held.discard(dongle)
-        if self._bg_stop.is_set():
+        if self._bg_stop.is_set() or self.manual_session is not None:
             return
         with self._lock:
             running = any(e.is_alive() and not e._stop_evt.is_set() for e in self._engines)
@@ -637,7 +657,7 @@ class Controller:
                 return
             self._audible = k
         session = self.manual_session
-        if session is not None and session.tuning.mode != "DAB":
+        if session is not None:
             return
         self._publish_audio(mono)
 

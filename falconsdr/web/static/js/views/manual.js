@@ -30,13 +30,10 @@ export function manualView(root) {
     title: t('Volume'), oninput: (event) => liveAudio.setVolume(+event.target.value) });
   const analogAudio = h('div.row', { hidden: true }, listen, h('div.volume', icon('volume'), volume));
   const stationList = h('select');
-  const audio = h('audio', { controls: true, preload: 'none', 'aria-label': t('DAB audio') });
   const play = h('button.primary', { type: 'button' }, t('Play station'));
-  const playbackError = h('p.muted', { role: 'status', hidden: true },
-    t('This DAB station is unavailable. Try playing it again.'));
   const stations = h('section.card.col', { hidden: true },
     h('div.card-head', h('h2', t('DAB/DAB+ stations'))),
-    h('div.row.wrap', h('label.field', t('DAB station'), stationList), play), audio, playbackError);
+    h('div.row.wrap', h('label.field', t('DAB station'), stationList), play));
   const canvas = h('canvas', { height: 260, role: 'img', 'aria-label': t('Live spectrum and waterfall around the tuned frequency.') });
   const axis = h('div.spectrum-axis');
   const spectrumCard = h('section.card.spectrum-card',
@@ -49,7 +46,7 @@ export function manualView(root) {
   let busy = false;
   let ready = false;
   let active = null;
-  let activeKey = '';
+  let playingStation = 0;
   let stationKey = '';
   let receiverKey = '';
   let revision = 0;
@@ -60,24 +57,19 @@ export function manualView(root) {
     frequencyField.hidden = frequency.disabled = dab;
     channelField.hidden = channel.disabled = !dab;
   };
-  const stopAudio = () => {
-    playbackError.hidden = true;
-    audio.pause();
-    if (audio.hasAttribute('src')) {
-      audio.removeAttribute('src');
-      audio.load();
-    }
-  };
   const updateListen = () => {
     analogAudio.hidden = !active || active.mode === 'DAB';
     listen.hidden = analogAudio.hidden;
     mount(listen, icon(liveAudio.playing ? 'mute' : 'headphones'),
       liveAudio.playing ? t('Stop listening') : t('Listen live'));
+    play.textContent = liveAudio.playing && playingStation === Number(stationList.value)
+      ? t('Stop listening') : t('Play station');
   };
   const render = (data) => {
     const initial = !ready;
     ready = true;
     active = data.tuning;
+    playingStation = data.station || 0;
     const nextReceiverKey = JSON.stringify(data.receivers);
     if (receiverKey !== nextReceiverKey) {
       const selected = receiver.value;
@@ -96,11 +88,6 @@ export function manualView(root) {
       }
       updateMode();
     }
-    const key = JSON.stringify(active);
-    if (key !== activeKey) {
-      activeKey = key;
-      stopAudio();
-    }
     const nextStationKey = JSON.stringify(data.stations);
     if (nextStationKey !== stationKey) {
       const selected = stationList.value;
@@ -108,6 +95,7 @@ export function manualView(root) {
       mount(stationList, ...data.stations.map(({ id, name, codec }) =>
         h('option', { value: id }, codec ? `${name} · ${codec}` : name)));
       if (data.stations.some(({ id }) => String(id) === selected)) stationList.value = selected;
+      else if (playingStation) stationList.value = playingStation;
     }
     stations.hidden = !data.stations.length;
     spectrumCard.hidden = active?.mode === 'DAB';
@@ -160,6 +148,7 @@ export function manualView(root) {
       if (destroyed) return;
       busy = false;
       render(data);
+      return true;
     } catch (e) {
       if (!destroyed) errorToast(e);
     } finally {
@@ -178,15 +167,22 @@ export function manualView(root) {
     frequency.focus();
   });
   stop.addEventListener('click', () => change('/api/manual/stop', {}));
-  play.addEventListener('click', () => {
-    if (!stationList.value) return;
-    if (liveAudio.playing) liveAudio.stop();
-    playbackError.hidden = true;
-    audio.src = `/api/manual/dab-audio?sid=${encodeURIComponent(stationList.value)}`;
-    audio.play().catch(errorToast);
-  });
-  audio.addEventListener('error', () => {
-    if (audio.hasAttribute('src')) playbackError.hidden = false;
+  stationList.addEventListener('change', updateListen);
+  play.addEventListener('click', async () => {
+    const sid = Number(stationList.value);
+    if (!sid) return;
+    if (liveAudio.playing && playingStation === sid) {
+      liveAudio.stop();
+      return;
+    }
+    const wasPlaying = liveAudio.playing;
+    try {
+      const [, selected] = await Promise.all([wasPlaying ? null : liveAudio.start(), change('/api/manual/dab-station', { sid })]);
+      if (!selected && !wasPlaying) liveAudio.stop();
+    } catch (error) {
+      if (!wasPlaying) liveAudio.stop();
+      errorToast(error);
+    }
   });
   mount(root, h('div.page.manual-tuning',
     h('div.page-head', h('h1', t('Manual tuning'))),
@@ -210,5 +206,5 @@ export function manualView(root) {
   updateMode();
   const offAudio = on('audio', updateListen);
   refresh();
-  return { destroy() { destroyed = true; clearTimeout(timer); stopAudio(); offAudio(); spectrum.destroy(); } };
+  return { destroy() { destroyed = true; clearTimeout(timer); offAudio(); spectrum.destroy(); } };
 }
