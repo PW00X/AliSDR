@@ -1,5 +1,5 @@
 Name:           falconsdr
-Version:        1.0.5
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        Wideband SDR ATC/radio scanner (self-contained build)
 License:        GPL-3.0-or-later

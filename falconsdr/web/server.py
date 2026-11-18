@@ -305,6 +305,8 @@ def make_handler(app: App):
                 ctl.tune_manual(self._body())
             elif path == "/api/manual/dab-station":
                 ctl.select_dab_station(self._body().get("sid"))
+            elif path == "/api/manual/record":
+                ctl.record_manual(self._body().get("enabled"))
             elif path == "/api/manual/stop":
                 self._body()
                 ctl.stop_manual()
@@ -724,6 +726,7 @@ def make_handler(app: App):
         ("GET", "/api/audio"): Handler.audio,
         ("GET", "/api/manual"): Handler.manual,
         ("POST", "/api/manual/tune"): Handler.manual,
+        ("POST", "/api/manual/record"): Handler.manual,
         ("POST", "/api/manual/stop"): Handler.manual,
         ("POST", "/api/manual/dab-station"): Handler.manual,
         ("GET", "/api/manual/image"): Handler.manual_image,

@@ -2659,7 +2659,53 @@ class ManualTuningTest(unittest.TestCase):
         self.assertIsNone(ctl.manual_session)
         self.assertEqual(len(ctl._engines), 2)
 
+    def test_manual_fm_recording_is_finalized_before_switching_audio_format(self) -> None:
+        import wave
+
+        from falconsdr.controller import Controller
+        from falconsdr.scanner_engine import AUDIO_RATE
+
+        cfg = AppConfig()
+        cfg.device.driver = "simulated"
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        with self.assertRaisesRegex(RuntimeError, "Tune to a station"):
+            ctl.record_manual(True)
+        broadcast = ctl.subscribe_audio(broadcast=True)
+        self.addCleanup(ctl.unsubscribe_audio, broadcast, True)
+        ctl.tune_manual({"mode": "WFM", "frequency_hz": 99_500_000})
+        self.assertTrue(broadcast.get(timeout=5))
+        ctl.record_manual(True)
+        (recording,) = ctl.open_recording_paths()
+        ctl.record_manual(True)  # a repeated start keeps the same file
+        self.assertEqual(ctl.open_recording_paths(), {recording})
+        self.assertTrue(ctl.live()["manual_tuning_recording"])
+        deadline = time.monotonic() + 3
+        while recording.stat().st_size < 8000 and time.monotonic() < deadline:
+            time.sleep(0.02)
+
+        ctl.tune_manual({"mode": "NFM", "frequency_hz": 145_500_000})
+        self.assertFalse(ctl.manual_status()["recording"])
+        self.assertEqual(ctl.open_recording_paths(), set())
+        (fm,) = Path(cfg.recording.output_dir).rglob("*_99500.wav")
+        with wave.open(str(fm), "rb") as wav:
+            self.assertEqual((wav.getframerate(), wav.getnchannels()), (48_000, 2))
+            self.assertGreater(wav.getnframes(), 0)
+
+        deadline = time.monotonic() + 3
+        while not ctl.manual_status()["can_record"] and time.monotonic() < deadline:
+            time.sleep(0.02)
+        ctl.record_manual(True)
+        ctl.stop_manual()
+        self.assertFalse(ctl.running)
+        self.assertEqual(ctl.open_recording_paths(), set())
+        (nfm,) = Path(cfg.recording.output_dir).rglob("*_145500.wav")
+        with wave.open(str(nfm), "rb") as wav:
+            self.assertEqual((wav.getframerate(), wav.getnchannels()), (AUDIO_RATE, 1))
+
     def test_dab_station_selection_and_native_pcm_through_auth(self) -> None:
+        import wave
         from contextlib import ExitStack
         from unittest.mock import patch
 
@@ -2719,6 +2765,10 @@ class ManualTuningTest(unittest.TestCase):
             time.sleep(0.01)
         with urlopen(Request(url + "/manual", headers=headers), timeout=5) as response:
             self.assertEqual([station["codec"] for station in json.load(response)["stations"]], ["DAB", "DAB+"])
+        record_url = url + "/manual/record"
+        start_recording = b'{"enabled":true}'
+        with self.assertRaises(HTTPError):
+            urlopen(Request(record_url, start_recording, headers), timeout=5)
         station_url = url + "/manual/dab-station"
         payload = b'{"sid":43981}'
         with self.assertRaises(HTTPError) as exc:
@@ -2745,6 +2795,23 @@ class ManualTuningTest(unittest.TestCase):
         with urlopen(Request(artwork, headers=headers), timeout=5) as response:
             self.assertEqual(response.headers["Content-Type"], "image/png")
             self.assertEqual(response.read(), b"\x89PNG\r\n\x1a\nartwork")
+        with self.assertRaises(HTTPError) as exc:
+            urlopen(Request(record_url, start_recording, {"X-FalconSDR": "1"}), timeout=5)
+        self.assertEqual(exc.exception.code, 401)
+        with urlopen(Request(record_url, start_recording, headers), timeout=5) as response:
+            self.assertTrue(json.load(response)["recording"])
+        (open_file,) = ctl.open_recording_paths()
+        deadline = time.monotonic() + 3
+        while open_file.stat().st_size < 4000 and time.monotonic() < deadline:
+            time.sleep(0.02)
+        with urlopen(Request(record_url, b'{"enabled":false}', headers), timeout=5) as response:
+            self.assertFalse(json.load(response)["recording"])
+        self.assertEqual(ctl.manual_status()["station"], 0xabcd)
+        (saved_file,) = Path(cfg.recording.output_dir).rglob("*_223936.wav")
+        with wave.open(str(saved_file), "rb") as wav:
+            self.assertEqual((wav.getframerate(), wav.getnchannels()), (48000, 2))
+            stereo = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2").reshape(-1, 2)
+            self.assertTrue(np.any(np.all(stereo == [10000, -3000], axis=1)))
         ctl.stop_manual()
         with self.assertRaises(HTTPError) as exc:
             urlopen(Request(artwork, headers=headers), timeout=5)

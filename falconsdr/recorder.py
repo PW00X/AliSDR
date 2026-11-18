@@ -14,11 +14,12 @@ from .config import RecordingConfig
 
 
 class Recorder:
-    def __init__(self, config: RecordingConfig, audio_rate: int, single_file: bool = False):
+    def __init__(self, config: RecordingConfig, audio_rate: int, single_file: bool = False, channels: int = 1):
         """``single_file`` is True only for the manual recording (gotcha 13);
         otherwise each transmission gets its own file in begin_transmission()."""
         self.config = config
         self.audio_rate = audio_rate
+        self.channels = channels
         self._single_file = single_file
         self._wav: wave.Wave_write | None = None
         self._current_path: Path | None = None
@@ -71,6 +72,11 @@ class Recorder:
         self._write_raw(audio)
         self._has_real_audio = True
 
+    def write_pcm16(self, pcm16: bytes) -> None:
+        """Write interleaved PCM from a continuous live stream."""
+        if self._wav is not None:
+            self._wav.writeframes(pcm16)
+
     def end_transmission(self) -> Path | None:
         """Closes the per-transmission file and returns its path - or deletes
         it and returns None if it never got real audio (a short spike that
@@ -103,7 +109,7 @@ class Recorder:
         # Straight into the date folder - organize() would move a loose file
         # while it's still open.
         now = dt.datetime.now()
-        return Path(self.config.output_dir) / now.strftime("%Y-%m-%d") / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}_session.wav"
+        return Path(self.config.output_dir) / now.strftime("%Y-%m-%d") / f"{now.strftime('%Y-%m-%d_%H-%M-%S-%f')}_session.wav"
 
     @staticmethod
     def rename_session_file_with_frequency(path: Path, freq_hz: int) -> Path | None:
@@ -135,7 +141,7 @@ class Recorder:
         self._close_file()
         path.parent.mkdir(parents=True, exist_ok=True)
         wav = wave.open(str(path), "wb")
-        wav.setnchannels(1)
+        wav.setnchannels(self.channels)
         wav.setsampwidth(2)
         wav.setframerate(self.audio_rate)
         self._wav = wav

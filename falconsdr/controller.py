@@ -17,6 +17,7 @@ import threading
 import traceback
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, fields, is_dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -24,12 +25,13 @@ from typing import Any, Optional
 import numpy as np
 
 from . import __version__, antenna_range, autostart, digital_voice, i18n, military_presets, schedule, storage
-from .audio_transcode import ffmpeg_available
+from .audio_transcode import ffmpeg_available, transcode_to_mp3
 from .config import DEFAULT_RECORDINGS_DIR, AppConfig, ScheduleEntry, VfoRangeConfig, _from_dict
-from .dab import load_decoder
+from .dab import AUDIO_RATE as BROADCAST_AUDIO_RATE, load_decoder
 from .manual_tuning import DAB_CHANNELS, ManualSession, Tuning
 from .models import BlacklistEntry, Channel, Modulation, snap_airband_hz
 from .playback.index import Library
+from .recorder import Recorder
 from .playback.transcription_availability import is_transcription_installed
 from . import sdr_native
 from .addons.manager import AddonManager
@@ -107,6 +109,36 @@ def channel_dict(c: Channel) -> dict:
     return {**asdict(c), "modulation": c.modulation.value}
 
 
+class _ManualRecording:
+    """Record the tuned stream, filling sustained audio gaps with silence."""
+
+    def __init__(self, recorder: Recorder, frequency_hz: int):
+        self.recorder = recorder
+        self.frequency_hz = frequency_hz
+        self.frame_bytes = recorder.channels * 2
+        self.last_audio = self.padded_to = time.monotonic()
+        self.second_of_silence = bytes(recorder.audio_rate * self.frame_bytes)
+
+    def pad_to(self, when: float) -> None:
+        frames = round((when - self.padded_to) * self.recorder.audio_rate)
+        while frames > 0:
+            count = min(frames, self.recorder.audio_rate)
+            self.recorder.write_pcm16(self.second_of_silence[:count * self.frame_bytes])
+            frames -= count
+        self.padded_to = max(self.padded_to, when)
+
+    def feed(self, pcm16: bytes) -> None:
+        now = time.monotonic()
+        if now - self.last_audio > 0.35:
+            # Allow the decoder to deliver ordinary bursts of audio without
+            # treating the time between those bursts as lost reception.
+            lead = len(pcm16) / (self.frame_bytes * self.recorder.audio_rate) if pcm16 else 0.25
+            self.pad_to(now - lead)
+        if pcm16:
+            self.recorder.write_pcm16(pcm16)
+            self.last_audio = self.padded_to = now
+
+
 class Controller:
     def __init__(self, config: Optional[AppConfig] = None) -> None:
         self.config = config or AppConfig.load()
@@ -146,6 +178,10 @@ class Controller:
         self._resume = False    # the scanner was running when its last receiver was taken
         self.manual_session: ManualSession | None = None
         self._manual_error = ""
+        self._manual_record_lock = threading.Lock()
+        self._manual_recording: _ManualRecording | None = None
+        self._manual_finishing: set[Path] = set()
+        self._manual_record_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="manual-recording")
         self.log(i18n.tr("Ready."))
 
     @staticmethod
@@ -177,6 +213,7 @@ class Controller:
             engine.request_stop()
         for engine in engines:
             self._join(engine, 5.0)
+        self._manual_record_pool.shutdown(wait=True)
         self.library.stop()
 
     # -- helpers used by the library ----------------------------------------
@@ -189,7 +226,12 @@ class Controller:
         return names
 
     def open_recording_paths(self) -> set[Path]:
-        return set().union(*(engine.open_recording_paths() for engine in self._engines))
+        paths = set().union(*(engine.open_recording_paths() for engine in self._engines))
+        with self._manual_record_lock:
+            paths.update(self._manual_finishing)
+            if self._manual_recording is not None:
+                paths.add(Path(self._manual_recording.recorder.current_path))
+        return paths
 
     def log(self, message: str) -> None:
         with self._lock:
@@ -306,6 +348,8 @@ class Controller:
                 return
             same_receiver = old is not None and old.tuning.receiver == k
             if can_reuse and same_receiver and tuning.mode != "DAB" and old.tuning.mode != "DAB":
+                if (old.tuning.mode == "WFM") != (tuning.mode == "WFM"):
+                    self._stop_manual_recording()
                 old.state = "starting"
                 old.tuning = tuning
                 return
@@ -327,7 +371,7 @@ class Controller:
             if not same_receiver:
                 self._held.add(k)
             self._manual_error = ""
-            session = ManualSession(tuning, device, self.config.debug_mode, self._publish_audio, self._manual_ended, library)
+            session = ManualSession(tuning, device, self.config.debug_mode, self._publish_manual_audio, self._manual_ended, library)
             session.pending_station = wanted
             session.on_broadcast_audio = self._publish_broadcast_audio
             self.manual_session = session
@@ -342,6 +386,88 @@ class Controller:
         with self._start_lock:
             self._stop_manual_locked()
             self._manual_error = ""
+
+    def record_manual(self, enabled: bool) -> None:
+        if type(enabled) is not bool:
+            raise ValueError(i18n.tr("Invalid recording request."))
+        with self._start_lock:
+            if not enabled:
+                self._stop_manual_recording()
+                return
+            session = self.manual_session
+            if not self._can_record_manual(session):
+                raise RuntimeError(i18n.tr("Tune to a station before recording."))
+            with self._manual_record_lock:
+                if self._manual_recording is not None:
+                    return
+                broadcast = session.tuning.mode in ("DAB", "WFM")
+                config = copy.copy(self.config.recording)
+                recorder = Recorder(config, BROADCAST_AUDIO_RATE if broadcast else AUDIO_RATE,
+                                    single_file=True, channels=2 if broadcast else 1)
+                try:
+                    recorder.start_session()
+                except OSError as exc:
+                    recorder.abort()
+                    raise RuntimeError(i18n.tr("Can't start recording: {error}").format(error=exc)) from exc
+                self._manual_recording = _ManualRecording(recorder, session.tuning.frequency_hz)
+
+    @staticmethod
+    def _can_record_manual(session: ManualSession | None) -> bool:
+        return bool(session and session.is_alive() and not session.stop_requested.is_set()
+                    and session.state == "listening" and (session.tuning.mode != "DAB" or session.station))
+
+    def _stop_manual_recording(self) -> None:
+        with self._manual_record_lock:
+            recording = self._manual_recording
+            if recording is None:
+                return
+            self._manual_recording = None
+            recorder = recording.recorder
+            try:
+                if time.monotonic() - recording.last_audio > 0.35:
+                    recording.pad_to(time.monotonic())
+                path = Path(recorder.current_path)
+                recorder.stop_session()
+            except OSError as exc:
+                self._manual_recording_failed(recorder, exc)
+                return
+            path = Recorder.rename_session_file_with_frequency(path, recording.frequency_hz) or path
+            if recorder.config.output_format == "mp3":
+                self._manual_finishing.add(path)
+
+        if recorder.config.output_format == "mp3":
+            self._manual_record_pool.submit(self._finish_manual_mp3, path)
+        else:
+            self._index_manual_recording(path)
+
+    def _index_manual_recording(self, path: Path) -> None:
+        self.library.add_file(path)
+        self._notify_recording(str(path))
+
+    def _finish_manual_mp3(self, path: Path) -> None:
+        try:
+            path_to_index = transcode_to_mp3(path) or path
+        finally:
+            with self._manual_record_lock:
+                self._manual_finishing.discard(path)
+        self._index_manual_recording(path_to_index)
+
+    def _manual_recording_failed(self, recorder: Recorder, exc: OSError) -> None:
+        self._manual_recording = None
+        recorder.abort()
+        self.log(i18n.tr("Manual recording stopped: {error}").format(error=exc))
+
+    def _record_manual_pcm(self, pcm16: bytes, channels: int) -> None:
+        recording = self._manual_recording
+        if recording is None or recording.recorder.channels != channels:
+            return
+        with self._manual_record_lock:
+            if self._manual_recording is not recording:
+                return
+            try:
+                recording.feed(pcm16)
+            except OSError as exc:
+                self._manual_recording_failed(recording.recorder, exc)
 
     def select_dab_station(self, sid: int) -> None:
         if type(sid) is not int:
@@ -363,6 +489,7 @@ class Controller:
         session = self.manual_session
         if session is None:
             return
+        self._stop_manual_recording()
         session.stop_requested.set()
         session.join(timeout=8)
         if session.is_alive():
@@ -375,6 +502,7 @@ class Controller:
         def release() -> None:
             with self._start_lock:
                 if self.manual_session is session:
+                    self._stop_manual_recording()
                     self.manual_session = None
                     self._manual_error = error
                     self._held.discard(session.tuning.receiver)
@@ -399,6 +527,8 @@ class Controller:
                 gain_range = session.gain_range
             receivers.append({"id": k, "driver": driver, "gain_range": gain_range, "gain_index": native_airspy})
         result = {
+            "recording": self._manual_recording is not None,
+            "can_record": self._can_record_manual(session),
             "receivers": receivers,
             "channels": DAB_CHANNELS,
             "favourites": self._manual_favourites(),
@@ -704,11 +834,21 @@ class Controller:
         self._publish_audio(mono)
 
     def _publish_audio(self, mono: Any) -> None:
-        pcm16 = (np.clip(np.asarray(mono, dtype=np.float32), -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
+        self._publish_pcm(self._mono_pcm16(mono), self._audio_subscribers)
+
+    @staticmethod
+    def _mono_pcm16(mono: Any) -> bytes:
+        return (np.clip(np.asarray(mono, dtype=np.float32), -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
+
+    def _publish_manual_audio(self, mono: Any) -> None:
+        pcm16 = self._mono_pcm16(mono)
         self._publish_pcm(pcm16, self._audio_subscribers)
+        self._record_manual_pcm(pcm16, channels=1)
 
     def _publish_broadcast_audio(self, pcm16: bytes) -> None:
-        self._publish_pcm(pcm16, self._broadcast_audio_subscribers)
+        if pcm16:
+            self._publish_pcm(pcm16, self._broadcast_audio_subscribers)
+        self._record_manual_pcm(pcm16, channels=2)
 
     def _publish_pcm(self, pcm16: bytes, subscribers: list[queue.Queue]) -> None:
         with self._audio_lock:
@@ -766,6 +906,7 @@ class Controller:
                 "running": bool(self._engines),
                 "stopping": any(e._stop_evt.is_set() for k, e in enumerate(self._engines) if k not in self._held),
                 "manual_tuning": session is not None,
+                "manual_tuning_recording": self._manual_recording is not None,
                 "manual_broadcast": bool(session and session.tuning.mode in ("DAB", "WFM")),
                 "manual_dab": bool(session and session.tuning.mode == "DAB"),
                 "solo_band": self._solo_band,

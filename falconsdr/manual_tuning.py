@@ -290,6 +290,8 @@ class ManualSession(threading.Thread):
                     self.on_audio(audio_resampler.process(mono).real)
                     last_audio = now
                     self.dab_error = ""
+                if sid and now - last_audio > 0.35:
+                    self.on_broadcast_audio(b"")
                 if sid and now - last_audio >= 12:
                     self.dab_error = tr("The DAB station is selected, but no audio is being decoded.")
         finally:

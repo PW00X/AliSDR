@@ -1,6 +1,6 @@
 # AliSDR
 
-<img src="packaging/icons/falconsdr.png" width="96" align="right" alt="">
+<img src="falconsdr/web/static/icon.svg" width="96" align="right" alt="AliSDR logo">
 
 A wideband radio scanner for SDR receivers that **records only the
 transmissions it actually stops on** - no hours of empty noise, no retuning
@@ -427,7 +427,9 @@ Open **Manual** from the top navigation. For a headless receiver,
 run the [headless installer](#headless-receiver) on the receiver host. It
 restarts the service and verifies that the installed revision is serving the UI.
 
-Select a receiver and enter a frequency in MHz. Use WFM for broadcast FM,
+Manual opens with DAB/DAB+ selected on a new browser and remembers the
+last modulation you chose. For analog tuning, select a receiver and enter
+a frequency in MHz. Use WFM for broadcast FM,
 or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
 **Listen live**. Click the spectrum to fill in a nearby frequency. Analog
 tuning plays continuously, even below the scanner's trigger level. WFM
@@ -458,6 +460,12 @@ audio stations. The browser receives stereo audio at 48 kHz. The spectrum,
 waterfall and signal meter are available during DAB reception. On a headless receiver, a timeout
 also logs the capture rate, gain and any reported IQ loss to
 `journalctl -u falconsdr-receiver`.
+
+Use **Record** once tuned to save the audio to **Recordings**. For DAB,
+select a station first. FM and DAB capture stereo audio. **Stop recording**
+saves the file while you keep listening. Stopping tuning, starting Scan,
+or changing to a tuning mode that requires a different audio format also
+saves the file.
 
 **Tune** stops scanning across all receivers. **Start** on the Scan tab
 ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.

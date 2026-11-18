@@ -1,6 +1,6 @@
 import { api, errorToast, fmtMHz, h, icon, mount, seg, slider, t } from '../core.js';
 import { liveAudio } from '../live-audio.js';
-import { S, cfg, on, syncConfig } from '../state.js';
+import { S, cfg, confirmRecording, on, syncConfig } from '../state.js';
 import { receiverPanel, spectrumPainter } from './listen.js';
 
 const analogModes = ['AM', 'NFM', 'WFM', 'SSB', 'USB', 'LSB'];
@@ -72,6 +72,8 @@ export function manualView(root) {
   const channelField = h('label.field', t('DAB channel'), channel);
   const tune = h('button.primary.big', { type: 'submit', disabled: true }, icon('play'), t('Tune'));
   const stop = h('button.big', { type: 'button', disabled: true }, icon('stop'), t('Stop tuning'));
+  const record = h('button.recbtn.big', { type: 'button', disabled: true,
+    title: t('Continuous recording of what you hear, including silence') }, icon('record'), t('Record'));
   const listen = h('button.big', { type: 'button', hidden: true, onclick: () => liveAudio.toggle().catch(errorToast) });
   const status = h('span.chip.state', { role: 'status' }, t('Loading…'));
   const readout = h('div.freq', '—');
@@ -115,7 +117,13 @@ export function manualView(root) {
   let receiverKey = '';
   let revision = 0;
   let timer;
-  mode.value = 'WFM';
+  const modulationKey = 'alisdr_manual_modulation';
+  const preference = localStorage.getItem(modulationKey);
+  mode.value = analogModes.includes(preference) ? preference : 'DAB';
+  const rememberMode = () => {
+    localStorage.setItem(modulationKey, mode.value);
+    updateMode();
+  };
   const tuneValues = () => ({
     receiver: Number(receiver.value), mode: mode.value,
     frequency_hz: Math.round(Number(frequency.value) * 1e6), channel: channel.value,
@@ -124,6 +132,12 @@ export function manualView(root) {
   const updateControls = () => {
     tune.disabled = !ready || busy || (mode.value === 'DAB' && channel.value === 'favourites');
     stop.disabled = busy || !active;
+    const recording = Boolean(latest?.recording);
+    record.disabled = busy || (!recording && !latest?.can_record);
+    if (recording !== record.classList.contains('on')) {
+      record.classList.toggle('on', recording);
+      mount(record, icon('record'), recording ? t('Stop recording') : t('Record'));
+    }
   };
   const formatFM = (hz) => `${fmtMHz(hz, 3)} MHz`;
   const matches = (a, b) => a.mode === b.mode && (a.mode === 'DAB'
@@ -261,7 +275,6 @@ export function manualView(root) {
       channel.value = 'favourites';
       if (active) {
         receiver.value = active.receiver;
-        mode.value = active.mode;
 
         if (active.mode !== 'DAB' && active.frequency_hz) frequency.value = active.frequency_hz / 1e6;
         if (data.gain) {
@@ -316,7 +329,8 @@ export function manualView(root) {
   const change = async (path, body) => {
     if (busy) return;
     revision++;
-    busy = tune.disabled = stop.disabled = true;
+    busy = true;
+    updateControls();
     try {
       if (path === '/api/manual/tune') await syncConfig();
       const data = await api.post(path, body);
@@ -332,16 +346,23 @@ export function manualView(root) {
       updateControls();
     }
   };
-  mode.addEventListener('change', updateMode);
+  mode.addEventListener('change', rememberMode);
   channel.addEventListener('change', updateMode);
   receiver.addEventListener('change', updateGain);
   canvas.addEventListener('click', (event) => {
     if (!frame || active?.mode === 'DAB') return;
-    mode.value = mode.value === 'DAB' ? 'WFM' : mode.value;
-    updateMode();
+    if (mode.value === 'DAB') {
+      mode.value = 'WFM';
+      rememberMode();
+    }
     const hz = frame.f0 + (frame.f1 - frame.f0) * event.offsetX / canvas.clientWidth;
     frequency.value = (hz / 1e6).toFixed(6);
     frequency.focus();
+  });
+  record.addEventListener('click', async () => {
+    const enabled = !latest?.recording;
+    if (enabled && !(await confirmRecording())) return;
+    change('/api/manual/record', { enabled });
   });
   stop.addEventListener('click', async () => {
     if (await change('/api/manual/stop', {})) {
@@ -360,7 +381,7 @@ export function manualView(root) {
       } },
       h('div.row.wrap', h('label.field', t('Modulation'), mode),
         frequencyField, channelField),
-      h('div.controls', tune, stop, audio))),
+      h('div.controls', tune, stop, record, audio))),
     spectrumCard),
     h('div.col', favouritesCard, stations, deviceCard))));
   updateMode();

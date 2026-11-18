@@ -138,7 +138,7 @@ function shell() {
     const running = live && live.running;
     const signal = live && (live.state === 'SIGNAL_DETECTED' || live.state === 'LINGER');
     mount(status,
-      live && live.recording ? h('span.chip.bad.live', { title: t('Recording') }, h('span.dot'), 'REC') : null,
+      live && (live.recording || live.manual_tuning_recording) ? h('span.chip.bad.live', { title: t('Recording') }, h('span.dot'), 'REC') : null,
       live && live.manual_tuning
         ? h('span.chip.good.live', h('span.dot'), t('Manual tuning'))
         : live && live.addon

@@ -4021,3 +4021,9 @@ msgstr "Grafika stacji"
 
 msgid "Station artwork is unavailable."
 msgstr "Grafika stacji jest niedostępna."
+
+msgid "Invalid recording request."
+msgstr "Nieprawidłowe żądanie nagrywania."
+
+msgid "Tune to a station before recording."
+msgstr "Przed nagrywaniem dostrój się do stacji."
