@@ -12,7 +12,7 @@ import { openChannelForFrequency } from './channels.js';
 
 const PAGE = 120;
 // Kept across visits to the tab.
-const F = { mode: 'frequencies', sel: [], q: '', range: 'all', minq: 0, sort: 'freq', facetSort: 'count', facetQ: '', autoNext: localStorage.getItem('autonext') !== '0' };
+const F = { mode: 'frequencies', sel: [], q: '', range: 'all', minq: 0, sort: 'old', facetSort: 'count', facetQ: '', autoNext: localStorage.getItem('autonext') !== '0' };
 
 function rangeSince(range) {
   const now = Date.now() / 1000;
@@ -38,7 +38,7 @@ export function transcriptStatus(tr, queued) {
 export function recordingsView(root) {
   const offs = [];
   const preset = sessionStorage.getItem('openFreq');  // from Statistics
-  if (preset) { F.sel = [preset]; F.mode = 'frequencies'; F.sort = 'old'; sessionStorage.removeItem('openFreq'); }
+  if (preset) { F.sel = [preset]; F.mode = 'frequencies'; sessionStorage.removeItem('openFreq'); }
   let items = [], total = 0, loading = false, current = null, selected = new Set(), facets = null, anchor = null, lastRes = null;
   const audio = new Audio();
   audio.preload = 'metadata';
@@ -51,11 +51,15 @@ export function recordingsView(root) {
   const facetSearch = h('input', { placeholder: t('Filter…'), value: F.facetQ, oninput: (e) => { F.facetQ = e.target.value; renderFacets(); } });
   const aside = h('aside.card',
     seg([['frequencies', t('Frequencies')], ['bands', t('Bands')], ['languages', t('Languages')]], F.mode, (v) => { F.mode = v; renderFacets(); }),
-    h('div.row', h('div.grow', facetSearch), select([['count', t('Most')], ['recent', t('Latest')], ['freq', t('A–Z')], ['quality', t('Best')]], F.facetSort, (v) => { F.facetSort = v; renderFacets(); }, { style: { width: 'auto' } })),
+    h('div.row', h('div.grow', facetSearch), select([['count', t('Most')], ['recent', t('Latest')], ['freq', t('Frequency (A–Z)')], ['quality', t('Best')]], F.facetSort, (v) => {
+      F.facetSort = v;
+      renderFacets();
+      if (!F.sel.length) reload();
+    }, { style: { width: 'auto' }, 'aria-label': t('Sort groups') })),
     facetList);
 
   const search = h('input', { type: 'search', placeholder: t('Search frequency, name, date or transcript…'), value: F.q, oninput: debounce((e) => { F.q = e.target.value; reload(); }, 300) });
-  const sort = select([['freq', t('Frequency: low to high')], ['freq_desc', t('Frequency: high to low')], ['old', t('Oldest first')], ['new', t('Newest first')], ['quality', t('Best quality')], ['long', t('Longest')]],
+  const sort = select([['old', t('Oldest first')], ['new', t('Newest first')], ['quality', t('Best quality')], ['long', t('Longest')]],
     F.sort, (v) => { F.sort = v; reload(); }, { 'aria-label': t('Sort recordings') });
   const toolbar = h('div.toolbar',
     h('div.search', icon('search'), search),
@@ -77,7 +81,8 @@ export function recordingsView(root) {
 
   // ---------------------------------------------------------- data
   function params(extra = {}) {
-    return { sel: F.sel, q: F.q, since: rangeSince(F.range), minq: F.minq || '', ...extra };
+    return { sel: F.sel, q: F.q, since: rangeSince(F.range), minq: F.minq || '',
+      group: F.sel.length ? '' : F.facetSort, ...extra };
   }
 
   async function reload() {
@@ -129,8 +134,6 @@ export function recordingsView(root) {
         if (key === 'all') F.sel = [];
         else if (e.ctrlKey || e.metaKey) F.sel = F.sel.includes(key) ? F.sel.filter((k) => k !== key) : [...F.sel, key];
         else F.sel = F.sel.length === 1 && F.sel[0] === key ? [] : [key];
-        F.sort = F.sel.length === 1 && F.sel[0].startsWith('freq:') ? 'old' : 'freq';
-        sort.value = F.sort;
         renderFacets();
         reload();
       },
@@ -517,7 +520,7 @@ export function recordingsView(root) {
   // New recordings slide in at the top while the newest ones are shown -
   // no reload, so scroll position, selection and the player stay put.
   const freshTimer = setInterval(async () => {
-    if (F.sort !== 'new' || loading || !lastRes || document.hidden) return;
+    if (F.sort !== 'new' || !F.sel.length || loading || !lastRes || document.hidden) return;
     try {
       const res = await api.get('/api/library' + qs(params({ sort: 'new', limit: 40 })));
       const known = new Map(items.map((x) => [x.id, x]));

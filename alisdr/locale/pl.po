@@ -3944,6 +3944,12 @@ msgstr "Częstotliwość: malejąco"
 msgid "Sort recordings"
 msgstr "Sortuj nagrania"
 
+msgid "Frequency (A–Z)"
+msgstr "Częstotliwość (A–Z)"
+
+msgid "Sort groups"
+msgstr "Sortuj grupy"
+
 msgid "Spectrum floor {level} dBFS"
 msgstr "Poziom tła widma {level} dBFS"
 

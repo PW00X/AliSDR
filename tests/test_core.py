@@ -188,6 +188,24 @@ class LibraryTest(_LibCase):
         self.assertEqual([item["id"] for item in page["items"]], [newer_low, older_high])
         one = self.lib.query(sel=["freq:118100"], sort="old")
         self.assertEqual([item["id"] for item in one["items"]], [older_low, newer_low])
+        extra_high = "2026-01-04/2026-01-04_10-00-00_121500.wav"
+        self.lib.add_file(_wav(self.root, extra_high))
+        for group in ("count", "recent"):
+            result = self.lib.query(group=group, sort="old")
+            self.assertEqual([item["id"] for item in result["items"]],
+                             [older_high, newer_high, extra_high, older_low, newer_low])
+        result = self.lib.query(group="freq", sort="old", offset=1, limit=3)
+        self.assertEqual([item["id"] for item in result["items"]], [newer_low, older_high, newer_high])
+        result = self.lib.query(group="freq", sort="new")
+        self.assertEqual([item["id"] for item in result["items"]],
+                         [newer_low, older_low, extra_high, newer_high, older_high])
+        from alisdr.playback.models import QualityMetrics
+        for rec in self.lib._recs.values():
+            score = 90 if rec.freq_khz == 118100 else 20
+            rec.quality = QualityMetrics(0, 0, 0, 0, score, 1)
+        result = self.lib.query(group="quality", sort="old")
+        self.assertEqual([item["id"] for item in result["items"]],
+                         [older_low, newer_low, older_high, newer_high, extra_high])
 
     def test_rescan_reads_only_folders_whose_listing_changed(self) -> None:
         import os

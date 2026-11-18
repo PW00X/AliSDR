@@ -708,6 +708,17 @@ function query(q) {
   const sort = q.get('sort') || 'new';
   const by = { quality: (a, b) => b.quality - a.quality, old: (a, b) => a.ts - b.ts, long: (a, b) => b.samples - a.samples }[sort] || ((a, b) => b.ts - a.ts);
   rows.sort(by);
+  const grouping = q.get('group');
+  if (['count', 'recent', 'freq', 'quality'].includes(grouping)) {
+    const groups = [...groupBy(rows, khz)].map(([frequency, recordings]) =>
+      ({ frequency, ...agg(recordings) }));
+    groups.sort((a, b) => a.frequency - b.frequency);
+    if (grouping === 'count') groups.sort((a, b) => b.count - a.count);
+    if (grouping === 'recent') groups.sort((a, b) => b.last.localeCompare(a.last));
+    if (grouping === 'quality') groups.sort((a, b) => (b.quality ?? -1) - (a.quality ?? -1));
+    const rank = new Map(groups.map((g, i) => [g.frequency, i]));
+    rows.sort((a, b) => rank.get(khz(a)) - rank.get(khz(b)));
+  }
   const offset = +(q.get('offset') || 0), limit = Math.min(+(q.get('limit') || 100), 500), nm = names();
   return {
     total: rows.length, total_bytes: rows.reduce((a, e) => a + sizeOf(e), 0),

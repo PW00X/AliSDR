@@ -378,7 +378,7 @@ class Library:
         }
 
     def query(self, sel=(), q: str = "", since=None, until=None, min_quality: float = 0.0,
-              sort: str = "new", offset: int = 0, limit: int = 100) -> dict:
+              sort: str = "new", offset: int = 0, limit: int = 100, group: str = "") -> dict:
         rows = self._select(sel, q, since, until, min_quality)
         if sort == "quality":
             rows.sort(key=lambda r: (r[1].quality.quality_score if r[1].quality else -1), reverse=True)
@@ -391,6 +391,22 @@ class Library:
             rows.sort(key=lambda r: r[1].freq_khz, reverse=sort == "freq_desc")
         else:
             rows.sort(key=lambda r: r[1].dt_utc, reverse=True)
+        if group in ("count", "recent", "freq", "quality"):
+            grouped: dict[int, list[Recording]] = {}
+            for _, rec in rows:
+                grouped.setdefault(rec.freq_khz, []).append(rec)
+            ordered = sorted(grouped)
+            if group == "count":
+                ordered.sort(key=lambda freq: len(grouped[freq]), reverse=True)
+            elif group == "recent":
+                ordered.sort(key=lambda freq: max(r.dt_utc for r in grouped[freq]), reverse=True)
+            elif group == "quality":
+                def average_quality(freq: int) -> float:
+                    scores = [r.quality.quality_score for r in grouped[freq] if r.quality and r.quality.readable]
+                    return round(sum(scores) / len(scores), 1) if scores else -1
+                ordered.sort(key=average_quality, reverse=True)
+            rank = {freq: index for index, freq in enumerate(ordered)}
+            rows.sort(key=lambda row: rank[row[1].freq_khz])
         names = self._freq_names()
         page = rows[offset:offset + limit]
         return {

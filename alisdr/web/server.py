@@ -446,7 +446,7 @@ def make_handler(app: App):
 
         def library(self, query: dict) -> None:
             self._json({
-                **lib.query(**self._filters(query), sort=str(_qs(query, "sort", "new")),
+                **lib.query(**self._filters(query), sort=str(_qs(query, "sort", "new")), group=str(_qs(query, "group", "")),
                             offset=int(_qs(query, "offset", 0)), limit=min(int(_qs(query, "limit", 100)), 500)),
                 "pending": lib.pending_count(),
             })
