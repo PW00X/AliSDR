@@ -2728,6 +2728,49 @@ class ControllerStartTest(unittest.TestCase):
 
 
 class ManualTuningTest(unittest.TestCase):
+    def test_tune_and_scan_share_saved_gain_with_the_airspy_sensitivity_range(self) -> None:
+        from unittest.mock import patch
+
+        from alisdr.controller import Controller
+        from alisdr.sdr_backend import SimulatedBackend
+
+        cfg = AppConfig()
+        cfg.device.driver = "airspy_native"
+        cfg.recording.enabled = False
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        self.assertEqual(cfg.device.gain_mode, "auto")
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        profile = {"driver": "airspy_native", "gain_index": True, "gain_range": [0.0, 21.0]}
+        self.assertEqual(ctl.live()["receiver_gain"], profile)
+        self.assertEqual(ctl.manual_status()["receivers"][0], {"id": 0, **profile})
+
+        def backend(_driver, _args, rate, mode, gain, **_opts):
+            simulated = SimulatedBackend(rate)
+            simulated.gain_range_db = (0.0, 21.0)
+            simulated.set_gain(mode, gain)
+            return simulated
+
+        with patch("alisdr.scanner_engine.create_backend", side_effect=backend) as scan_open, \
+                patch("alisdr.manual_tuning.create_backend", side_effect=backend) as tune_open:
+            self.addCleanup(ctl.stop)
+            ctl.patch_config({"device": {"gain_mode": "manual", "gain_db": 12}})
+            ctl.start()
+            deadline = time.monotonic() + 5
+            while not scan_open.called and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertEqual(scan_open.call_args.args[3:5], ("manual", 12))
+            self.assertEqual(ctl.live()["receiver_gain"], profile)
+            audio = ctl.subscribe_audio()
+            try:
+                ctl.tune_manual({"mode": "NFM", "frequency_hz": 145_500_000})
+                self.assertTrue(audio.get(timeout=5))
+                self.assertEqual(tune_open.call_args.args[3:5], ("manual", 12))
+                self.assertEqual(ctl.manual_status()["gain"], {"mode": "manual", "db": 12})
+            finally:
+                ctl.unsubscribe_audio(audio)
+                ctl.stop_manual()
+
     def test_analog_retunes_in_place_and_stays_idle(self) -> None:
         from alisdr.controller import Controller
 

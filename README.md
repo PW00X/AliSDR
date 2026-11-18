@@ -270,8 +270,10 @@ when decoded. Use the star to save the tuned FM frequency. With FM selected in *
 By default, the list shows stations whose RDS name was decoded. Use
 **Show stations without RDS names** to see the other frequencies found by the scan.
 
-Tune defaults to **Auto (hardware)**. To set a different gain mode or level,
-press **Tune** to apply them. Scan keeps its own configured gain.
+Tune and Scan share the saved receiver gain and default to **Auto (hardware)**.
+Press **Tune** to apply a gain change to the tuned station. Scan applies
+gain mode and manual gain changes as it runs. A band's own gain settings
+still apply during Scan.
 With the native Airspy driver, the slider shows the 0–21 sensitivity index.
 
 The Linux installer builds DAB/DAB+ by default. AliSDR's Python receiver feeds IQ from the
@@ -312,9 +314,8 @@ ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.
   Add them to the **blacklist** (Scan → *Skip + blacklist*, or Channels →
   Blacklist). After that you can usually lower the trigger level by several
   dB and pick up the weak stations you were missing.
-- **Gain** defaults to *Auto (software)*. The tuner's own hardware AGC tends
-  to overload on a strong nearby station, which shows up as false detections
-  on neighbouring channels.
+- **Gain** defaults to *Auto (hardware)*. If a strong nearby station causes
+  overload and false detections on neighbouring channels, try *Auto (software)*.
 - **Hold after a transmission** (5 s by default) keeps a recording open
   through the pause between a call and its answer.
 - A narrower **step** in a band means more channels to check per sweep; use

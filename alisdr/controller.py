@@ -253,6 +253,14 @@ class Controller:
         extra = [d for d in self.config.device.extra_devices if isinstance(d, dict) and d.get("driver")]
         return [None, *extra]
 
+    @staticmethod
+    def _gain_profile(driver: str) -> dict:
+        native_airspy = driver == "airspy_native" or (driver == "airspy" and not HAVE_SOAPY)
+        native_hackrf = driver == "hackrf_native" or (driver == "hackrf" and not HAVE_SOAPY)
+        gain_range = sdr_native._AIRSPY_GAIN_RANGE_DB if native_airspy else (
+            sdr_native._HACKRF_GAIN_RANGE_DB if native_hackrf else (0, 50))
+        return {"driver": driver, "gain_range": list(gain_range), "gain_index": native_airspy}
+
     def start(self) -> None:
         with self._start_lock:
             if self.manual_session is not None:
@@ -291,7 +299,8 @@ class Controller:
         with self._lock:
             # A held receiver keeps an engine that is never started (so the lists stay aligned with the receivers).
             self._engines, self._finished, self._audible = engines, set(held), min(set(range(len(engines))) - held)
-            self._lives = [{**self._idle_live(), "state": "CALCULATE_NEXT_FREQ"} for _ in engines]
+            self._lives = [{**self._idle_live(), "state": "CALCULATE_NEXT_FREQ",
+                            "gain_range": self._gain_profile(engine.driver)["gain_range"]} for engine in engines]
         for k, engine in enumerate(engines):
             if k not in held:
                 engine.start()
@@ -341,10 +350,10 @@ class Controller:
             if devices[k] is not None:
                 device.update({"device_args": "", "bias_tee": False, **devices[k]})
             device["sample_rate_hz"] = antenna_range.device_rates(self.config)[k]
-            gain_mode = body.get("gain_mode", device["gain_mode"])
-            gain_db = body.get("gain_db", device["gain_db"])
+            gain_mode = body.get("gain_mode", self.config.device.gain_mode)
+            gain_db = body.get("gain_db", self.config.device.gain_db)
             if (gain_mode not in ("manual", "auto", "sw_auto")
-                    or type(gain_db) not in (int, float) or not -100 <= gain_db <= 100):
+                    or type(gain_db) not in (int, float) or not -100 <= gain_db <= sdr_native._HACKRF_GAIN_RANGE_DB[1]):
                 raise ValueError(i18n.tr("Enter a valid receiver gain."))
             device.update(gain_mode=gain_mode, gain_db=gain_db)
             old = self.manual_session
@@ -564,14 +573,17 @@ class Controller:
     def manual_status(self) -> dict:
         session = self.manual_session
         devices = self._devices()
+        with self._lock:
+            ranges = [live["gain_range"] for live in self._lives]
         receivers = []
         for k, dev in enumerate(devices):
             driver = (dev or {}).get("driver", self.config.device.driver)
-            native_airspy = driver == "airspy_native" or (driver == "airspy" and not HAVE_SOAPY)
-            gain_range = sdr_native._AIRSPY_GAIN_RANGE_DB if native_airspy else (0, 50)
+            profile = self._gain_profile(driver)
             if session and session.tuning.receiver == k and session.gain_range is not None:
-                gain_range = session.gain_range
-            receivers.append({"id": k, "driver": driver, "gain_range": gain_range, "gain_index": native_airspy})
+                profile["gain_range"] = list(session.gain_range)
+            elif k < len(ranges):
+                profile["gain_range"] = ranges[k]
+            receivers.append({"id": k, **profile})
         stations = self._fm_stations
         stations = sorted(stations.copy().values(), key=lambda row: row["frequency_hz"]) if stations is not None else None
         result = {
@@ -698,7 +710,8 @@ class Controller:
         with self._lock:
             self._engines[k] = engine
             self._finished.discard(k)
-            self._lives[k] = {**self._idle_live(), "state": "CALCULATE_NEXT_FREQ"}
+            self._lives[k] = {**self._idle_live(), "state": "CALCULATE_NEXT_FREQ",
+                              "gain_range": self._gain_profile(engine.driver)["gain_range"]}
         self._connect(k, engine, len(self._engines))
         engine.start()
 
@@ -952,8 +965,14 @@ class Controller:
     def live(self, since_log: int = 0) -> dict:
         session = self.manual_session
         with self._lock:
+            receiver_gain = self._gain_profile(self.config.device.driver)
+            if session and session.tuning.receiver == 0 and session.gain_range is not None:
+                receiver_gain["gain_range"] = list(session.gain_range)
+            elif self._lives:
+                receiver_gain["gain_range"] = self._lives[0]["gain_range"]
             return {
                 **self._merged_live_locked(),
+                "receiver_gain": receiver_gain,
                 "running": bool(self._engines),
                 "stopping": any(e._stop_evt.is_set() for k, e in enumerate(self._engines) if k not in self._held),
                 "manual_tuning": session is not None,
@@ -1006,6 +1025,7 @@ class Controller:
     def settings(self) -> dict:
         return {
             "version": __version__,
+            "receiver_gain": self._gain_profile(self.config.device.driver),
             "config": asdict(self.config),
             "channels": [channel_dict(c) for c in self.channels],
             "blacklist": [asdict(b) for b in self.blacklist],

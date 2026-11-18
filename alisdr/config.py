@@ -153,8 +153,7 @@ class DeviceConfig:
     driver: str = "auto"          # "auto", "rtlsdr", "simulated", or a SoapySDR driver key
     device_args: str = ""         # extra SoapySDR device args, e.g. "serial=00000001"
     sample_rate_hz: float = 2_400_000.0  # capture bandwidth; RTL-SDR handles ~2.4 MSPS
-    # "manual" (gain_db), "auto" (hardware AGC) or "sw_auto" (agc.py) - the
-    # default, since hardware AGC overdrives on strong stations (gotcha 27).
+    # Shared Tune/Scan gain mode: "manual", "auto" (hardware AGC) or "sw_auto".
     gain_mode: str = "auto"
 
     gain_db: float = 30.0

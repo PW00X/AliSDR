@@ -4,7 +4,7 @@ import { openChannelForFrequency } from './channels.js';
 import { NETWORK, groupDevices, groupOf, groupOfExtra, heldGroups, isTwice, nextGroup, takenByExtra, usableFor } from './dongles.js';
 import { api, confirmDialog, errorToast, fmtChannel, fmtMHz, h, icon, modal, mount, select, seg, slider, t, toast, toggle } from '../core.js';
 import { BOOST_STEPS_DB, liveAudio } from '../live-audio.js';
-import { S, cfg, confirmRecording, on, patchConfig, setFastPolling } from '../state.js';
+import { S, cfg, confirmRecording, on, patchConfig, setFastPolling, syncConfig } from '../state.js';
 import { NAMES, eventLine, fold, levelControl, passes } from './messages.js';
 import { askCustomRange, askSingleFrequency, bandEditor, bandRange, clearOverrides, hasOverrides, presetPicker } from './bands.js';
 
@@ -203,6 +203,42 @@ export function receiverPanel(device, extraControls = null, lockText = 'Stop the
   return { renderDevice, lockDevice };
 }
 
+export function receiverGainControl(field, profile) {
+  let key = '';
+  let level;
+  const render = () => {
+    const { gain_mode: mode, gain_db: gain } = cfg().device;
+    const { gain_range: [min, max] = [0, 50], gain_index: indexed = false } = profile() || {};
+    const nextKey = JSON.stringify([mode, min, max, indexed]);
+    const value = Math.max(min, Math.min(max, gain));
+    if (key !== nextKey) {
+      key = nextKey;
+      const name = indexed ? t('Sensitivity index') : mode === 'sw_auto' ? t('Starting gain') : t('Gain');
+      level = mode === 'auto' ? null : slider({
+        name, min, max, step: indexed ? 1 : 0.1, value, unit: indexed ? '' : 'dB',
+        oninput: (v) => patchConfig({ device: { gain_db: v } }),
+      });
+      if (level) {
+        level.input.setAttribute('aria-label', name);
+        level.set(Number(level.input.value));
+      }
+      mount(field, h('span.small.muted', t('Gain')),
+        seg([['manual', t('Manual')], ['auto', t('Auto (hardware)')], ['sw_auto', t('Auto (software)')]],
+          mode, (v) => {
+            const gainDb = Math.max(min, Math.min(max, cfg().device.gain_db));
+            patchConfig({ device: v === 'auto' ? { gain_mode: v } : { gain_mode: v, gain_db: gainDb } });
+            render();
+          }),
+        level || h('span.faint.small', t('The tuner sets its own gain. Can overload on very strong stations - try software auto then.')));
+    }
+    if (level && Number(level.input.value) !== value) {
+      level.input.value = value;
+      level.set(Number(level.input.value));
+    }
+  };
+  return render;
+}
+
 export function stateLabel(state) {
   return {
     IDLE: t('Stopped'), CALCULATE_NEXT_FREQ: t('Scanning'), TUNING: t('Scanning'), SCANNING: t('Scanning'),
@@ -265,10 +301,11 @@ export function listenView(root, modes) {
   const dongleRow = h('div.row.wrap', { style: { gap: '6px' } });
   // Bands/channels that no dongle's antenna range reaches (live.uncovered, antenna_range.py).
   const rangeNotice = h('div.notice.hidden', { role: 'status' }, icon('ban'), h('span', { style: { flex: '1 1 260px' } }));
+  const tunerHeader = h('div.tuner-header', modes, h('div.tuner-readout', freqEl, nameEl));
   const hero = h('section.card.hero',
     h('div.row', stateChip, h('span.spacer'), cycleText),
+    tunerHeader,
     dongleRow,
-    h('div', freqEl, nameEl),
     driverHint,
     methodHint,
     rangeNotice,
@@ -352,6 +389,8 @@ export function listenView(root, modes) {
     hero.classList.toggle('hidden', paused);
     spectrumCard.classList.toggle('hidden', paused);
     addonPanel.classList.toggle('hidden', !id);
+    const modeHost = paused ? addonPanel : tunerHeader;
+    if (modes.parentNode !== modeHost) modeHost.prepend(modes);
     if (id && !addonPoll) { addonLastId = 0; addonSeen = []; addonName = id; pollAddon(); addonPoll = setInterval(pollAddon, 2000); }
     if (!id && addonPoll) { clearInterval(addonPoll); addonPoll = null; }
     if (id) drawAddon();
@@ -377,7 +416,7 @@ export function listenView(root, modes) {
   const feedCard = h('section.card', h('div.card-head', h('h2', t('Activity'))), feed);
 
   mount(page, h('div.page-head', h('h1', t('Listen'))), h('div.grid.listen',
-    h('div.col', { style: { gap: '16px' } }, modes, addonPanel, hero, spectrumCard, bandsCard),
+    h('div.col', { style: { gap: '16px' } }, addonPanel, hero, spectrumCard, bandsCard),
     h('div.col', { style: { gap: '16px' } }, quick, device, feedCard)));
 
   // ---------------------------------------------------------- behaviour
@@ -385,6 +424,7 @@ export function listenView(root, modes) {
     try {
       if (S.live && S.live.running) await api.post('/api/scanner/stop');
       else {
+        await syncConfig();
         await api.post('/api/scanner/start');
         if (!liveAudio.playing && localStorage.getItem('autolisten') !== '0') liveAudio.start().catch(() => {});
       }
@@ -465,7 +505,7 @@ export function listenView(root, modes) {
     iqBtn.textContent = live.raw_iq ? t('Stop raw IQ') : t('Raw IQ');
     iqBtn.classList.toggle('on', !!live.raw_iq);
     spectrum.draw(live.spectrum);
-    gainSlider && gainSlider.input && (gainSlider.input.min = live.gain_range[0], gainSlider.input.max = live.gain_range[1]);
+    renderGain();
     lockDevice(live.running || live.manual_tuning);
     renderFeed();
   }
@@ -485,12 +525,12 @@ export function listenView(root, modes) {
   }
 
   // ---------------------------------------------------------- quick settings
-  let gainSlider = null;
+  const gainField = h('div.col', { style: { gap: '6px' } });
+  const renderGain = receiverGainControl(gainField, () =>
+    [S.live?.receiver_gain, S.settings.receiver_gain].find((entry) => entry?.driver === cfg().device.driver));
   function renderQuick() {
     const c = cfg();
-    const gainMode = c.device.gain_mode;
-    const range = S.live ? S.live.gain_range : [0, 50];
-    gainSlider = slider({ name: gainMode === 'sw_auto' ? t('Starting gain') : t('Gain'), min: range[0], max: range[1], step: 0.1, value: c.device.gain_db, unit: 'dB', oninput: (v) => patchConfig({ device: { gain_db: v } }) });
+    renderGain();
     const squelch = slider({ name: t('Squelch below trigger'), min: -40, max: 0, step: 1, value: c.squelch_offset_db, unit: 'dB', oninput: (v) => patchConfig({ squelch_offset_db: v }) });
     squelch.input.disabled = !c.squelch_enabled;
     const nr = slider({ name: t('Noise reduction strength'), min: 0, max: 100, step: 1, value: Math.round(c.noise_reduction.strength * 100), unit: '%', oninput: (v) => patchConfig({ noise_reduction: { strength: v / 100 } }) });
@@ -503,10 +543,7 @@ export function listenView(root, modes) {
       h('div.col', { style: { gap: '6px' } },
         toggle(t('Squelch'), c.squelch_enabled, (v) => { patchConfig({ squelch_enabled: v }); squelch.input.disabled = !v; }, { hint: t('Mutes the noise tail after a transmission ends') }),
         squelch),
-      h('div.col', { style: { gap: '6px' } },
-        h('span.small.muted', t('Gain')),
-        seg([['manual', t('Manual')], ['auto', t('Auto (hardware)')], ['sw_auto', t('Auto (software)')]], gainMode, (v) => { patchConfig({ device: { gain_mode: v } }); renderQuick(); }),
-        gainMode === 'auto' ? h('span.faint.small', t('The tuner sets its own gain. Can overload on very strong stations - try software auto then.')) : gainSlider),
+      gainField,
       slider({ name: t('Tuning time'), min: 0, max: 1000, step: 10, value: c.timing.tuning_time_ms, unit: 'ms', oninput: (v) => patchConfig({ timing: { tuning_time_ms: v } }) }),
       slider({ name: t('Hold after a transmission'), min: 0, max: 30000, step: 100, value: c.timing.linger_time_ms, format: (v) => `${(v / 1000).toFixed(1)} s`, oninput: (v) => patchConfig({ timing: { linger_time_ms: v } }) }),
       h('div.col', { style: { gap: '6px' } },

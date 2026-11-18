@@ -326,10 +326,10 @@ catalog loads; wrap them in a function called at point of use
    machine running the scanner — it streams to the browser (gotcha 40).
 
 27. **Three gain modes (`DeviceConfig.gain_mode`): `"manual"`, `"auto"` =
-    the tuner's own hardware AGC (passed straight to `backend.set_gain`),
-    `"sw_auto"` = `SoftwareAgc` (`alisdr/agc.py`, the default).**
+    the tuner's own hardware AGC (the shared Tune/Scan default),
+    `"sw_auto"` = `SoftwareAgc` (`alisdr/agc.py`).**
     Hardware AGC can overdrive the ADC (measured +0.7/+1 dBFS peaks, extra
-    spurious neighbour detections), so `"sw_auto"` is the default: `_maybe_apply_gain()`/`_maybe_run_software_agc()` send explicit
+    spurious neighbour detections). In software Auto, `_maybe_apply_gain()`/`_maybe_run_software_agc()` send explicit
     `"manual"` values computed from each tick's IQ peak (target ≈ −6 dBFS,
     ±3 dB dead zone, ≥1s between steps) and never touch the hardware AGC.
     The step decision uses a peak smoothed over ~1 s (`SMOOTH_TAU_S`), not one

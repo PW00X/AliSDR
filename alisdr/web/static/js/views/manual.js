@@ -1,7 +1,7 @@
-import { api, errorToast, fmtMHz, h, icon, mount, seg, slider, t, toggle } from '../core.js';
+import { api, errorToast, fmtMHz, h, icon, mount, t, toggle } from '../core.js';
 import { liveAudio } from '../live-audio.js';
 import { S, cfg, confirmRecording, on, syncConfig } from '../state.js';
-import { receiverPanel, spectrumPainter } from './listen.js';
+import { receiverGainControl, receiverPanel, spectrumPainter } from './listen.js';
 
 const analogModes = ['AM', 'NFM', 'WFM', 'SSB', 'USB', 'LSB'];
 
@@ -41,33 +41,14 @@ export function manualView(root, modes) {
     value: '99.5', required: true,
   });
   const channel = h('select');
-  let gainMode = 'auto';
-  let gainDb = cfg().device.gain_db;
   let receivers = [];
-  const gainField = h('div.col');
+  const gainField = h('div.col', { style: { gap: '6px' } });
   const receiverField = h('label.field', t('Receiver'), receiver);
   const deviceCard = h('section.card.col');
   const devicePanel = receiverPanel(deviceCard, h('div.col', receiverField, gainField),
     'Stop scanning or tuning to change the device or capture width.');
-  const updateGain = () => {
-    const device = receivers.find(({ id }) => id === Number(receiver.value));
-    const [min, max] = device?.gain_range || [0, 50];
-    gainDb = Math.max(min, Math.min(max, gainDb));
-    const name = device?.gain_index ? t('Sensitivity index')
-      : gainMode === 'sw_auto' ? t('Starting gain') : t('Gain');
-    const level = gainMode === 'auto' ? null : slider({
-      name, min, max, step: device?.gain_index ? 1 : 0.1, value: gainDb,
-      unit: device?.gain_index ? '' : 'dB', oninput: (value) => { gainDb = value; },
-    });
-    if (level) {
-      gainDb = Number(level.input.value);
-      level.set(gainDb);
-      level.input.setAttribute('aria-label', name);
-    }
-    mount(gainField, h('span.small.muted', t('Gain')),
-      seg([['manual', t('Manual')], ['auto', t('Auto (hardware)')], ['sw_auto', t('Auto (software)')]],
-        gainMode, (value) => { gainMode = value; updateGain(); }), level);
-  };
+  const updateGain = receiverGainControl(gainField,
+    () => receivers.find(({ id }) => id === Number(receiver.value)) || S.settings.receiver_gain);
   const frequencyField = h('label.field', t('Frequency (MHz)'), frequency);
   const channelField = h('label.field', t('DAB channel'), channel);
   const tune = h('button.primary.big', { type: 'submit', disabled: true }, icon('play'), t('Tune'));
@@ -137,7 +118,6 @@ export function manualView(root, modes) {
   const tuneValues = () => ({
     receiver: Number(receiver.value), mode: mode.value,
     frequency_hz: Math.round(Number(frequency.value) * 1e6), channel: channel.value,
-    gain_mode: gainMode, gain_db: gainDb,
   });
   const updateControls = () => {
     tune.disabled = !ready || busy || (mode.value === 'DAB' && channel.value === 'favourites');
@@ -382,7 +362,7 @@ export function manualView(root, modes) {
             : [t('FM broadcast'), formatFM(active.frequency_hz)].join(' · ')),
           meta.ensemble && meta.ensemble !== title ? h('span.muted', `${t('Ensemble')}: ${meta.ensemble}`) : null,
           meta.pi ? h('span.muted', `RDS PI: ${meta.pi}`) : null),
-        h('span.spacer'), fm && favouriteButton(fmEntry)) : null,
+        fm && favouriteButton(fmEntry)) : null,
       meta.text ? h('span', meta.text) : null);
     }
   };
@@ -407,7 +387,6 @@ export function manualView(root, modes) {
     ready = true;
     active = data.tuning;
     playingStation = data.station || 0;
-    const previousReceiverKey = receiverKey;
     const nextReceiverKey = JSON.stringify(data.receivers);
     if (receiverKey !== nextReceiverKey) {
       const selected = receiver.value;
@@ -426,19 +405,16 @@ export function manualView(root, modes) {
         receiver.value = active.receiver;
 
         if (active.mode !== 'DAB' && active.frequency_hz) frequency.value = active.frequency_hz / 1e6;
-        if (data.gain) {
-          gainMode = data.gain.mode;
-          gainDb = data.gain.db;
-        }
       }
       updateMode();
     }
-    if (initial || receiverKey !== previousReceiverKey) updateGain();
+    updateGain();
     devicePanel.lockDevice(active || S.live?.running);
     spectrumHint.hidden = active?.mode === 'DAB';
     const fmScan = data.fm_scan;
-    readout.textContent = fmScan ? formatFM(fmScan.frequency_hz) : active?.mode === 'DAB' ? active.channel
-      : active ? `${fmtMHz(active.frequency_hz, 3)} MHz` : '—';
+    if (active?.mode === 'DAB') readout.textContent = active.channel;
+    else if (active) mount(readout, fmtMHz(fmScan?.frequency_hz ?? active.frequency_hz, 3), h('small', 'MHz'));
+    else readout.textContent = '—';
     detail.textContent = fmScan ? t('FM scan') : active?.mode === 'DAB' ? 'DAB/DAB+' : active?.mode === 'WFM' ? t('FM broadcast') : active?.mode || '';
     meter.hidden = data.level == null || !active;
     if (!meter.hidden) {
@@ -536,8 +512,9 @@ export function manualView(root, modes) {
   mount(root, h('div.page.manual-tuning',
     h('div.page-head', h('h1', t('Listen'))),
     h('div.grid.listen',
-    h('div.col', modes,
-    h('section.card.hero', h('div.row', status), frequencyDisplay, info, meter,
+    h('div.col',
+    h('section.card.hero', h('div.row', status),
+      h('div.tuner-header', modes, h('div.tuner-readout', frequencyDisplay, info)), meter,
       h('form.col', { onsubmit: (event) => {
         event.preventDefault();
         if (!tune.disabled) {
@@ -553,7 +530,7 @@ export function manualView(root, modes) {
   updateMode();
   devicePanel.renderDevice();
   const offAudio = on('audio', updateListen);
-  const offSettings = on('settings', devicePanel.renderDevice);
+  const offSettings = on('settings', () => { devicePanel.renderDevice(); updateGain(); });
   const offLive = on('live', (live) => devicePanel.lockDevice(active || live.running));
   refresh();
   return { destroy() { destroyed = true; clearTimeout(timer); offAudio(); offSettings(); offLive(); spectrum.destroy(); } };
