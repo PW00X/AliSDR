@@ -1,7 +1,7 @@
 #!/bin/sh
 # FalconSDR one-line installer:
 #
-#   curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --with-dab
+#   curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --server --with-dab
 #
 # Installs the fork from source by default. With FALCONSDR_REPO set to a
 # repository that publishes releases, picks the matching artifact:
@@ -271,6 +271,7 @@ install_server() {
   else
     $SUDO git -c advice.detachedHead=false clone -q --depth 1 --branch "$ref" "https://github.com/$REPO.git" "$src"
   fi
+  revision="$($SUDO git -C "$src" rev-parse --verify HEAD)"
   if [ "$WITH_DAB" = 1 ]; then
     $SUDO sh "$src/packaging/dab/install.sh" /opt/falconsdr/.venv/lib
   fi
@@ -283,14 +284,13 @@ install_server() {
     retries=10
     while :; do
       session="$(curl --noproxy '*' -fsS --max-time 2 http://127.0.0.1:8765/api/session 2>/dev/null || true)"
-      if printf '%s\n' "$session" | grep -Eq '"navigation"[[:space:]]*:[[:space:]]*"scan-manual"' &&
-         printf '%s\n' "$session" | grep -Eq '"dab_backend"[[:space:]]*:[[:space:]]*"in-process"' &&
+      if printf '%s\n' "$session" | grep -Eq "\"revision\"[[:space:]]*:[[:space:]]*\"$revision\"" &&
          printf '%s\n' "$session" | grep -Eq '"mode"[[:space:]]*:[[:space:]]*"server"'; then
         break
       fi
       retries=$((retries - 1))
       [ "$retries" -gt 0 ] ||
-        die "Port 8765 is not serving the updated headless UI. Check for an older FalconSDR process and run: journalctl -u falconsdr-receiver -n 50 --no-pager"
+        die "Port 8765 is not serving headless revision $revision. Check for an older FalconSDR process and run: journalctl -u falconsdr-receiver -n 50 --no-pager"
       sleep 2
     done
   else
@@ -299,7 +299,7 @@ install_server() {
   systemctl is-active --quiet falconsdr-receiver.service ||
     die "FalconSDR $version is installed, but the service didn't start - see: journalctl -u falconsdr-receiver"
   say ""
-  say "FalconSDR $version is installed and running (service falconsdr-receiver, starts on boot)."
+  say "FalconSDR $version ($revision) is installed and running (service falconsdr-receiver, starts on boot)."
   say "Open it from any device on your network:  http://${ip:-<server-ip>}:8765/"
   say "To update later, run the same command again."
 }

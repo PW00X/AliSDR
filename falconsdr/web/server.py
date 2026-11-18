@@ -38,6 +38,10 @@ from ..military_presets import BandPreset
 from ..models import BlacklistEntry
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+try:
+    _INSTALLED_REVISION = (STATIC_DIR.parents[2] / ".falconsdr-revision").read_text(encoding="ascii").strip()
+except (OSError, UnicodeError):
+    _INSTALLED_REVISION = ""
 _COOKIE = "sst"
 _MAX_JSON = 32 * 1024 * 1024
 _KEEPALIVE_S = 5.0
@@ -226,6 +230,7 @@ def make_handler(app: App):
                     "remote": cfg.remote_receiver.url if app.mode == "client" else "",
                     "navigation": "scan-manual",
                     "dab_backend": "in-process",
+                    "revision": _INSTALLED_REVISION,
                 })
             if path == "/api/i18n":
                 lang = cfg.language

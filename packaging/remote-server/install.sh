@@ -56,6 +56,12 @@ if [ -f "$CONFIG" ]; then
 fi
 
 install -m 644 "$SRC/packaging/remote-server/$UNIT" /etc/systemd/system/
+# Record the deployed source revision before the new process imports the web server.
+revision=$(git -C "$SRC" rev-parse --verify HEAD 2>/dev/null || true)
+if [ -n "$revision" ]; then
+    printf '%s\n' "$revision" > "$DEST/.falconsdr-revision"
+    chmod 644 "$DEST/.falconsdr-revision"
+fi
 systemctl daemon-reload
 systemctl enable --quiet "$UNIT"
 systemctl restart "$UNIT"  # starts it, or restarts it onto the new code

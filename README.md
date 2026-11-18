@@ -424,7 +424,7 @@ Good to know:
 
 Open **Manual** between **Scan** and **Recordings**. For a headless receiver,
 run the [headless installer](#headless-receiver) on the receiver host. It
-restarts the service and checks that the updated navigation is being served.
+restarts the service and verifies that the installed revision is serving the UI.
 
 Select a receiver and enter a frequency in MHz. Use WFM for broadcast FM,
 or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then

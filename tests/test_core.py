@@ -2444,6 +2444,17 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(self._status(locked + "/api/live", headers={"Authorization": "Bearer nope"}), 401)
         self.assertEqual(self._status(locked + "/api/live", headers={"Authorization": "Bearer secret"}), 200)
 
+    def test_installer_can_read_the_running_revision_with_access_locked(self) -> None:
+        from unittest.mock import patch
+
+        with patch("falconsdr.web.server._INSTALLED_REVISION", "a" * 40):
+            locked = self._serve("server", "secret")
+            with urlopen(locked + "/api/session", timeout=5) as response:
+                session = json.load(response)
+        self.assertEqual(session["revision"], "a" * 40)
+        self.assertEqual(session["mode"], "server")
+        self.assertFalse(session["authenticated"])
+
     def test_an_unexpected_error_is_answered_with_500(self) -> None:
         from falconsdr.web.server import App, make_handler
         from http.server import ThreadingHTTPServer
