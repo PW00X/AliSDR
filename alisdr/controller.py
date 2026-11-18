@@ -148,6 +148,7 @@ class Controller:
         self.blacklist: list[BlacklistEntry] = storage.load_blacklist()
         self._lock = threading.Lock()
         self._start_lock = threading.Lock()  # two Start requests at once must not start two sets of engines
+        self.before_dab = None
         # One engine per dongle (config.device + device.extra_devices); the
         # first is the "lead". _audible = index of the one heard live.
         self._engines: list[ScannerEngine] = []
@@ -389,6 +390,8 @@ class Controller:
             session.on_broadcast_audio = self._publish_broadcast_audio
             self.manual_session = session
             try:
+                if tuning.mode == "DAB" and self.before_dab is not None:
+                    self.before_dab()
                 session.start()
             except Exception:
                 self.manual_session = None
@@ -399,6 +402,10 @@ class Controller:
         with self._start_lock:
             self._stop_manual_locked()
             self._manual_error = ""
+
+    def dab_active(self) -> bool:
+        session = self.manual_session
+        return session is not None and session.tuning.mode == "DAB"
 
     def record_manual(self, enabled: bool) -> None:
         if type(enabled) is not bool:

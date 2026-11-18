@@ -55,6 +55,10 @@ Use `--ask-password` if the receiver requires a password, or set
 Manage transcription, copies and library imports in the receiver's web app
 under **Add-ons → Transcription & computers**.
 
+While the receiver tunes or plays DAB/DAB+, transcription on the receiver
+pauses. An interrupted recording returns to the queue and can be processed
+by another computer or retried on the receiver after DAB tuning ends.
+
 ## USB passthrough
 
 The receiver must see the RTL-SDR dongle. Proxmox LXC (on the Proxmox host,

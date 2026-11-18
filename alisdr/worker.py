@@ -33,7 +33,9 @@ from .config import CONFIG_DIR, TranscriptionConfig, _from_dict, atomic_write_te
 from .playback.models import QualityMetrics, Recording
 from .playback.organizer import iter_all_recordings, parse_filename
 from .playback.transcription_availability import is_transcription_installed
+from .playback.transcription_engine import ModelUnavailable, transcribe_recording
 from .playback.transcription_install import model_cached, model_download_bytes
+from .playback.transcription_process import TranscriptionPaused, TranscriptionProcess
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +101,8 @@ class Api:
 class Worker(threading.Thread):
     def __init__(self, base_url: str, token: "str | Callable[[], str]", name: str = "", local_root: Optional[Path] = None,
                  embedded: bool = False, on_detach: Optional[Callable[[], None]] = None,
-                 on_restart: Optional[Callable[[], None]] = None) -> None:
+                 on_restart: Optional[Callable[[], None]] = None,
+                 dab_active: Optional[Callable[[], bool]] = None) -> None:
         super().__init__(daemon=True, name="worker")
         self.api = Api(base_url, token)
         self.name = name or socket.gethostname()
@@ -107,8 +110,11 @@ class Worker(threading.Thread):
         self.embedded = embedded
         self.on_detach = on_detach
         self.on_restart = on_restart
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
         self._wake = threading.Event()  # a command arrived - don't sit out the idle pause
+        self._dab_active = dab_active if embedded and dab_active else lambda: False
+        self._local_transcription = TranscriptionProcess(
+            lambda: self._stop_event.is_set() or self._dab_active()) if embedded else None
         self._log: deque[str] = deque(maxlen=40)
         self._status = "idle"
         self._status_since = time.time()
@@ -159,7 +165,7 @@ class Worker(threading.Thread):
         }
 
     def _heartbeat_loop(self) -> None:
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             sent = time.monotonic()
             try:
                 reply = self.api.post("/api/worker/heartbeat", {"name": self.name, "info": self._info()}, timeout=10)
@@ -178,20 +184,25 @@ class Worker(threading.Thread):
                 self._connected = False
             self._hb_wake.wait(_HEARTBEAT_S)
             self._hb_wake.clear()
-            self._stop.wait(max(0.0, _MIN_HEARTBEAT_GAP_S - (time.monotonic() - sent)))
+            self._stop_event.wait(max(0.0, _MIN_HEARTBEAT_GAP_S - (time.monotonic() - sent)))
 
     # -- main loop ------------------------------------------------------------
     def stop(self) -> None:
-        self._stop.set()
-        self._wake.set()
+        self._stop_event.set()
         self._hb_wake.set()
+        self.pause_transcription()
+
+    def pause_transcription(self) -> None:
+        if self._local_transcription is not None:
+            self._local_transcription.close()
+        self._wake.set()
 
     def run(self) -> None:
         threading.Thread(target=self._heartbeat_loop, daemon=True, name="worker-heartbeat").start()
         imported = False
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             if not self._connected:
-                self._stop.wait(2.0)
+                self._stop_event.wait(2.0)
                 continue
             try:
                 self._run_commands()
@@ -201,15 +212,19 @@ class Worker(threading.Thread):
                 if not self.embedded and time.monotonic() - self._last_mirror > _MIRROR_INTERVAL_S:
                     self._last_mirror = time.monotonic()
                     self._mirror() if self._settings.get("mirror") else self._count_local_only()
-                if self._settings.get("transcribe") and self._installed:
+                can_transcribe = self._settings.get("transcribe") and self._installed
+                if can_transcribe and not self._dab_active() and not self._stop_event.is_set():
                     did_work = self._transcribe_one()
-                self._set_status("transcribing" if did_work else "idle")
+                if can_transcribe and self._dab_active():
+                    self._set_status("paused_dab")
+                else:
+                    self._set_status("transcribing" if did_work else "idle")
                 if not did_work:
                     self._wake.wait(_IDLE_S)
                     self._wake.clear()
             except (URLError, OSError, ValueError, KeyError) as exc:
                 self.say(f"error: {exc}")
-                self._stop.wait(_IDLE_S)
+                self._stop_event.wait(_IDLE_S)
 
     def _run_commands(self) -> None:
         with self._lock:
@@ -234,6 +249,8 @@ class Worker(threading.Thread):
     # -- transcription ----------------------------------------------------------
     def _install(self, with_gpu: bool) -> None:
         from .playback.transcription_install import install_transcription
+        if self._local_transcription is not None:
+            self._local_transcription.close()
         self._set_status("installing")
         self.say("installing transcription - several GB to download, this can take a few minutes")
         ok, needs_restart, message = install_transcription(with_gpu, self._log_line)
@@ -246,6 +263,8 @@ class Worker(threading.Thread):
 
     def _uninstall(self, with_models: bool) -> None:
         from .playback.transcription_install import uninstall_transcription
+        if self._local_transcription is not None:
+            self._local_transcription.close()
         self._set_status("uninstalling")
         self.say("uninstalling transcription…")
         with self._lock:
@@ -261,7 +280,6 @@ class Worker(threading.Thread):
         self._set_status("idle")
 
     def _transcribe_one(self) -> bool:
-        from .playback.transcription_engine import ModelUnavailable, transcribe_recording
         job = self.api.post("/api/worker/claim", {"name": self.name})["job"]
         if not job:
             return False
@@ -286,11 +304,18 @@ class Worker(threading.Thread):
                 tconfig = self._tconfig
             self._expect_model_download(tconfig)
             try:
-                result = transcribe_recording(rec, tconfig, forced_language=job.get("language"))
+                language = job.get("language")
+                if self._local_transcription is not None:
+                    result = self._local_transcription.transcribe(rec, tconfig, language)
+                else:
+                    result = transcribe_recording(rec, tconfig, forced_language=language)
             finally:
                 self._downloading = None
             self.api.post("/api/worker/result", {"id": rel, "key": job["key"], "result": result.__dict__})
             self.say(f"transcribed {Path(rel).name} [{result.status}]")
+        except TranscriptionPaused:
+            self.api.post("/api/worker/release", {"id": rel})
+            return False
         except ModelUnavailable as exc:
             # Back to the queue, untouched - the next try loads the model afresh.
             self.api.post("/api/worker/release", {"id": rel})
@@ -351,7 +376,7 @@ class Worker(threading.Thread):
         self._local_only = sum(1 for rel in local if rel not in server)
         verified = []
         for rel, f in sorted(server.items(), key=lambda kv: kv[0], reverse=True):
-            if self._stop.is_set():
+            if self._stop_event.is_set():
                 break
             if not safe_rel(rel):
                 self.say(f"ignored a suspicious path from the server: {rel[:80]}")
@@ -380,7 +405,7 @@ class Worker(threading.Thread):
         self._set_status("uploading")
         self.say(f"uploading {len(todo)} recordings")
         for i, (rel, path) in enumerate(todo, 1):
-            if self._stop.is_set():
+            if self._stop_event.is_set():
                 break
             try:
                 self.api.upload(rel, path)

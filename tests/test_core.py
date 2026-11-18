@@ -2303,6 +2303,88 @@ class WorkerMirrorTest(unittest.TestCase):
         self.assertEqual(w.api.mirrored, ["d/" + NAME.format(khz=1)])
 
 
+def _test_transcription_process(connection):
+    """Spawn target that waits on the first attempt and can finish on retry."""
+    from alisdr.playback.models import TranscriptionResult
+
+    recording, _config, language = connection.recv()
+    recording.path.with_suffix(".started").touch()
+    if not recording.path.with_suffix(".resume").is_file():
+        time.sleep(60)
+    connection.send((TranscriptionResult("receiver test", language, 1.0, "ok", "test", ""), None))
+    try:
+        connection.recv()
+    except EOFError:
+        pass
+
+
+class WorkerReceptionTest(unittest.TestCase):
+    def test_dab_preempts_receiver_transcription_and_requeues_it(self) -> None:
+        from unittest.mock import patch
+
+        from alisdr.controller import Controller
+        from alisdr.web.server import App, serve
+        from alisdr.worker import Api, Worker
+
+        def wait_for(predicate) -> None:
+            deadline = time.monotonic() + 10
+            while not predicate() and time.monotonic() < deadline:
+                time.sleep(.02)
+            self.assertTrue(predicate())
+
+        cfg = AppConfig()
+        root = Path(tempfile.mkdtemp(dir=_HOME))
+        cfg.recording.output_dir = str(root)
+        cfg.transcription.enabled = False
+        rel = "2026-01-01/" + NAME.format(khz=121500)
+        recording = _wav(root, rel)
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        ctl.library.rescan()
+        ctl.library.request_transcription([rel], "en")
+        http = serve(App(cfg, ctl, ""), "127.0.0.1", 0)
+        self.addCleanup(http.server_close)
+        self.addCleanup(http.shutdown)
+        base = f"http://127.0.0.1:{http.server_port}"
+        remote = Api(base, "")
+        dab_started = threading.Event()
+        process_at_dab_open = []
+
+        def listen(session):
+            process_at_dab_open.append(worker._local_transcription._process)
+            dab_started.set()
+            session.stop_requested.wait(10)
+
+        with patch("alisdr.playback.transcription_process._serve", _test_transcription_process), \
+                patch("alisdr.controller.load_decoder", return_value=object()), \
+                patch("alisdr.manual_tuning.ManualSession._dab", listen), \
+                patch("alisdr.worker.is_transcription_installed", return_value=True), \
+                patch("alisdr.worker.model_cached", return_value=True), \
+                patch("alisdr.worker._IDLE_S", .05):
+            worker = Worker(base, "", name="receiver", embedded=True, dab_active=ctl.dab_active)
+            ctl.before_dab = worker.pause_transcription
+            worker.start()
+            try:
+                wait_for(recording.with_suffix(".started").is_file)
+                ctl.tune_manual({"mode": "DAB", "channel": "12A"})
+                self.assertTrue(dab_started.wait(2))
+                self.assertEqual(process_at_dab_open, [None])
+                wait_for(lambda: worker._status == "paused_dab")
+                self.assertIsNone(ctl.library.get(rel).transcript)
+
+                job = remote.post("/api/worker/claim", {"name": "remote"})["job"]
+                self.assertEqual((job["id"], job["language"]), (rel, "en"))
+                remote.post("/api/worker/release", {"id": rel})
+                recording.with_suffix(".resume").touch()
+                ctl.stop_manual()
+                wait_for(lambda: ctl.library.get(rel).transcript is not None)
+                result = ctl.library.get(rel).transcript
+                self.assertEqual((result.text, result.language), ("receiver test", "en"))
+            finally:
+                worker.stop()
+                worker.join(2)
+
+
 class WorkerProgressTest(unittest.TestCase):
     def _worker(self):
         from alisdr.worker import Worker

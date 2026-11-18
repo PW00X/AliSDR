@@ -83,7 +83,9 @@ def main() -> int:
     worker_host = {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(args.host, args.host)
     worker_host = f"[{worker_host}]" if ":" in worker_host else worker_host
     worker = Worker(f"http://{worker_host}:{httpd.server_port}", lambda: app.token,
-                    name=os.environ.get("ALISDR_WORKER_NAME", ""), embedded=True, on_restart=request_restart)
+                    name=os.environ.get("ALISDR_WORKER_NAME", ""), embedded=True, on_restart=request_restart,
+                    dab_active=controller.dab_active)
+    controller.before_dab = worker.pause_transcription
     threading.Thread(target=controller.start_background, daemon=True, name="library-start").start()
     try:
         worker.start()
@@ -93,9 +95,11 @@ def main() -> int:
             controller.start()
         stop.wait()
     finally:
+        worker.stop()
+        if worker.ident is not None:
+            worker.join(timeout=2)
         httpd.shutdown()
         httpd.server_close()
-        worker.stop()
         controller.shutdown()
     if restart.is_set():
         os.execv(sys.executable, [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]])

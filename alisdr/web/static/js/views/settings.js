@@ -256,7 +256,7 @@ export function settingsView(root, hash, scope = 'settings') {
     };
     const wt = waiting.get(w.name);
     const busy = !!wt || BUSY.includes(info.status);
-    const status = { idle: t('idle'), transcribing: t('transcribing'), copying: t('copying recordings'), uploading: t('uploading recordings'), installing: t('installing transcription…'), uninstalling: t('uninstalling transcription…'), downloading: t('downloading the model…') }[info.status] || info.status;
+    const status = { idle: t('idle'), transcribing: t('transcribing'), paused_dab: t('Transcription paused during DAB'), copying: t('copying recordings'), uploading: t('uploading recordings'), installing: t('installing transcription…'), uninstalling: t('uninstalling transcription…'), downloading: t('downloading the model…') }[info.status] || info.status;
     // What is going on right now, for the operations that take a while.
     const forS = info.status_for_s ? ` (${fmtDuration(info.status_for_s)})` : '';
     const progress = wt && !BUSY.includes(info.status)

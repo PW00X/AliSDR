@@ -1867,6 +1867,9 @@ msgstr "bezczynny"
 msgid "transcribing"
 msgstr "transkrybuje"
 
+msgid "Transcription paused during DAB"
+msgstr "Transkrypcja wstrzymana podczas odbioru DAB"
+
 msgid "copying recordings"
 msgstr "kopiuje nagrania"
 
