@@ -10,24 +10,15 @@ and records audio **only** for transmissions the scanner actually stops on —
 never the retuning noise. `alisdr/scanner_engine.py`'s state machine is
 the authoritative spec.
 
-The UI is a **web app** served by the program itself (Python standard
-library HTTP server + vanilla JS/CSS, no framework, no build step). One
-program, three modes (`main.py`):
-
-- **local** (default) — this computer scans; UI on `http://127.0.0.1:8765`,
-  opened in the browser automatically. A second launch just reopens it.
-- **server** (`--server`, systemd `alisdr-server.service`) — same,
-  reachable from the whole network (phones too). `sdr-mode` (the owner's
-  mode switcher on the receiver) can use the legacy alias. Keep its clean
-  SIGTERM shutdown (gotcha 41).
-- **client** — `AppConfig.remote_receiver.enabled`: this computer doesn't
-  scan; it runs a `Worker` for a server (local Whisper transcription and/or
-  a verified local copy of the recordings) and opens the server's UI.
+The app runs headless. `main.py` serves the browser UI and API on port 8765.
+Use `alisdr-server.service` for an always-on receiver and
+`python3 -m alisdr.worker <server-url>` for optional remote transcription
+and recording copies. Keep clean SIGTERM shutdown (gotcha 41).
 
 ## Running it
 
 ```
-python3 main.py                 # local; --server for the network; --local ignores a saved server
+python3 main.py                 # serve the web app on port 8765
 python3 -m unittest tests/test_core.py tests/test_addons.py
 python3 main.py --probe-sdr [driver]   # with the scanner stopped: measures a real receiver (gotcha 55)
 ```
@@ -54,8 +45,7 @@ catalog loads; wrap them in a function called at point of use
 
 ## Architecture
 
-- `main.py` — CLI/modes, single-instance check, clean shutdown on
-  SIGTERM/SIGINT, mode switches (gotcha 41).
+- `main.py` — headless server CLI and clean shutdown on SIGTERM/SIGINT (gotcha 41).
 - `alisdr/web/server.py` — `ThreadingHTTPServer` + JSON API + live-audio
   stream + recording files (HTTP Range) + worker protocol; auth/CSRF in
   `_route` (gotcha 38). `web/static/` — `index.html`, `app.css`,
@@ -245,7 +235,7 @@ catalog loads; wrap them in a function called at point of use
     macOS stay RTL-SDR-only for the zero-install path; conda-forge SoapySDR
     is a documented, unautomated path for other hardware there.
 18. **Transcription (faster-whisper) is an in-app-installable optional
-    extra** (packaged builds: see gotcha 43), not in `requirements.txt`, and runs in a `Worker` (gotcha 37) on
+    extra**, not in `requirements.txt`, and runs in a `Worker` (gotcha 37) on
     whichever computer has it switched on — never assume the scanning
     machine can run Whisper. `is_transcription_installed()`
     (`transcription_availability.py` — `importlib.invalidate_caches()` then
@@ -419,76 +409,6 @@ catalog loads; wrap them in a function called at point of use
     `analyze_wav()`'s SNR scoring (already relative to the file's own
     content) are untouched. Guards divide-by-zero for a genuinely all-
     silent file (stays all-zero).
-35. **`packaging/linux-deb/build.sh`** builds a self-contained PyInstaller
-    `--onedir` bundle wrapped in a .deb (RTL-SDR only - no SoapySDR - plus
-    `alisdr/web/static` as data; see its own header comment and
-    README.md for the full rationale/known limitations). Several real,
-    clean-container-verified gotchas any other frozen build (Windows .exe,
-    AppImage) will also hit - the first two are the same underlying
-    failure mode (a native library loaded dynamically at *runtime*, not
-    linked at import time, so PyInstaller's static analysis can't see it
-    needs bundling) with three different fix shapes depending on how each
-    library does its own loading:
-    - **`tzdata` needs `--collect-data tzdata` explicitly** - it ships only
-      data files, so PyInstaller's static import analysis never sees
-      `zoneinfo`'s own runtime fallback to it and silently drops it,
-      reopening the exact `ZoneInfoNotFoundError` this package was added to
-      requirements.txt to prevent in the first place.
-    - **`pyrtlsdrlib` needs `--collect-data pyrtlsdrlib` explicitly** -
-      `pyrtlsdrlib.lib.load_librtlsdr()` locates its own bundled
-      `librtlsdr.so*` via `importlib.resources.files()` at runtime, which
-      this fix makes visible to the bundle at its correct package-relative
-      path. Without it, the build can appear to work on a dev machine that
-      happens to also have a *system* `rtl-sdr` package installed (pyrtlsdr's
-      own fallback chain silently finds that instead) while failing on a
-      genuinely clean machine with neither - `HAVE_RTLSDR_NATIVE` ends up
-      False there, and the app falls through to the SoapySDR path this build
-      deliberately doesn't ship, surfacing as "the python3-soapysdr module is
-      not installed" instead of ever finding the real dongle.
-    - **`main.py`'s venv re-exec check and `transcription_install.py`'s
-      installer both gate on `getattr(sys, "frozen", False)`** - a frozen
-      build's own `sys.executable` *is* the app itself, not a real Python;
-      calling `[sys.executable, "-m", "pip", ...]` would try to re-launch
-      the whole app a second time instead of running pip. The transcription
-      installer fails with a clear message in a frozen build instead. Any
-      future code path that shells out to `sys.executable` expecting a real
-      interpreter needs the same guard. **That message must go through
-      `on_line`** - the worker's log (shown per computer in Settings) is the
-      only place the user sees why an install failed. Likewise `_restart()`
-      in `main.py` re-execs `sys.executable` directly when frozen.
-    - **A fresh install has no udev rule granting a plain user access to an
-      RTL-SDR dongle's USB device, and nothing stops the kernel's own DVB-T
-      driver from claiming it first** - the `rtl-sdr` apt package normally
-      provides both, but this self-contained build intentionally depends on
-      no system package. Real, reported symptom: the device "isn't
-      detected" and the app silently fell back to `Simulated` (its "auto"
-      driver mode did that on *any* open failure, including a plain
-      permission error) - indistinguishable from a genuine hardware
-      problem. Gotcha 8's `debug_mode` gate (added later) means a non-debug
-      install now surfaces this as a visible "Failed to connect... retrying"
-      state instead, but the real udev/DVB-T fix below is still needed so
-      it connects at all. Fixed by shipping `60-rtl-sdr.rules` (udev,
-      0bda:2832/2838 → group `plugdev`) and `blacklist-rtl-dvb.conf`
-      (modprobe blacklist for `dvb_usb_rtl28xxu`/`rtl2832`/`rtl2830`) via
-      `postinst`. **Every `udevadm`/`rmmod` call in `postinst` is wrapped in
-      `timeout`** - `udevadm control --reload-rules` can hang indefinitely
-      (not just fail) with no running udev daemon (confirmed hanging the
-      whole `apt install` in a bare Docker container) - a postinst must
-      never be able to block an install.
-    - **Build the published .deb in an old distro**
-      (`packaging/linux-deb/build-in-docker.sh`, Debian 11): a bundle built
-      on a new glibc half-works on older systems - the app starts, then a
-      lazily imported module (`termios`, hit by deleting Whisper models)
-      fails with "GLIBC_2.42 not found".
-    - **A system program started from the frozen Linux app must not inherit
-      its `LD_LIBRARY_PATH`** (PyInstaller points it at the bundle) - a
-      system ffmpeg loaded the bundle's libraries and failed every MP3.
-      `audio_transcode.system_env()` restores the user's value; use it for
-      any new subprocess of a system binary.
-    - **`multiprocessing.freeze_support()` runs first in `main.py` when
-      frozen** - Whisper's libraries start multiprocessing's resource
-      tracker, which re-runs the app's own executable with `-c ...`.
-
 36. **Engine signals are plain synchronous callbacks** (`scanner_engine.Signal`,
     no Qt): handlers run on whichever engine thread emits (main loop, slot
     pool, spectrum worker). Every handler must be thread-safe and quick —
@@ -510,7 +430,7 @@ catalog loads; wrap them in a function called at point of use
     `/api/` call except session/login/i18n needs the HttpOnly cookie or
     `Authorization: Bearer`. Independently, every POST/PUT must carry
     `X-AliSDR: 1` (a non-simple header → CORS preflight this server never
-    answers → other websites can't trigger actions), and local mode with no
+    answers → other websites can't trigger actions), and a loopback-only server with no
     password refuses non-loopback `Host` headers (DNS rebinding). Keep both
     when adding endpoints; `api()` in `core.js` and `worker.Api` add the
     header.
@@ -524,12 +444,9 @@ catalog loads; wrap them in a function called at point of use
     context (HTTPS/localhost), and the UI is reached by plain `http://IP`.
     Idle streams get 10 ms of silence every 5 s (keeps proxies/sockets
     alive and lets the server notice dead listeners).
-41. **Mode switches and stops shut down cleanly first.** SIGTERM/SIGINT,
-    the UI's Quit, connect/disconnect all set `stop` in `main.py`, which
-    then runs `controller.shutdown()` (closes every open recording) before
-    exiting or re-exec'ing — `sdr-mode` stops the receiver unit on every
-    mode switch, and an `os.execv()` straight from a request handler would
-    leave truncated recordings.
+41. **Server shutdown closes every open recording.** SIGTERM/SIGINT
+    set the stop event in `main.py`; the main thread calls
+    `controller.shutdown()` before exiting.
 
 42. **UI design follows the `apple-design` skill's HIG rules** (owner's
     choice): appearance follows the system light/dark setting only — no
@@ -547,47 +464,6 @@ catalog loads; wrap them in a function called at point of use
     small `seg()`: someone who does not know a switch exists must still see it. Channels lists have a checkbox column
     (shift = range), a sticky bulk bar (scan / don't scan / move to folder / delete) and "Delete all"; click / Ctrl /
     Shift / Ctrl+A / Delete still work.
-
-43. **Windows release = `packaging/windows/build.ps1`** (PyInstaller
-    `--onedir --noconsole` → portable ZIP + Inno Setup installer,
-    `alisdr.iss`; see its README). Same `--collect-data` rules as gotcha
-    35. Every build runs `main.py --self-test` (`alisdr/selftest.py`) and
-    a smoke run on the *built* exe with `PATH` = System32 and an empty
-    profile - a dependency the bundle lacks must fail the build, never a
-    user's first launch (`build.sh` runs the self-test too). Add a check to
-    `selftest.py` for any new runtime-loaded dependency. A windowed exe has
-    `sys.stdout`/`stderr` = None - `main.py` points them at
-    `CONFIG_DIR/alisdr.log`. The installer never touches the user's
-    profile; its `AppId` must never change (upgrades/uninstall find the
-    install by it). **Packaged builds install transcription too**: `main.py
-    --pip` runs the bundled pip (`--collect-all pip`, plus a distlib finder
-    registration for its launcher templates) into `ADDONS_DIR`
-    (`transcription_install.py`, appended to sys.path by `enable_addons()`).
-    The Windows bundle needs `python3.dll` copied in by `build.ps1` - abi3
-    wheels (PyAV) link it and PyInstaller omits it. Never `--upgrade` add-ons
-    already imported in the process (Windows locks loaded `.pyd`), and never
-    install over a pending removal (`_REMOVE_MARKER`): `rmtree` skips locked
-    `.pyd` and pip `--target` skips existing folders - together they left
-    half-deleted `tokenizers`/`av` and every transcription failed. MP3 in
-    every install: `audio_transcode.ffmpeg_exe()` = system ffmpeg, else
-    `imageio-ffmpeg`'s binary; spawn console tools with `NO_WINDOW` (the
-    windowed exe would flash a console per call). Never assume text files
-    are read in UTF-8 on Windows - always pass `encoding="utf-8"`. **The
-    installer's "Launch AliSDR" goes through `explorer.exe`, never the exe
-    directly**: a process Inno Setup starts inherits its RedirectionTrust
-    mitigation and can't follow the (non-admin) symlinks of the Hugging Face
-    model cache - every model load failed with "Unable to open file
-    'model.bin'" until the app was restarted from the Start menu. A model
-    that can't load raises `ModelUnavailable` - the recording goes back to
-    the queue (worker retries in `_MODEL_RETRY_S`), never an "error" result.
-44. **"Start with the system" (`alisdr/autostart.py`) is off by default
-    and the OS login item is its only state** (HKCU `Run` / XDG autostart
-    `.desktop` / macOS LaunchAgent - the last untested on a real Mac), no
-    config flag that could disagree with it. Always `--no-browser`. Local
-    mode only (`/api/autostart` refuses in server mode - systemd owns that).
-    Windows-only UI help for the WinUSB/Zadig driver (`listen.js`
-    `driverHelp()`, shown while `RECONNECTING` and in the SDR device card)
-    keys off `capabilities.platform`.
 
 45. **Digital voice (DMR, C4FM/YSF) is an optional add-on, never bundled**
     (`digital_voice.py`): dsd-fme + mbelib (AMBE/IMBE vocoder - patent-
@@ -770,7 +646,7 @@ catalog loads; wrap them in a function called at point of use
     covers (`iq_uncovered(steady)` for blocking reads, `async_stream(last)` for the stream), and
     `py-spy record --gil --threads --format raw` in a throwaway venv names the GIL holder.
 
-54. **`RtlSdrBackend` (librtlsdr: Windows, macOS, the .deb, the receiver) switches from blocking
+54. **`RtlSdrBackend` (librtlsdr: Windows, macOS and Linux) switches from blocking
     reads to an async stream once the scanner has stayed on a frequency for 8 reads**
     (`_ASYNC_AFTER_READS`; `DeviceConfig.async_read`, default on; Settings → Advanced "Continuous RTL-SDR reading" switches it off, read when the device opens). Between two blocking
     `rtlsdr_read_sync` calls no transfer is pending and the dongle drops samples: measured on the
@@ -811,16 +687,10 @@ catalog loads; wrap them in a function called at point of use
     block); native lost 0.000 s (soapy: not measured); DC spike +7.7 dB native vs +0.3 dB soapy over the floor - the one open point, see
     "DC spike" below; Airspy never.) SoapySDR stays the default for both; the native
     path is the way out when SoapySDR is missing/fails (`open_real_backend`: `hackrf`/`airspy` without SoapySDR
-    open natively) and a way to compare. `libhackrf`/`libairspy` are loaded by `_find_library` (bundle folder, system
-    package, `ALISDR_LIBHACKRF`/`ALISDR_LIBAIRSPY`) and **bundled in the Windows build, every Linux package and (since 1.4.1) the macOS builds (Homebrew `hackrf`/`airspy`, `--add-binary`, self-test required via `ALISDR_REQUIRE_NATIVE_LIBS`; the workflow's `attach` input off = a test build that never touches a release)** (the
-    `build-in-docker.sh` scripts install them - Fedora: `hackrf`, `airspyone_host` - and set `ALISDR_REQUIRE_NATIVE_LIBS=1`: a missing
-    one fails the build and `--self-test` requires them). Licences checked from the sources on 2026-10-31: both libraries BSD-3-Clause
-    (GPL-compatible; a binary needs their notice: `fetch_native_libs.py` and `linux-native-libs.sh` append it to
-    THIRD-PARTY-LICENSES.txt), libusb LGPL-2.1 and libwinpthread MIT, as separate DLLs/.so. Windows DLLs come from
-    conda-forge, pinned by SHA-256 in `packaging/windows/fetch_native_libs.py` (HackRF publishes no Windows binaries;
-    Airspy's own zip needs the VC++ 2010 runtime) - update them there; `--self-test` loads both (a dropped file fails
-    the build; `ALISDR_REQUIRE_NATIVE_LIBS=1` makes it required on Linux too). Do not copy SoapyHackRF (MIT) / hackrf-tools
-    (GPL-2.0) code; the gain split is our own. What the code assumes and `main.py --probe-sdr` must confirm on a
+    open natively) and a way to compare. `libhackrf` and `libairspy` are loaded
+    from system libraries or paths specified by `ALISDR_LIBHACKRF` /
+    `ALISDR_LIBAIRSPY`. Both libraries are BSD-3-Clause. Do not copy
+    SoapyHackRF (MIT) or hackrf-tools (GPL-2.0) code. What to confirm on a
     real board: how many blocks after a retune still hold the old frequency (`CallbackStream.begin_retune` drops
     those that arrive within one transfer + a margin of the retune - the same bug SoapySDR had, gotcha 54), the
     gain steps (HackRF: LNA 8 dB x VGA 2 dB split, amp above 102 dB - `hackrf_gain_split`; Airspy: the
@@ -975,7 +845,7 @@ catalog loads; wrap them in a function called at point of use
 Unit tests: `python -m unittest tests/test_core.py` (sets its own scratch
 `HOME` *and* `USERPROFILE` - `Path.home()` reads the latter on Windows; with
 `HOME` alone the tests once overwrote the real config there). To smoke-test end to end, run `HOME=/tmp/x python3 main.py
---no-browser --port 18810` with a config there that has
+--host 127.0.0.1 --port 18810` with a config there that has
 `"debug_mode": true, "device": {"driver": "simulated"}` and a scratch
 `recording.output_dir` — otherwise
 config edits during a manual test run land in the real

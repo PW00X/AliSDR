@@ -9,7 +9,7 @@ Type=simple
 User=alisdr
 SupplementaryGroups=plugdev
 WorkingDirectory=/opt/alisdr
-ExecStart=/opt/alisdr/.venv/bin/python /opt/alisdr/main.py --server
+ExecStart=/opt/alisdr/.venv/bin/python /opt/alisdr/main.py
 # SIGTERM closes every open recording cleanly (sdr-mode switches stop this unit).
 TimeoutStopSec=15
 Restart=always

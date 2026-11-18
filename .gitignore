@@ -13,20 +13,6 @@ __pycache__/
 # OS cruft
 .DS_Store
 
-# Packaging build artifacts (built fresh by packaging/*/build.sh - never committed)
-packaging/linux-deb/build-venv/
-packaging/linux-deb/build/
-packaging/linux-deb/out/
-packaging/rpm/build-venv/
-packaging/rpm/build/
-packaging/rpm/out/
-packaging/appimage/build-venv/
-packaging/appimage/build/
-packaging/appimage/out/
-packaging/windows/build-venv/
-packaging/windows/build/
-packaging/windows/out/
-
 # Test/tool caches and leftovers of atomic writes (config.atomic_write_text)
 .pytest_cache/
 *.tmp

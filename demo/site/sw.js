@@ -886,8 +886,8 @@ function settings() {
     // Like Controller.devices(): the network entry carries the typed address while it is the chosen one, or the UI loses it.
     devices: DEVICES.map((d) => ({ driver: d.driver, args: d.driver === 'rtl_tcp' && st.config.device.driver === 'rtl_tcp' ? st.config.device.device_args || '' : '', label: tr(d.label), rate: d.rate })),
     languages: FX.languages,
-    capabilities: { ffmpeg: true, transcription_installed: true, digital: false, platform: 'linux', autostart: null },
-    curated: FX.curated, mode: 'local', password_set: false,
+    capabilities: { ffmpeg: true, transcription_installed: true, digital: false, platform: 'linux' },
+    curated: FX.curated, mode: 'server', password_set: false,
   };
 }
 
@@ -912,7 +912,7 @@ const notInDemo = () => { throw new Error(tr('Not available in the online demo -
 async function body(req) { try { return await req.json(); } catch { return {}; } }
 
 const ROUTES = {
-  'GET /api/session': () => ({ authenticated: true, mode: 'local', remote: '' }),
+  'GET /api/session': () => ({ authenticated: true, mode: 'server', remote: '' }),
   'GET /api/i18n': (req, q) => {
     const want = (q.get('lang') || 'en').slice(0, 2).toLowerCase();
     uiLang = FX.i18n[want] ? want : 'en';
@@ -1008,12 +1008,9 @@ const ROUTES = {
     return { ok: true };
   },
   'POST /api/access': notInDemo,
-  'POST /api/quit': notInDemo,
-  'POST /api/autostart': notInDemo,
   'GET /api/digital': () => ({ installed: false, running: false, log: [], error: '', hint: '' }),
   'POST /api/digital/install': notInDemo,
   'POST /api/digital/uninstall': notInDemo,
-  'POST /api/client/connect': notInDemo,
   'GET /api/library': (req, q) => query(q),
   'GET /api/library/ids': (req, q) => select(q).map((e) => e.id),
   'GET /api/library/facets': () => facets(),

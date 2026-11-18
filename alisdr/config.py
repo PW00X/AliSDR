@@ -134,7 +134,7 @@ def _default_candidate_languages() -> list[str]:
 
 def _from_dict(cls, raw: dict):
     """Builds a config dataclass ignoring keys it doesn't know - a config.json
-    written by a newer/older version (or pushed by a newer desktop client to
+    written by a newer/older version (or pushed by a newer browser client to
     a remote receiver) must never crash load() with an unexpected-keyword
     TypeError. Also covers stale keys of removed options ("mode",
     "insert_marker", "audio_format")."""
@@ -318,10 +318,7 @@ class TranscriptionConfig:
 
 @dataclass
 class RemoteReceiverConfig:
-    """Client mode: this computer doesn't scan itself, it works for a
-    AliSDR server elsewhere - transcribing locally and/or keeping a
-    local copy of its recordings (see worker.py). Off = local mode."""
-    enabled: bool = False
+    """Credentials saved by earlier installs, used by the headless worker."""
     url: str = ""  # e.g. "http://receiver.local:8765"
     token: str = ""
 

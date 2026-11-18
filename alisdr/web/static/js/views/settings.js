@@ -22,7 +22,6 @@ const SECTIONS = [
   ['location', () => t('Location')],
   ['appearance', () => t('Language & listening')],
   ['storage', () => t('Disk & retention')],
-  ['connect', () => t('Connect to a server')],
   ['access', () => t('Access')],
   ['advanced', () => t('Advanced')],
 ];
@@ -80,7 +79,7 @@ export function settingsView(root, hash, scope = 'settings') {
   const offs = [];
   const timers = [];
   const cards = {};
-  const visible = (scope === 'addons' ? ADDON_SECTIONS : SECTIONS).filter(([k]) => k !== 'connect' || S.settings.mode === 'local');
+  const visible = scope === 'addons' ? ADDON_SECTIONS : SECTIONS;
   const nav = h('nav', visible.map(([k, label]) => h('a', { href: `#/${scope}/${k}`, onclick: (e) => { e.preventDefault(); cards[k].scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, label())));
   const content = h('div.col', { style: { gap: '16px' } });
   mount(root, h('div.page', h('div.page-head', h('h1', scope === 'addons' ? t('Add-ons') : t('Settings'))),
@@ -213,9 +212,8 @@ export function settingsView(root, hash, scope = 'settings') {
       h('details',
         h('summary.small.muted', { style: { cursor: 'pointer' } }, t('Add another computer (e.g. your PC with a GPU)')),
         h('div.col', { style: { marginTop: '10px' } },
-          h('p.small.muted', { style: { margin: 0 } }, t('On that computer start AliSDR, open Settings → Connect to a server and enter:')),
-          h('code.cmd', location.origin),
-          S.settings.password_set ? h('p.small.muted', { style: { margin: 0 } }, t('…and this server\'s password.')) : null,
+          h('p.small.muted', { style: { margin: 0 } }, t('From an AliSDR checkout on the worker, run:')),
+          h('code.cmd', `python3 -m alisdr.worker ${location.origin}${S.settings.password_set ? ' --ask-password' : ''}`),
           h('p.small.muted', { style: { margin: 0 } }, t('It then shows up here. Turn on transcription or local copies for it, and if it already has recordings of its own, send them here with one click.')))));
     loadWorkers();
   }
@@ -291,14 +289,12 @@ export function settingsView(root, hash, scope = 'settings') {
         !w.online && !info.embedded ? h('button.ghost.small', { onclick: () => api.post('/api/workers/forget', { name: w.name }).then(loadWorkers) }, t('Forget')) : null),
       info.last_seen && !w.online ? h('span.faint.small', t('Last seen {ago}', { ago: fmtAgo(new Date(info.last_seen * 1000).toISOString()) })) : null,
       progress,
-      setting(t('Transcribe here'), info.removal_pending ? h('span', { style: { color: 'var(--warn)' } }, t('Transcription is uninstalled - restart AliSDR on this computer to remove its files.'))
-        : info.installed === false ?t('Whisper isn\'t installed on this computer yet.')
+      setting(t('Transcribe here'), info.installed === false ? t('Whisper isn\'t installed on this computer yet.')
         : s.transcribe && !cfg().transcription.enabled ? h('span', { style: { color: 'var(--warn)' } }, t('Automatic transcription is off above - this computer only gets recordings you queue by hand.'))
           : (s.transcribe && pending ? t('{n} recordings waiting', { n: pending.toLocaleString() }) : ''),
         h('div.row.wrap',
-          info.removal_pending && w.online ? h('button.primary', { disabled: busy, onclick: () => command('restart') }, icon('refresh'), t('Restart now')) : null,
-          info.installed === false && !info.removal_pending && w.online ? h('button', { disabled: busy, onclick: () => command('install') }, icon('download'), t('Install')) : null,
-          info.installed === false && !info.removal_pending && w.online && info.gpu ? h('button', { disabled: busy, onclick: () => command('install_gpu') }, t('Install with GPU support')) : null,
+          info.installed === false && w.online ? h('button', { disabled: busy, onclick: () => command('install') }, icon('download'), t('Install')) : null,
+          info.installed === false && w.online && info.gpu ? h('button', { disabled: busy, onclick: () => command('install_gpu') }, t('Install with GPU support')) : null,
           info.installed === true && w.online && (info.status === 'idle' || wt) ? h('button.ghost.danger', { disabled: busy, onclick: () => uninstall() }, icon('trash'), t('Uninstall')) : null,
           toggle('', s.transcribe, (v) => update({ transcribe: v })))),
       info.embedded ? null : setting(t('Keep a copy of every recording'), t('Copied to this folder on that computer (verified by size).'),
@@ -367,26 +363,6 @@ export function settingsView(root, hash, scope = 'settings') {
         st.hint ? h('p.small.muted', { style: { margin: 0 } }, t('It needs a compiler and a few libraries. Install them with this command (in a terminal on this machine), then press Install again:')) : null,
         st.hint ? h('code.cmd', st.hint) : null) : null,
       st.log.length ? h('pre.log', st.log.filter((l) => l.trim()).join('\n')) : null);
-  }
-
-  // ---------------------------------------------------------- connect (local mode)
-  function renderConnect() {
-    if (!cards.connect) return;
-    const url = h('input', { placeholder: 'http://192.168.1.10:8765', style: { width: 'min(320px, 100%)' } });
-    const pass = h('input', { type: 'password', placeholder: t('Password (if the server has one)') });
-    const btn = h('button.primary', {
-      onclick: async () => {
-        btn.disabled = true;
-        try {
-          const res = await api.post('/api/client/connect', { url: url.value, token: pass.value });
-          toast(t('Connected - opening the server…'), 'good');
-          setTimeout(() => { location.href = `${res.url}/#token=${encodeURIComponent(res.token)}`; }, 1500);
-        } catch (e) { errorToast(e); btn.disabled = false; }
-      },
-    }, icon('link'), t('Connect'));
-    mount(body('connect'),
-      h('p.muted', { style: { margin: 0 } }, t('Have a AliSDR server elsewhere (e.g. an always-on receiver)? Connect this computer to it: it stops scanning on its own and instead transcribes and/or keeps copies of the server\'s recordings. You can come back to local mode any time.')),
-      h('div.row.wrap', url, pass, btn));
   }
 
   // ---------------------------------------------------------- access
@@ -515,21 +491,6 @@ export function settingsView(root, hash, scope = 'settings') {
             renderAll();
           },
         }, t('Reset…'))),
-      S.settings.mode === 'local' && S.settings.capabilities.autostart !== null ? setting(t('Start with the system'), t('Starts AliSDR in the background when you log in to this computer, without opening the browser.'),
-        toggle('', S.settings.capabilities.autostart, async (v, e) => {
-          try {
-            S.settings.capabilities.autostart = (await api.post('/api/autostart', { enabled: v })).enabled;
-          } catch (err) { errorToast(err); }
-          e.target.checked = S.settings.capabilities.autostart;
-        })) : null,
-      S.settings.mode === 'local' ? setting(t('Quit AliSDR'), t('Stops the scanner and closes the program running in the background. Start it again from the menu or with the same command.'),
-        h('button', {
-          onclick: async () => {
-            if (!(await confirmDialog(t('Quit AliSDR'), t('Stop scanning and close the program?'), t('Quit'), true))) return;
-            await api.post('/api/quit');
-            document.body.replaceChildren(h('div.center-page', h('div.card.login', h('h2', 'AliSDR'), h('p.muted', t('Closed. You can close this tab.')))));
-          },
-        }, icon('logout'), t('Quit'))) : null,
       h('p.faint.small', { style: { margin: 0 } }, `AliSDR ${S.settings.version} · ${S.settings.mode} · ${lang}`));
   }
 
@@ -552,7 +513,6 @@ export function settingsView(root, hash, scope = 'settings') {
       if (!stopNotify) stopNotify = notifyCard(body('notify'));
       return;
     }
-    renderRecording(); renderAddonsSignpost(); renderStorage(); renderConnect(); renderAccess();
     renderLocation(); renderPresets(); renderAppearance(); renderAdvanced();
   }
   renderAll();

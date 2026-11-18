@@ -1,8 +1,6 @@
 """Experimental native backends for HackRF (libhackrf) and Airspy (libairspy), loaded with ctypes.
 
-Both libraries are BSD-3-Clause (headers checked 2026-10-31), so AliSDR (GPL-3.0-or-later) may use and
-ship them: the Windows and .deb builds bundle them (packaging/windows/fetch_native_libs.py, linux-deb/build.sh).
-Elsewhere they are *found*: a system package (``libhackrf0``,
+Both libraries are BSD-3-Clause and can be loaded from a system package (``libhackrf0``,
 ``libairspy0``), a DLL next to the program, or ``ALISDR_LIBHACKRF`` / ``ALISDR_LIBAIRSPY``.
 SoapySDR stays the default for these two (it is the better tested path); this is the way out when it is
 missing or fails. Neither has been run against real hardware by the author - ``main.py --probe-sdr``
@@ -39,8 +37,6 @@ def _find_library(names: tuple[str, ...], env: str, find_name: str) -> ctypes.CD
     if os.environ.get(env):
         candidates.append(os.environ[env])
     folders = [Path(sys.executable).parent, Path(__file__).resolve().parent.parent]
-    if getattr(sys, "frozen", False) and getattr(sys, "_MEIPASS", None):
-        folders.insert(0, Path(sys._MEIPASS))
     for folder in folders:
         candidates += [str(folder / n) for n in names if (folder / n).exists()]
     candidates += list(names)
@@ -586,8 +582,7 @@ def native_status(max_age_s: float = 15.0) -> dict:
     with _status_lock:
         if _status is not None and time.monotonic() - _status[0] < max_age_s:
             return _status[1]
-        cmd = [sys.executable, "--list-native-sdr"] if getattr(sys, "frozen", False) else \
-            [sys.executable, str(Path(__file__).resolve().parent.parent / "main.py"), "--list-native-sdr"]
+        cmd = [sys.executable, str(Path(__file__).resolve().parent.parent / "main.py"), "--list-native-sdr"]
         try:
             out = subprocess.run(cmd, capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL,
                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout

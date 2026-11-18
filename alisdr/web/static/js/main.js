@@ -1,4 +1,4 @@
-import { api, errorToast, h, icon, loadLanguage, modal, mount, t, toast } from './core.js';
+import { api, errorToast, h, icon, loadLanguage, mount, t, toast } from './core.js';
 import { liveAudio } from './live-audio.js';
 import { S, addonsInUse, emit, loadSettings, maybeShowLaunchNotice, on, startPolling } from './state.js';
 import { channelsView } from './views/channels.js';
@@ -13,8 +13,8 @@ import { statsView } from './views/stats.js';
 const app = document.getElementById('app');
 
 const ROUTES = {
-  listen: { label: () => t('Scan'), icon: 'listen', view: listenView },
   manual: { label: () => t('Static'), icon: 'headphones', view: manualView },
+  listen: { label: () => t('Scan'), icon: 'listen', view: listenView },
   recordings: { label: () => t('Recordings'), icon: 'library', view: recordingsView },
   // What the add-on decoders found. Shown once add-ons are in use (Add-ons is the always-visible showcase); with
   // nothing received yet it explains itself and points to Add-ons.
@@ -35,15 +35,8 @@ async function boot() {
     setTimeout(boot, 3000);
     return;
   }
-  // #token=... (opened by main.py on a helper computer) logs in without typing.
-  const m = location.hash.match(/token=([^&]+)/);
-  if (m) {
-    history.replaceState(null, '', location.pathname);
-    try { await api.post('/api/login', { token: decodeURIComponent(m[1]) }); } catch { /* fall through to the form */ }
-  }
   const session = await api.get('/api/session');
   if (!session.authenticated) return loginPage();
-  if (session.mode === 'client') return clientPage();
   await loadSettings();
   shell();
   startPolling();
@@ -69,54 +62,17 @@ function loginPage() {
   input.focus();
 }
 
-// This computer only helps another server: show what it's doing and how to get there.
-async function clientPage() {
-  const body = h('div.col');
-  const card = h('div.card.login', { style: { width: 'min(560px, 100%)', textAlign: 'left' } },
-    h('div.row', h('img', { src: 'icon.svg', alt: '', style: { width: '44px', height: '44px', margin: 0 } }),
-      h('div', h('h2', 'AliSDR'), h('span.muted', t('This computer works for a AliSDR server')))),
-    body);
-  mount(app, h('div.center-page', card));
-  const refresh = async () => {
-    let st;
-    try { st = await api.get('/api/client/status'); } catch { return; }
-    const info = st.info || {};
-    mount(body,
-      h('div.row.wrap',
-        h('span.chip', { class: st.connected ? 'good live' : 'bad' }, h('span.dot'), st.connected ? t('Connected') : t('Not connected')),
-        h('span.chip', st.name),
-        info.gpu ? h('span.chip.accent', icon('cpu'), info.gpu) : null),
-      h('div.mono.small.muted', st.url),
-      h('p.muted', t('Transcription and copying are set up per computer in the server\'s Settings → Transcription & computers.')),
-      info.log && info.log.length ? h('pre.small.muted', { style: { maxHeight: '160px', overflow: 'auto', margin: 0 } }, info.log.slice(-8).join('\n')) : null,
-      h('div.row.wrap',
-        h('button.primary.big', { onclick: () => { location.href = `${st.url}/#token=${encodeURIComponent(st.token)}`; } }, icon('external'), t('Open the server panel')),
-        h('button.ghost', {
-          onclick: async () => {
-            if (!(await modal(t('Disconnect from the server?'), t('This computer goes back to scanning on its own. Recordings stay on the server.'), [[t('Cancel'), false, 'ghost'], [t('Disconnect'), true, 'danger solid']]))) return;
-            await api.post('/api/client/disconnect');
-            toast(t('Switching to local mode…'));
-            setTimeout(() => location.reload(), 2500);
-          },
-        }, t('Disconnect'))));
-  };
-  refresh();
-  setInterval(refresh, 3000);
-}
-
 let current = null;
 
 function shell() {
-  const defaultRoute = S.settings.mode === 'server' ? 'manual' : 'listen';
-  const routeOrder = Object.keys(ROUTES);
-  if (defaultRoute === 'manual') routeOrder.splice(0, 2, 'manual', 'listen');
+  const defaultRoute = 'manual';
   const routeKey = () => (location.hash.match(/^#\/(\w+)/) || [])[1] || defaultRoute;
   const nav = h('nav.nav');
   const status = h('div.status');
   const content = h('main');
   mount(app, h('div.shell',
     h('header.topbar',
-      h('a.brand', { href: '#/' + defaultRoute }, h('img', { src: 'icon.svg', alt: '' }), 'AliSDR', h('small', S.settings.mode === 'server' ? t('server') : '')),
+      h('a.brand', { href: '#/' + defaultRoute }, h('img', { src: 'icon.svg', alt: '' }), 'AliSDR', h('small', t('server'))),
       nav, status),
     content));
   const markActive = () => {
@@ -127,7 +83,7 @@ function shell() {
     });
   };
   const renderNav = () => {
-    nav.replaceChildren(...routeOrder.map((key) => [key, ROUTES[key]]).filter(([, r]) => !r.show || r.show())
+    nav.replaceChildren(...Object.entries(ROUTES).filter(([, r]) => !r.show || r.show())
       .map(([key, r]) => h('a', { href: `#/${key}`, 'data-route': key }, icon(r.icon), h('span', r.label()))));
     markActive();
   };

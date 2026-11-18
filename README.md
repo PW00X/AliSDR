@@ -93,8 +93,7 @@ headless receiver you listen to from any phone or PC on your network.
   [what it needs](#transcription-needs-more-than-scanning).
 
 **Server and multiple computers**
-- `--server` mode for a small always-on Linux receiver (mini PC, home
-  server, container).
+- Headless receiver for a mini PC, home server, or container.
 - Other computers connect to it to transcribe recordings with their GPU
   and/or keep a verified local copy of the library.
 - An RTL-SDR on another computer works as a source too, through its `rtl_tcp`
@@ -113,34 +112,26 @@ headless receiver you listen to from any phone or PC on your network.
 
 An RTL-SDR is opened through librtlsdr; on Linux from source also through
 SoapySDR - choose under *SDR device → Access method*. HackRF and Airspy work
-through the bundled `libhackrf` / `libairspy` (experimental: confirmed on a
-real HackRF One, **untested on an Airspy**; pick *Access method → libhackrf /
-libairspy*); on Linux from source they work
-through [SoapySDR](https://github.com/pothosware/SoapySDR) with the matching
-module, or through the same built-in access once `libhackrf0` / `libairspy0`
-are installed.
+through the system `libhackrf` / `libairspy` libraries or
+[SoapySDR](https://github.com/pothosware/SoapySDR) with the matching module.
 
 HackRF captures 2-20 MHz (the default 2.4 MHz is the safest start); an Airspy
 only the fixed widths its board has (for instance 2.5 and 10 MHz on an Airspy
 R2), and AliSDR picks the nearest. A wider capture needs more processor -
 on a 4-core mini PC about 1, 8 and 19 ms of every 30 ms block go to the
 spectrum at 2.4, 10 and 20 MHz, plus 2, 9 and 17 ms for each transmission being
-recorded. The macOS builds carry the HackRF/Airspy libraries since 1.4.1
-(untested on a real Mac).
+recorded.
 
 Developed and tested with an **RTL-SDR Blog V4** on Linux and Windows 11.
 A **HackRF One** has been checked on Linux (10 MHz capture; SoapySDR and
 libhackrf both scan, libhackrf reported no lost samples) by
 [phutch](https://github.com/phutch) in
 [upstream issue #9](https://github.com/rafafunt/FalconSDR/issues/9) - thank you.
-Other receivers and macOS (experimental builds) should work but haven't been
-tested yet - reports are welcome.
 
-**Testing a receiver:** stop the scanner and run `alisdr --probe-sdr`
-(from source: `python main.py --probe-sdr`; add `hackrf_native` / `hackrf` /
+**Testing a receiver:** stop the scanner and run `python3 main.py --probe-sdr`
+(add `hackrf_native` / `hackrf` /
 `airspy_native` / `airspy` to pick the way it is opened, or `rtl_tcp` to
-measure the server whose address is saved on the Scan page; on Windows the output
-goes to `%USERPROFILE%\.config\AliSDR\alisdr.log`). It measures the
+measure the server whose address is saved on the Scan page). It measures the
 gain steps, the DC spike, how many blocks after a retune still hold the old
 frequency, and sample losses, and prints one `RESULT {...}`
 line - please paste it into an issue together with your receiver's model.
@@ -151,7 +142,7 @@ Any antenna works; one cut or tuned for the band you scan works much better.
 
 Scanning and recording are light - a small mini PC runs them fine. The
 figures below are only for the optional speech-to-text (it can also run on
-another computer, see [Headless receiver](#headless-receiver)). Pick the
+another computer, see [Headless receiver](packaging/remote-server/README.md#headless-transcription-worker)). Pick the
 model on the Add-ons page (Transcription).
 
 | Model | RAM (GPU: VRAM) | Word errors, clean / noisy radio |
@@ -191,26 +182,13 @@ one run each.
 
 ## Installation
 
-### Linux desktop or headless server
+### Headless Linux server
 
-The installer fetches the AliSDR source and installs its Python dependencies.
-On Debian-based systems, it also builds the native DAB/DAB+ decoder.
-
-For a local desktop checkout:
+On Debian, Ubuntu, or Raspberry Pi OS, run this on the receiver to build and
+install AliSDR with DAB/DAB+ from source:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash
-```
-
-Launch it with `.venv/bin/python main.py` from the AliSDR checkout. Use
-`--with-sdr-libs` to install the system HackRF and Airspy libraries on
-supported distributions. For SoapySDR, install the distribution's Python
-bindings and the driver for your receiver.
-
-On the headless receiver (Debian, Ubuntu or Raspberry Pi OS):
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server
 ```
 
 Open `http://<receiver-ip>:8765` in your browser. The service starts at boot
@@ -232,11 +210,9 @@ python3 -m venv --system-site-packages .venv
 .venv/bin/python main.py
 ```
 
-On Windows, use `py -m venv .venv` and
-`.venv\Scripts\python.exe` for the two Python commands. RTL-SDR devices on
-Windows need the WinUSB driver. Select the device in AliSDR after installing
-its driver. For Debian-based systems, the one-line installer also builds
-DAB and prepares the receiver service when invoked with `--server`.
+Open `http://<receiver-ip>:8765` from another device on the network. To build
+the DAB decoder from the checkout on Debian-based Linux, run
+`sudo sh packaging/dab/install.sh "$PWD/.venv/lib"`.
 
 ### Network receiver (rtl_tcp)
 
@@ -278,7 +254,7 @@ Good to know:
 ### Static tuning, FM and DAB/DAB+
 
 Open **Static** from the top navigation. For a headless receiver,
-run the [headless installer](#linux-desktop-or-headless-server) on the receiver host. It
+run the [headless installer](#headless-linux-server) on the receiver host. It
 restarts the service and verifies that the installed revision is serving the UI.
 
 Manual opens with DAB/DAB+ selected on a new browser and remembers the
@@ -297,8 +273,7 @@ Static defaults to **Auto (hardware)**. To set a different gain mode or level,
 press **Tune** to apply them. The Scan page keeps its own configured gain.
 With the native Airspy driver, the slider shows the 0–21 sensitivity index.
 
-For digital broadcast radio on the Linux receiver, run the headless installer
-with `--server`. AliSDR's Python receiver feeds IQ from the
+The Linux installer builds DAB/DAB+ by default. AliSDR's Python receiver feeds IQ from the
 selected SDR to the [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline)
 shared library and sends decoded audio through AliSDR's live audio stream.
 
@@ -333,7 +308,7 @@ ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.
 - **Some frequencies are just a constant carrier or interference** (birdies
   from your own computer or USB hub, a nearby transmitter's harmonics, a dead
   carrier). They trip the trigger all the time and keep you from lowering it.
-  Add them to the **blacklist** (Listen → *Skip + blacklist*, or Channels →
+  Add them to the **blacklist** (Scan → *Skip + blacklist*, or Channels →
   Blacklist). After that you can usually lower the trigger level by several
   dB and pick up the weak stations you were missing.
 - **Gain** defaults to *Auto (software)*. The tuner's own hardware AGC tends
@@ -353,12 +328,9 @@ ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.
 Run from the source checkout.
 
 ```
-python3 main.py         local mode: scan on this computer, UI on 127.0.0.1:8765
-python3 main.py --server      reachable from the whole network
+python3 main.py               serve the web app on the network at port 8765
 python3 main.py --start       start scanning right away
-python3 main.py --local       scan locally even if this computer is set up as a client of a server
-python3 main.py --port 9000   another port
-python3 main.py --no-browser  don't open the browser
+python3 main.py --host 10.0.0.5 --port 9000   bind a specific interface and port
 python3 main.py --version     show the version
 python3 main.py --self-test   check this install has everything it needs
 python3 main.py --probe-sdr   measure the receiver with the scanner stopped (see Hardware)

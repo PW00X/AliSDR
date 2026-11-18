@@ -170,14 +170,6 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(Path(out["dirs"][0]["path"]), root.resolve() / "A")
 
 
-class AutostartTest(unittest.TestCase):
-    def test_login_item_never_opens_the_browser_and_quotes_paths(self) -> None:
-        from alisdr import autostart
-        self.assertEqual(autostart.command()[-1], "--no-browser")
-        self.assertEqual(autostart._desktop_exec(["/opt/falcon sdr/x", "--no-browser"]), '"/opt/falcon sdr/x" --no-browser')
-        self.assertEqual(autostart._desktop_exec(['/a"b$c']), r'"/a\"b\$c"')
-
-
 class LibraryTest(_LibCase):
     def test_rescan_reads_only_folders_whose_listing_changed(self) -> None:
         import os
@@ -290,41 +282,6 @@ class LibraryTest(_LibCase):
         fresh = Library(self.cfg, lambda: self.open, lambda: {})  # program restarted
         fresh.rescan()
         self.assertEqual(fresh.claim_job("pc")["id"], rel)
-
-    def test_packaged_uninstall_waits_for_a_restart_only_while_in_use(self) -> None:
-        import sys
-        from unittest import mock
-        from alisdr.playback import transcription_install as ti
-        lines: list[str] = []
-        with mock.patch.object(sys, "frozen", True, create=True):
-            ti.enable_addons()
-            (ti.ADDONS_DIR / "faster_whisper").mkdir(exist_ok=True)
-            with mock.patch.object(ti, "_loaded", return_value=True):  # Windows: files locked
-                self.assertEqual(ti.uninstall_transcription([], lines.append), (True, True, ""))
-            self.assertTrue((ti.ADDONS_DIR / "faster_whisper").exists())
-            ti.enable_addons()  # next start
-            self.assertFalse((ti.ADDONS_DIR / "faster_whisper").exists())
-            self.assertFalse(ti._REMOVE_MARKER.exists())
-            (ti.ADDONS_DIR / "faster_whisper").mkdir()
-            with mock.patch.object(ti, "_loaded", return_value=False):
-                self.assertEqual(ti.uninstall_transcription([], lines.append), (True, False, ""))
-            self.assertFalse((ti.ADDONS_DIR / "faster_whisper").exists())
-            self.assertTrue(ti.ADDONS_DIR.is_dir())  # still there for a later install
-            # Another process still holds a .pyd: rmtree leaves part of it - finish on restart.
-            (ti.ADDONS_DIR / "faster_whisper").mkdir()
-            with mock.patch.object(ti, "_loaded", return_value=False), \
-                    mock.patch.object(ti.shutil, "rmtree"), mock.patch.object(ti.time, "sleep"):
-                self.assertEqual(ti.uninstall_transcription([], lines.append), (True, True, ""))
-                self.assertTrue(ti.removal_pending())
-                sys.path.remove(str(ti.ADDONS_DIR))
-                ti.enable_addons()  # restart while still locked: marker stays, broken files stay off sys.path
-                self.assertNotIn(str(ti.ADDONS_DIR), sys.path)
-            self.assertTrue(ti.removal_pending())
-            ok, _, _ = ti.install_transcription(False, lines.append)  # never over half-removed files
-            self.assertFalse(ok)
-            ti.enable_addons()
-            self.assertFalse((ti.ADDONS_DIR / "faster_whisper").exists())
-            self.assertFalse(ti._REMOVE_MARKER.exists())
 
     def test_uninstall_deletes_only_the_chosen_models(self) -> None:
         from unittest import mock
@@ -2457,7 +2414,7 @@ class WorkerSafeRelTest(unittest.TestCase):
 
 
 class HttpTest(unittest.TestCase):
-    def _serve(self, mode: str, token: str):
+    def _serve(self, token: str):
         from alisdr.web.server import App, make_handler
         from http.server import ThreadingHTTPServer
 
@@ -2469,7 +2426,7 @@ class HttpTest(unittest.TestCase):
 
             def stop(self):
                 pass
-        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), token, mode)))
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), token)))
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         self.addCleanup(httpd.server_close)
         self.addCleanup(httpd.shutdown)
@@ -2484,9 +2441,9 @@ class HttpTest(unittest.TestCase):
             return e.code
 
     def test_password_is_optional_and_enforced_when_set(self) -> None:
-        open_url = self._serve("server", "")
+        open_url = self._serve("")
         self.assertEqual(self._status(open_url + "/api/live"), 200)
-        locked = self._serve("server", "secret")
+        locked = self._serve("secret")
         self.assertEqual(self._status(locked + "/api/live"), 401)
         self.assertEqual(self._status(locked + "/api/live", headers={"Authorization": "Bearer nope"}), 401)
         self.assertEqual(self._status(locked + "/api/live", headers={"Authorization": "Bearer secret"}), 200)
@@ -2495,7 +2452,7 @@ class HttpTest(unittest.TestCase):
         from unittest.mock import patch
 
         with patch("alisdr.web.server._INSTALLED_REVISION", "a" * 40):
-            locked = self._serve("server", "secret")
+            locked = self._serve("secret")
             with urlopen(locked + "/api/session", timeout=5) as response:
                 session = json.load(response)
         self.assertEqual(session["revision"], "a" * 40)
@@ -2511,7 +2468,7 @@ class HttpTest(unittest.TestCase):
 
             def live(self, since_log=0):
                 raise AttributeError("a bug")
-        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "", "server")))
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "")))
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         self.addCleanup(httpd.server_close)
         self.addCleanup(httpd.shutdown)
@@ -2540,7 +2497,7 @@ class HttpTest(unittest.TestCase):
 
         class Ctl:
             library = Lib()
-        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "", "server")))
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "")))
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         self.addCleanup(httpd.server_close)
         self.addCleanup(httpd.shutdown)
@@ -2586,7 +2543,7 @@ class HttpTest(unittest.TestCase):
     def test_a_wrong_password_is_answered_slowly(self) -> None:
         from unittest import mock
         from alisdr.web import server
-        url = self._serve("server", "secret")
+        url = self._serve("secret")
         def login(token: str) -> tuple[int, float]:
             began = time.monotonic()
             req = Request(url + "/api/login", data=json.dumps({"token": token}).encode(), method="POST",
@@ -2604,7 +2561,7 @@ class HttpTest(unittest.TestCase):
         self.assertGreaterEqual(elapsed, 0.3)  # asked for 0.4; Windows timers are coarse and sleep() can return early
 
     def test_csrf_and_dns_rebinding_are_refused(self) -> None:
-        url = self._serve("local", "")
+        url = self._serve("")
         self.assertEqual(self._status(url + "/api/scanner/stop", "POST"), 403)
         self.assertEqual(self._status(url + "/api/scanner/stop", "POST", {"X-AliSDR": "1"}), 200)
         self.assertEqual(self._status(url + "/api/scanner/stop", "POST", {"X-FalconSDR": "1"}), 200)
@@ -2793,7 +2750,7 @@ class ManualTuningTest(unittest.TestCase):
         cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
         ctl = Controller(cfg)
         cleanup.callback(ctl.shutdown)
-        web = cleanup.enter_context(serve(App(cfg, ctl, "secret", "server"), "127.0.0.1", 0))
+        web = cleanup.enter_context(serve(App(cfg, ctl, "secret"), "127.0.0.1", 0))
         cleanup.callback(web.shutdown)
         url = f"http://127.0.0.1:{web.server_port}/api"
         headers = {"Authorization": "Bearer secret", "X-AliSDR": "1", "Content-Type": "application/json"}
@@ -2993,6 +2950,89 @@ class ManualTuningTest(unittest.TestCase):
             decoder.feed(chunk, 200000)
         self.assertEqual(decoder.info, {"pi": "CAFE", "name": "FALCONFM", "text": "Hi"})
 
+    def test_dab_favourite_after_scan_recovers_from_sync_without_services(self) -> None:
+        from unittest.mock import patch
+
+        import numpy as np
+
+        from alisdr import manual_tuning
+        from alisdr.controller import Controller
+        from alisdr.sdr_backend import SimulatedBackend
+
+        events = []
+        sid = 0x1234
+
+        class Receiver(SimulatedBackend):
+            def set_frequency(self, frequency):
+                events.append(("frequency", frequency))
+                super().set_frequency(frequency)
+
+            def set_gain(self, mode, gain):
+                events.append(("gain", mode))
+                super().set_gain(mode, gain)
+
+        class Decoder:
+            opened = 0
+
+            def __init__(self, library, station, reception, metadata, image):
+                type(self).opened += 1
+                self.attempt = self.opened
+                self.station = station
+                self.reception = reception
+                self.selected = 0
+                events.append(("decoder", self.attempt))
+
+            def push(self, iq):
+                self.reception(True, 20, 0)
+                if self.attempt == 2:
+                    self.station(sid, b"Radio Plus", 63)
+
+            def select(self, service):
+                self.selected = service
+                events.append(("select", service))
+
+            def drain_audio(self):
+                if self.selected:
+                    yield 48_000, np.full(960, 1200, dtype=np.int16)
+
+            def close(self):
+                events.append(("close", self.attempt))
+
+        cfg = AppConfig()
+        cfg.device.driver = "simulated"
+        cfg.recording.enabled = False
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        with patch("alisdr.controller.load_decoder", return_value=object()), \
+                patch.object(manual_tuning, "open_real_backend", return_value=Receiver(2_048_000)), \
+                patch.object(manual_tuning, "Decoder", Decoder), \
+                patch.object(manual_tuning, "DAB_TUNER_SETTLE_S", .01), \
+                patch.object(manual_tuning, "DAB_GAIN_SETTLE_S", .01), \
+                patch.object(manual_tuning, "DAB_RETRY_AFTER_S", .05):
+            ctl = Controller(cfg)
+            audio = ctl.subscribe_audio(broadcast=True)
+            try:
+                ctl.start()
+                ctl.tune_manual({"mode": "DAB", "channel": "12A", "rediscover": True, "gain_mode": "auto"})
+                tune_id = ctl.manual_status()["tune_id"]
+                self.assertFalse(ctl.running)
+                deadline = time.monotonic() + 5
+                while not ctl.manual_status()["stations"] and time.monotonic() < deadline:
+                    time.sleep(.01)
+                status = ctl.manual_status()
+                self.assertEqual(status["tune_id"], tune_id, (status["error"], events))
+                self.assertEqual([service["id"] for service in status["stations"]], [sid])
+                ctl.select_dab_station(sid, "12A", tune_id)
+                self.assertTrue(audio.get(timeout=5))
+                transitions = [event for event in events if event[0] != "gain"]
+                self.assertEqual(transitions[:6], [
+                    ("frequency", 223_936_000), ("decoder", 1), ("close", 1),
+                    ("frequency", 223_936_000), ("decoder", 2), ("select", sid),
+                ])
+                self.assertIn(("gain", "manual"), events)
+            finally:
+                ctl.unsubscribe_audio(audio, True)
+                ctl.shutdown()
+
     def test_empty_dab_channel_times_out_and_releases_receiver(self) -> None:
         from unittest.mock import Mock, patch
 
@@ -3084,7 +3124,7 @@ class UploadAndRangeTest(_LibCase):
 
         class Ctl:
             library = self.lib
-        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "", "server")))
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "")))
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         self.addCleanup(httpd.server_close)
         self.addCleanup(httpd.shutdown)

@@ -29,14 +29,13 @@ if ! id alisdr >/dev/null 2>&1; then
     useradd --system --home-dir "$HOME_DIR" --no-create-home --shell /usr/sbin/nologin --groups plugdev alisdr
 fi
 mkdir -p "$DEST"
-rsync -a --delete --exclude .venv --exclude .git --exclude '__pycache__' \
-    --exclude 'packaging/linux-deb/build*' --exclude 'packaging/linux-deb/out' "$SRC/" "$DEST/"
+rsync -a --delete --exclude .venv --exclude .git --exclude '__pycache__' "$SRC/" "$DEST/"
 [ -x "$DEST/.venv/bin/python" ] || python3 -m venv --system-site-packages "$DEST/.venv"
 "$DEST/.venv/bin/pip" install --quiet --upgrade -r "$DEST/requirements.txt"
 sh "$SRC/packaging/dab/install.sh" "$DEST/.venv/lib"
 
-install -D -m 644 "$SRC/packaging/linux-deb/60-rtl-sdr.rules" /etc/udev/rules.d/60-rtl-sdr.rules
-install -D -m 644 "$SRC/packaging/linux-deb/blacklist-rtl-dvb.conf" /etc/modprobe.d/blacklist-rtl-dvb.conf
+install -D -m 644 "$SRC/packaging/remote-server/60-rtl-sdr.rules" /etc/udev/rules.d/60-rtl-sdr.rules
+install -D -m 644 "$SRC/packaging/remote-server/blacklist-rtl-dvb.conf" /etc/modprobe.d/blacklist-rtl-dvb.conf
 command -v udevadm >/dev/null && timeout 5 udevadm control --reload-rules >/dev/null 2>&1 || true
 
 install -m 644 "$SRC/packaging/remote-server/$UNIT" "$UNIT_DIR/$UNIT"

@@ -4075,3 +4075,6 @@ msgstr "Pasmo odbiornika jest zbyt wąskie do skanowania FM."
 
 msgid "DAB decoder unavailable. Run the Linux source installer to build the DAB decoder."
 msgstr "Dekoder DAB jest niedostępny. Uruchom instalator dla systemu Linux, aby go zbudować."
+
+msgid "From an AliSDR checkout on the worker, run:"
+msgstr "W katalogu źródłowym AliSDR na komputerze roboczym uruchom:"

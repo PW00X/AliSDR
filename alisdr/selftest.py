@@ -1,10 +1,6 @@
-"""`main.py --self-test`: proves a build carries everything a machine with
-nothing installed needs - run by the packaging scripts on the *built* app,
-so a dependency PyInstaller silently dropped (AGENTS.md gotcha 35: tzdata,
-librtlsdr) fails the build instead of a user's first launch."""
+"""Verify the headless server runtime and its installed dependencies."""
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -28,16 +24,11 @@ def _checks():
         return f"librtlsdr loaded ({Path(rtlsdr.__file__).parent.name})"
 
     def native_receiver_libraries():
-        # libhackrf/libairspy are bundled in the Windows build and the .deb (ALISDR_REQUIRE_NATIVE_LIBS=1 there):
-        # a dropped DLL/.so must fail the build, not the first HackRF user. Listing needs no device, but loads libusb.
         from alisdr import sdr_native
         hack, air = sdr_native.hackrf_library(), sdr_native.airspy_library()
-        required = getattr(sys, "frozen", False) and (sys.platform == "win32" or os.environ.get("ALISDR_REQUIRE_NATIVE_LIBS") == "1")
         missing = [name for name, lib in (("libhackrf", hack), ("libairspy", air)) if lib is None]
-        if required and missing:
-            raise RuntimeError(f"{' and '.join(missing)} could not be loaded from the bundle")
         sdr_native.enumerate_here()    # in this process: nothing else holds libusb in a self-test
-        return "libhackrf and libairspy load" if not missing else f"not bundled here ({', '.join(missing)} missing - fine for a source install)"
+        return "libhackrf and libairspy load" if not missing else f"optional libraries missing: {', '.join(missing)}"
 
     def web_ui():
         from alisdr.web.server import STATIC_DIR
@@ -92,20 +83,7 @@ def _checks():
                 raise RuntimeError("MP3 decoded to nothing")
         return f"encode + decode ok ({Path(exe).name})"
 
-    def addon_installer():
-        if not getattr(sys, "frozen", False):
-            return "not a packaged build - pip of the running Python is used"
-        from pip import __version__
-        from pip._internal.cli.main import main  # noqa: F401 - what `--pip` runs
-        from pip._vendor import distlib
-        launcher = Path(distlib.__file__).parent / "t64.exe"
-        if sys.platform == "win32" and not launcher.is_file():
-            raise RuntimeError(f"pip's script launchers missing ({launcher})")
-        if sys.platform == "win32" and not (Path(sys.executable).parent / "_internal" / "python3.dll").is_file():
-            raise RuntimeError("python3.dll missing - abi3 add-ons (PyAV) can't load")
-        return f"bundled pip {__version__}"
-
-    return [numpy_scipy, timezones, rtlsdr_library, native_receiver_libraries, web_ui, translations, band_presets, demodulator, mp3, addon_installer]
+    return [numpy_scipy, timezones, rtlsdr_library, native_receiver_libraries, web_ui, translations, band_presets, demodulator, mp3]
 
 
 def run() -> int:

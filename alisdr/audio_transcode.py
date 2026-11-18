@@ -5,38 +5,19 @@ long-standing rule (a transcode is a whole-file operation; doing it per-chunk
 would be both pointless and slow).
 
 ``ffmpeg``: a system one on PATH wins, otherwise the binary shipped in the
-``imageio-ffmpeg`` pip package (requirements.txt) - so MP3 also works in the
-packaged builds with nothing installed. Still degrades gracefully: with no
+``imageio-ffmpeg`` pip package (requirements.txt) - so MP3 works without a system FFmpeg install. Still degrades gracefully: with no
 ffmpeg at all, the WAV is simply left in place rather than the recording
 being lost or the scanner failing.
 """
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 
-# A console program started from the windowed Windows build would flash a
-# console window per call; 0 (no flags) everywhere else.
+# Keep Windows subprocesses headless. Other platforms use no flags.
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-
-def system_env() -> dict | None:
-    """Environment for running a *system* program (ffmpeg, nvidia-smi). A
-    frozen Linux build points LD_LIBRARY_PATH at its own bundled libraries;
-    a system ffmpeg loading those fails ("could not encode MP3")."""
-    if not getattr(sys, "frozen", False):
-        return None
-    env = dict(os.environ)
-    orig = env.pop("LD_LIBRARY_PATH_ORIG", None)  # PyInstaller keeps the user's own value here
-    if orig is None:
-        env.pop("LD_LIBRARY_PATH", None)
-    else:
-        env["LD_LIBRARY_PATH"] = orig
-    return env
 
 
 def ffmpeg_exe() -> str | None:
@@ -79,7 +60,6 @@ def transcode_to_mp3(wav_path: Path, bitrate_kbps: int = 96) -> Path | None:
             capture_output=True,
             timeout=120,
             creationflags=NO_WINDOW,
-            env=system_env(),
         )
         partial.replace(mp3_path)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):

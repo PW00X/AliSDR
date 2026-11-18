@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from alisdr.audio_transcode import NO_WINDOW, ffmpeg_exe, system_env
+from alisdr.audio_transcode import NO_WINDOW, ffmpeg_exe
 from alisdr.playback.config import APP_DATA_DIR
 from alisdr.playback.models import QualityMetrics
 
@@ -47,7 +47,7 @@ def _mp3_to_wav_file(path: Path) -> Path:
     try:
         subprocess.run(
             [ffmpeg, "-v", "error", "-y", "-i", str(path), "-f", "wav", name],
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True, creationflags=NO_WINDOW, env=system_env(),
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True, creationflags=NO_WINDOW,
         )
     except BaseException:
         Path(name).unlink(missing_ok=True)

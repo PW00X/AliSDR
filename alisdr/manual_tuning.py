@@ -28,6 +28,8 @@ FM_SCAN_WIDTH_HZ = 90_000
 FM_SCAN_SNR_DB = 10
 FM_RDS_DWELL_S = 4
 DAB_DISCOVERY_TIMEOUT = 20
+DAB_RETRY_AFTER_S = 8
+DAB_TUNER_SETTLE_S = 0.35
 DAB_GAIN_SETTLE_S = 5
 ANALOG_MODES = ("AM", "NFM", "WFM", "SSB", "USB", "LSB")
 _log = logging.getLogger(__name__)
@@ -289,6 +291,21 @@ class ManualSession(threading.Thread):
         if sid == self.station:
             self.station_image = (sid, hashlib.sha256(data).hexdigest(), media_type, data)
 
+    def _settle_dab(self, acquisition, chunk, frequency, gain, software_gain):
+        acquisition.set_frequency(frequency)
+        # The first few blocks can include the previous capture or startup AGC.
+        # Discard them before initializing the OFDM decoder.
+        agc = SoftwareAgc(gain) if software_gain else None
+        deadline = time.monotonic() + (DAB_GAIN_SETTLE_S if agc else DAB_TUNER_SETTLE_S)
+        while not self.stop_requested.is_set() and time.monotonic() < deadline:
+            iq = acquisition.read(chunk)
+            if agc and iq.size:
+                new_gain = agc.step(float(np.max(np.abs(iq))), acquisition.gain_range_db)
+                if new_gain is not None:
+                    acquisition.set_gain("manual", new_gain)
+                    gain = new_gain
+        return gain
+
     def _dab(self):
         dev = self.device
         gain = dev["gain_db"]
@@ -308,22 +325,10 @@ class ManualSession(threading.Thread):
             acquisition = AcquisitionThread(raw, chunk, max_queued=12, debug=self.debug)
             self.gain_range = acquisition.gain_range_db
             frequency = CHANNELS[self.tuning.channel]
-            acquisition.set_frequency(frequency)
-            acquisition.read(chunk)
+            lo, hi = acquisition.gain_range_db
             if dev["gain_mode"] != "auto":
-                lo, hi = acquisition.gain_range_db
                 gain = max(lo, min(hi, gain))
-            if software_gain:
-                # Gain steps flush the Airspy's IQ queues. Let software AGC
-                # settle first, then give the decoder an uninterrupted stream.
-                agc = SoftwareAgc(gain)
-                deadline = time.monotonic() + DAB_GAIN_SETTLE_S
-                while not self.stop_requested.is_set() and time.monotonic() < deadline:
-                    iq = acquisition.read(chunk)
-                    new_gain = agc.step(float(np.max(np.abs(iq))), acquisition.gain_range_db)
-                    if new_gain is not None:
-                        acquisition.set_gain("manual", new_gain)
-                        gain = new_gain
+            gain = self._settle_dab(acquisition, chunk, frequency, gain, software_gain)
             if self.stop_requested.is_set():
                 return
             channel = ChannelInput(rate)
@@ -335,6 +340,8 @@ class ManualSession(threading.Thread):
             self.state = "discovering"
             started = time.monotonic()
             next_meter = started
+            retried = False
+            ever_synced = False
             previous_sid = previous_rate = 0
             last_audio = started
             audio_resampler = None
@@ -347,8 +354,30 @@ class ManualSession(threading.Thread):
                     spectrum.submit(iq, rate, frequency, 0)
                     next_meter = now + 0.35
                 decoder.push(conditioned)
+                ever_synced |= self.synced
                 if self.stations:
                     self.state = "listening"
+                elif not retried and DAB_RETRY_AFTER_S < DAB_DISCOVERY_TIMEOUT and now - started >= DAB_RETRY_AFTER_S:
+                    # OFDM sync alone does not establish that the ensemble's
+                    # service information can be decoded. Restart discovery
+                    # after another hardware tune, without reopening USB.
+                    retried = True
+                    decoder.close()
+                    decoder = None
+                    self.station_info.clear()
+                    self.synced = False
+                    fallback_gain = dev["gain_mode"] == "auto"
+                    if fallback_gain:
+                        gain = (lo + hi) / 2
+                        acquisition.set_gain("manual", gain)
+                    gain = self._settle_dab(acquisition, chunk, frequency, gain, fallback_gain)
+                    if self.stop_requested.is_set():
+                        return
+                    channel = ChannelInput(rate)
+                    decoder = Decoder(self.dab_library, self._dab_station, self._dab_reception,
+                                      self._dab_metadata, self._dab_image)
+                    started = time.monotonic()
+                    continue
                 elif now - started >= DAB_DISCOVERY_TIMEOUT:
                     lost = stream_stats()[0] - lost_before if stream_stats else 0.0
                     _log.warning(
@@ -358,7 +387,7 @@ class ManualSession(threading.Thread):
                         dev["gain_db"], gain, self.level, acquisition.chunks_dropped - dropped_before, lost,
                     )
                     message = ("DAB channel {channel} synchronized, but no audio stations were decoded."
-                               if self.synced else "No DAB signal could be synchronized on channel {channel}.")
+                               if ever_synced else "No DAB signal could be synchronized on channel {channel}.")
                     raise RuntimeError(tr(message).format(channel=self.tuning.channel))
 
                 if self.pending_station in self.stations:

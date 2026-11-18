@@ -29,12 +29,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from .audio_transcode import system_env
 from .config import CONFIG_DIR, TranscriptionConfig, _from_dict, atomic_write_text
 from .playback.models import QualityMetrics, Recording
 from .playback.organizer import iter_all_recordings, parse_filename
 from .playback.transcription_availability import is_transcription_installed
-from .playback.transcription_install import model_cached, model_download_bytes, removal_pending
+from .playback.transcription_install import model_cached, model_download_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +155,7 @@ class Worker(threading.Thread):
             "download": download, "status_for_s": round(time.time() - self._status_since),
             "embedded": self.embedded, "status": "downloading" if download else self._status, "installed": self._installed,
             "gpu": _gpu_name(), "log": list(self._log), "local_only": self._local_only,
-            "mirror_root": str(self._mirror_root() or ""), "removal_pending": removal_pending(),
+            "mirror_root": str(self._mirror_root() or ""),
         }
 
     def _heartbeat_loop(self) -> None:
@@ -396,7 +395,7 @@ class Worker(threading.Thread):
 
     def _import_local_metadata(self, force: bool = False) -> bool:
         """One-time: this computer's own transcripts, quality analysis and
-        favorites (the desktop app kept them locally) for files the server
+        locally stored favorites for files the server
         also has. Never overwrites anything the server already knows."""
         root = self._mirror_root()
         state = _load_state()
@@ -472,7 +471,7 @@ def _gpu_name() -> str:
             try:
                 out = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
                                      capture_output=True, text=True, errors="replace", timeout=5,
-                                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), env=system_env())
+                                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                 _GPU_CACHE = out.stdout.strip().splitlines()[0] if out.returncode == 0 and out.stdout.strip() else ""
             except (OSError, subprocess.TimeoutExpired):
                 pass
@@ -480,3 +479,62 @@ def _gpu_name() -> str:
 
 
 _GPU_CACHE: Optional[str] = None
+
+
+
+def main() -> int:
+    """Run an independent headless transcription and recording-copy worker."""
+    import argparse
+    import getpass
+    import logging
+    import signal
+    import sys
+
+    from .config import AppConfig
+    from .venv_paths import VENV_DIR, VENV_PYTHON
+
+    argv = [str(VENV_PYTHON), "-m", "alisdr.worker", *sys.argv[1:]]
+    if VENV_PYTHON.exists() and Path(sys.prefix).resolve() != VENV_DIR.resolve():
+        os.execv(str(VENV_PYTHON), argv)
+
+    parser = argparse.ArgumentParser(description="AliSDR headless worker")
+    parser.add_argument("url", nargs="?", help="AliSDR server browser address")
+    parser.add_argument("--ask-password", action="store_true")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    config = AppConfig.load()
+    url = (args.url or config.remote_receiver.url).strip().rstrip("/")
+    if not url.startswith(("http://", "https://")):
+        parser.error("provide the AliSDR server address as an http:// or https:// URL")
+    token = os.environ.get("ALISDR_ACCESS_TOKEN", config.remote_receiver.token)
+    if args.ask_password:
+        token = getpass.getpass("Receiver password: ")
+        # Keep the password out of the command line and retain it on re-exec.
+        os.environ["ALISDR_ACCESS_TOKEN"] = token
+        argv.remove("--ask-password")
+
+    stop = threading.Event()
+    restart = threading.Event()
+
+    def request_restart() -> None:
+        restart.set()
+        stop.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: stop.set())
+    worker = Worker(url, token, local_root=Path(config.recording.output_dir),
+                    name=os.environ.get("ALISDR_WORKER_NAME", ""), on_detach=stop.set,
+                    on_restart=request_restart)
+    worker.start()
+    try:
+        stop.wait()
+    finally:
+        worker.stop()
+    if restart.is_set():
+        argv[0] = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
+        os.execv(argv[0], argv)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

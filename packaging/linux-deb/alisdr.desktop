@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=AliSDR
-Comment=Wideband SDR ATC/radio scanner
-Exec=/usr/bin/alisdr
-Icon=alisdr
-Terminal=false
-Categories=HamRadio;AudioVideo;

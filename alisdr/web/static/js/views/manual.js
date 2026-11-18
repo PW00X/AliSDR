@@ -193,9 +193,7 @@ export function manualView(root) {
   const startDabDiscovery = async (request) => {
     if (destroyed || requestedStation !== request) return;
     request.waiting = false;
-    request.sawStations = false;
-    request.deadline = performance.now() + 35_000;
-    request.attempts++;
+    request.deadline = performance.now() + 45_000;
     // Keep station selection out of Tune. Start a new discovery even when
     // the receiver is already on this ensemble, so an old list cannot win.
     const result = await change('/api/manual/tune', {
@@ -218,20 +216,15 @@ export function manualView(root) {
       cancelDab(t('The DAB channel changed. Try the station again.'));
       return;
     }
-    if (data.tuning && data.stations.length) request.sawStations = true;
     if (data.tuning?.channel === entry.channel && data.state === 'listening'
         && data.stations.some(({ id }) => id === entry.id)) {
       request.waiting = false;
       queueMicrotask(() => { void playDab(request); });
     } else if (!data.tuning || performance.now() >= deadline) {
       request.waiting = false;
-      if (!request.sawStations && request.attempts === 1 && (data.error || data.tuning)) {
-        queueMicrotask(() => { void startDabDiscovery(request); });
-      } else {
-        cancelDab(data.error || t('Saved station {name} was not found on {channel}.', {
-          name: entry.name || String(entry.id), channel: entry.channel,
-        }));
-      }
+      cancelDab(data.error || t('Saved station {name} was not found on {channel}.', {
+        name: entry.name || String(entry.id), channel: entry.channel,
+      }));
     }
   };
   const playEntry = async (entry, current, favourite) => {
@@ -245,7 +238,7 @@ export function manualView(root) {
       liveAudio.stop();
       const prepared = liveAudio.prepare();
       prepared.catch(() => {});  // Discovery can outlast a rejected audio permission request.
-      const request = { entry, prepared, values, attempts: 0 };
+      const request = { entry, prepared, values };
       requestedStation = request;
       if (!favourite && active?.channel === entry.channel && active.receiver === values.receiver) {
         request.tuneId = latest.tune_id;

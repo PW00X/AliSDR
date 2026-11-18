@@ -24,7 +24,7 @@ from typing import Any, Optional
 
 import numpy as np
 
-from . import __version__, antenna_range, autostart, digital_voice, i18n, military_presets, schedule, storage
+from . import __version__, antenna_range, digital_voice, i18n, military_presets, schedule, storage
 from .audio_transcode import ffmpeg_available, transcode_to_mp3
 from .config import DEFAULT_RECORDINGS_DIR, AppConfig, ScheduleEntry, VfoRangeConfig, _from_dict
 from .dab import AUDIO_RATE as BROADCAST_AUDIO_RATE, load_decoder
@@ -1007,7 +1007,6 @@ class Controller:
                 "soapy": HAVE_SOAPY,
                 "native": {k: sdr_native.native_status()[k] for k in ("hackrf", "airspy")},
                 "usb_seen": sdr_native.usb_receivers_seen(),
-                "autostart": autostart.is_enabled() if autostart.supported() else None,
             },
         }
 
@@ -1067,7 +1066,7 @@ class Controller:
     def patch_config(self, patch: dict) -> None:
         old_language = self.config.language
         old_root = self.config.recording.output_dir
-        for locked in ("access_token", "workers", "notify", "manual_favourites"):
+        for locked in ("access_token", "workers", "notify", "manual_favourites", "remote_receiver"):
             patch.pop(locked, None)
         if isinstance(patch.get("addons"), dict):
             for locked in ("paths", "extra_args"):               # a command line: only /api/addons/configure, which checks who asks

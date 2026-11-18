@@ -1,4 +1,4 @@
-# Headless receiver (server mode)
+# Headless receiver
 
 The receiver runs AliSDR as a service and serves its web UI on port
 8765 to every device on the network: open `http://<receiver-ip>:8765/` in any
@@ -11,7 +11,7 @@ On the receiver (Debian, Ubuntu, Raspberry Pi OS - 64-bit recommended),
 one line installs or updates it and starts the service:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server
+curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash
 ```
 
 It installs this fork's `master` branch and keeps its checkout in
@@ -41,14 +41,19 @@ recordings cleanly. On upgrade, the installer replaces the standalone
 receiver units with aliases to `alisdr-server.service` so existing scripts and unit overrides continue to work. The upgrade
 moves the existing service data to `/var/lib/alisdr`.
 
-## Transcription and copies on your PC
+## Headless transcription worker
 
-A small receiver usually can't run Whisper. Start AliSDR on your PC,
-open Settings → Connect to a server, and enter the receiver's address. The PC
-then appears under Settings → Transcription & computers on the receiver,
-where you switch on transcription (uses its GPU) and/or keeping a copy of
-every recording. If the PC already has its own recordings, the same page
-offers to send them to the receiver with their transcripts and favorites.
+Install the Python dependencies from a checkout on the worker host, then
+connect it to the receiver:
+
+```sh
+python3 -m alisdr.worker http://<receiver-ip>:8765
+```
+
+Use `--ask-password` if the receiver requires a password, or set
+`ALISDR_ACCESS_TOKEN` in the worker's service environment for unattended use.
+Manage transcription, copies and library imports in the receiver's web app
+under **Add-ons → Transcription & computers**.
 
 ## USB passthrough
 

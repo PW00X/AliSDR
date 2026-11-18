@@ -9,7 +9,7 @@
 # reported case on a fresh Ubuntu VM with no other RTL-SDR software
 # ever installed to provide this rule already (e.g. the `rtl-sdr` apt
 # package ships an equivalent rule, but this self-contained .deb
-# deliberately doesn't depend on it - see packaging/linux-deb/README.md).
+# deliberately doesn't depend on it - see packaging/remote-server/README.md).
 #
 # 0bda:2832 / 0bda:2838 are the two RTL2832U-based Vendor:Product IDs the
 # overwhelming majority of real RTL-SDR dongles (including RTL-SDR Blog

@@ -14,7 +14,7 @@ from collections import deque
 from pathlib import Path
 from typing import Callable
 
-from ..audio_transcode import NO_WINDOW, system_env
+from ..audio_transcode import NO_WINDOW
 from ..config import CONFIG_DIR
 
 BIN_DIR = CONFIG_DIR / "addons" / "bin"
@@ -66,7 +66,7 @@ class ExternalRunner:
         kwargs = {"creationflags": NO_WINDOW} if sys.platform == "win32" else {}
         self._proc = subprocess.Popen(
             self.argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
-            env=system_env(), text=True, encoding="utf-8", errors="replace", bufsize=1, **kwargs)
+            text=True, encoding="utf-8", errors="replace", bufsize=1, **kwargs)
         threading.Thread(target=self._read_stdout, name="addon-stdout", daemon=True).start()
         threading.Thread(target=self._read_stderr, name="addon-stderr", daemon=True).start()
 
@@ -120,7 +120,7 @@ def list_rtl433_protocols(program: str) -> list[dict]:
     kwargs = {"creationflags": NO_WINDOW} if sys.platform == "win32" else {}
     try:
         out = subprocess.run([program, "-R", "help"], capture_output=True, text=True, encoding="utf-8", errors="replace",
-                             timeout=15, env=system_env(), stdin=subprocess.DEVNULL, **kwargs)
+                             timeout=15, stdin=subprocess.DEVNULL, **kwargs)
         text = out.stderr + out.stdout
     except (OSError, subprocess.SubprocessError):
         return []

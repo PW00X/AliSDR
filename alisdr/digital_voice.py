@@ -29,7 +29,7 @@ from typing import Callable
 
 import numpy as np
 
-from .audio_transcode import NO_WINDOW, system_env
+from .audio_transcode import NO_WINDOW
 from .models import Modulation
 from .playback.config import APP_DATA_DIR
 
@@ -72,7 +72,7 @@ def is_digital_installed() -> bool:
 
 
 def _env() -> dict:
-    env = dict(system_env() or os.environ)
+    env = dict(os.environ)
     lib = str(DSD_DIR / "lib")
     for key in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
         env[key] = lib + (os.pathsep + env[key] if env.get(key) else "")
@@ -275,7 +275,7 @@ def _install_windows() -> None:
 
 
 def _run(cmd: list[str]) -> None:
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=system_env())
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if proc.returncode != 0:
         tail = proc.stdout.decode("utf-8", "replace").strip().splitlines()[-6:]
         for line in tail:

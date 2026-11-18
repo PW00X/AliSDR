@@ -21,7 +21,7 @@ import threading
 import zipfile
 from pathlib import Path
 
-from ..audio_transcode import NO_WINDOW, system_env
+from ..audio_transcode import NO_WINDOW
 from ..digital_voice import _urlopen     # the certificate fallbacks of a packaged build
 from ..i18n import tr
 from .external import BIN_DIR, tool_path, which
@@ -134,7 +134,7 @@ def _install_vdl2() -> None:
     try:
         _say(addon_id, "dumpvdl2 (GPL-3.0) and libacars (MIT) are built here from the authors' source code.")
         missing = [tool for tool in ("cmake", "make", "cc", "pkg-config") if not which(tool)]
-        env = dict(system_env() or os.environ)
+        env = dict(os.environ)
         env["PATH"] = tool_path()
         prefix = install_dir(addon_id) / "prefix"
         for var in ("PKG_CONFIG_PATH",):
@@ -211,7 +211,7 @@ def _install_rtl433() -> None:
         kwargs = {"creationflags": NO_WINDOW} if sys.platform == "win32" else {}
         try:
             check = subprocess.run([str(exe), "-V"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
-                                   env=system_env(), stdin=subprocess.DEVNULL, **kwargs)
+                                   stdin=subprocess.DEVNULL, **kwargs)
             ok = "rtl_433" in (check.stdout + check.stderr)
             reason = (check.stderr or check.stdout).strip().splitlines()[-1:] or [""]
         except (OSError, subprocess.SubprocessError) as exc:

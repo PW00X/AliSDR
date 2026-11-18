@@ -5,7 +5,7 @@ worker.py). Python's standard library only.
 
 Auth: an optional shared password ("access token", Settings → Access). Off
 by default - anyone who can reach the server can use it. When set, the
-browser gets it once (login form, or ``#token=`` in the URL main.py opens)
+browser gets it once from the login form
 and keeps it in an HttpOnly, SameSite=Strict cookie; workers send it as a
 Bearer token.
 """
@@ -26,9 +26,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, quote, unquote, urlparse
-from urllib.request import Request, urlopen
 
-from .. import autostart, digital_voice, i18n, military_presets
+from .. import digital_voice, i18n, military_presets
 from ..addons import install as installer
 from ..addons.external import list_rtl433_protocols
 from ..addons.sensors import metrics as sensor_metrics
@@ -56,22 +55,10 @@ _KEEPALIVE = bytes(250)  # 10 ms of silence at 12.5 kHz/16-bit: keeps idle strea
 
 
 class App:
-    """What the handler serves. ``mode``: "local" (this computer scans),
-    "server" (same, reachable over the network) or "client" (this computer
-    only works for another server - no controller, just a status page;
-    ``worker`` is that worker). ``on_switch`` re-execs main.py after the
-    mode changed (connect / disconnect)."""
-
-    def __init__(self, config: AppConfig, controller: Optional[Controller], token: str, mode: str,
-                 on_switch: Optional[Callable[[], None]] = None, worker: Any = None,
-                 on_quit: Optional[Callable[[], None]] = None) -> None:
+    def __init__(self, config: AppConfig, controller: Controller, token: str) -> None:
         self.config = config
         self.controller = controller
         self.token = token
-        self.mode = mode
-        self.on_switch = on_switch
-        self.worker = worker
-        self.on_quit = on_quit  # "Quit" in the UI - local/client mode only (a server is stopped by systemd)
 
 
 def _qs(query: dict, name: str, default: Any = None) -> Any:
@@ -165,7 +152,7 @@ def make_handler(app: App):
             url = urlparse(self.path)
             path, query = url.path, parse_qs(url.query)
             try:
-                if (app.mode == "local" and not app.token
+                if (self.server.server_address[0] in _LOOPBACK_HOSTS and not app.token
                         and self.headers.get("Host", "").rsplit(":", 1)[0] not in _LOOPBACK_HOSTS):
                     return self._error(403, "Forbidden")  # localhost-only UI: refuse DNS-rebinding hosts
                 if method in ("POST", "PUT") and (
@@ -180,8 +167,6 @@ def make_handler(app: App):
                     return self._public(method, path, query)
                 if not self._token_ok():
                     return self._error(401, "Unauthorized")
-                if app.mode == "client" and not path.startswith("/api/client/"):
-                    return self._error(404, "Not found")
                 handler = ROUTES.get((method, path))
                 if handler is None:
                     return self._error(404, "Not found")
@@ -228,9 +213,8 @@ def make_handler(app: App):
         def _public(self, method: str, path: str, query: dict) -> None:
             if path == "/api/session":
                 return self._json({
-                    "authenticated": self._token_ok(), "mode": app.mode,
-                    "remote": cfg.remote_receiver.url if app.mode == "client" else "",
-                    "navigation": "manual-scan" if app.mode == "server" else "scan-manual",
+                    "authenticated": self._token_ok(), "mode": "server",
+                    "navigation": "manual-scan",
                     "dab_backend": "in-process",
                     "revision": _INSTALLED_REVISION,
                 })
@@ -331,8 +315,9 @@ def make_handler(app: App):
                 "military": [channel_dict(c) for c in military_presets.MILITARY_CHANNELS],
                 "fire": [channel_dict(c) for c in military_presets.FIRE_CHANNELS],
             }
-            data["mode"] = app.mode
+            data["mode"] = "server"
             data["config"].pop("access_token", None)
+            data["config"].pop("remote_receiver", None)
             data["config"].pop("notify", None)       # secrets: /api/notify serves it masked
             data["password_set"] = bool(app.token)
             self._json(data)
@@ -379,19 +364,6 @@ def make_handler(app: App):
             cookie = (f"{_COOKIE}={quote(token, safe='')}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict"
                       if token else f"{_COOKIE}=; Path=/; Max-Age=0")
             self._json({"ok": True}, extra={"Set-Cookie": cookie})
-
-        def quit(self, _query: dict) -> None:
-            if app.mode == "server" or app.on_quit is None:
-                raise ValueError("Not available on a server")
-            self._json({"ok": True})
-            threading.Timer(0.3, app.on_quit).start()
-
-        def autostart(self, _query: dict) -> None:
-            # Login item of the computer the program runs on - meaningless from a server's remote UI.
-            if app.mode == "server" or not autostart.supported():
-                raise ValueError("Not available here")
-            autostart.set_enabled(bool(self._body().get("enabled")))
-            self._json({"enabled": autostart.is_enabled()})
 
         def digital(self, _query: dict) -> None:
             """Optional digital voice add-on (digital_voice.py) - installed on
@@ -461,41 +433,6 @@ def make_handler(app: App):
         def reset(self, _query: dict) -> None:
             ctl.reset_to_defaults()
             self._json({"ok": True})
-
-        def connect_client(self, _query: dict) -> None:
-            """Local mode -> client of another AliSDR server."""
-            if app.mode != "local" or app.on_switch is None:
-                raise ValueError("Only available in local mode")
-            body = self._body()
-            url = str(body.get("url", "")).strip().rstrip("/")
-            token = str(body.get("token", "")).strip()
-            if not url.startswith(("http://", "https://")):
-                raise ValueError(i18n.tr("Enter the server address, e.g. http://192.168.1.10:8765"))
-            try:
-                with urlopen(Request(url + "/api/live", headers={"Authorization": f"Bearer {token}"}), timeout=5):
-                    pass
-            except OSError as exc:  # URLError, and a plain TimeoutError while reading the reply
-                raise RuntimeError(i18n.tr("Can't connect: {error}").format(error=getattr(exc, "reason", exc)))
-            rr = cfg.remote_receiver
-            rr.enabled, rr.url, rr.token = True, url, token
-            cfg.save()
-            self._json({"ok": True, "url": url, "token": token})
-            threading.Timer(0.5, app.on_switch).start()
-
-        def client_status(self, _query: dict) -> None:
-            w = app.worker
-            self._json({
-                "url": cfg.remote_receiver.url, "token": cfg.remote_receiver.token,
-                "name": w.name if w else "", "connected": bool(w and w._connected),
-                "info": w._info() if w else {},
-            })
-
-        def client_disconnect(self, _query: dict) -> None:
-            cfg.remote_receiver.enabled = False
-            cfg.save()
-            self._json({"ok": True})
-            if app.on_switch:
-                threading.Timer(0.5, app.on_switch).start()
 
         # -- library --------------------------------------------------------
         def _filters(self, query: dict) -> dict:
@@ -754,8 +691,6 @@ def make_handler(app: App):
         ("POST", "/api/disclaimer"): Handler.disclaimer,
         ("POST", "/api/reset"): Handler.reset,
         ("POST", "/api/access"): Handler.access,
-        ("POST", "/api/quit"): Handler.quit,
-        ("POST", "/api/autostart"): Handler.autostart,
         ("GET", "/api/notify"): Handler.notify,
         ("GET", "/api/notify/recent"): Handler.notify,
         ("POST", "/api/notify/save"): Handler.notify,
@@ -773,10 +708,6 @@ def make_handler(app: App):
         ("GET", "/api/digital"): Handler.digital,
         ("POST", "/api/digital/install"): Handler.digital,
         ("POST", "/api/digital/uninstall"): Handler.digital,
-        ("POST", "/api/client/quit"): Handler.quit,
-        ("POST", "/api/client/connect"): Handler.connect_client,
-        ("GET", "/api/client/status"): Handler.client_status,
-        ("POST", "/api/client/disconnect"): Handler.client_disconnect,
         ("GET", "/api/library"): Handler.library,
         ("GET", "/api/library/ids"): Handler.library_ids,
         ("GET", "/api/library/facets"): Handler.facets,
