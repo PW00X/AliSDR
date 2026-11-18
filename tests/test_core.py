@@ -2788,7 +2788,7 @@ class ManualTuningTest(unittest.TestCase):
         cleanup = ExitStack()
         self.addCleanup(cleanup.close)
         cleanup.enter_context(patch("alisdr.controller.load_decoder", return_value=Library()))
-        cleanup.enter_context(patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2_048_000)))
+        cleanup.enter_context(patch.object(manual_tuning, "open_real_backend", side_effect=lambda *a, **kw: SimulatedBackend(2_048_000)))
         cfg = AppConfig()
         cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
         ctl = Controller(cfg)
@@ -2853,10 +2853,83 @@ class ManualTuningTest(unittest.TestCase):
             self.assertEqual((wav.getframerate(), wav.getnchannels()), (48000, 2))
             stereo = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2").reshape(-1, 2)
             self.assertTrue(np.any(np.all(stereo == [10000, -3000], axis=1)))
+        before = ctl.manual_status()["tune_id"]
+        tune = {"mode": "DAB", "channel": "12A", "gain_mode": "manual", "rediscover": True}
+        with urlopen(Request(url + "/manual/tune", json.dumps(tune).encode(), headers), timeout=5) as response:
+            status = json.load(response)
+        self.assertEqual(status["station"], 0)
+        self.assertNotEqual(status["tune_id"], before)
+        deadline = time.monotonic() + 5
+        while not ctl.manual_status()["stations"] and time.monotonic() < deadline:
+            time.sleep(0.01)
+        selection = {"sid": 0xabcd, "channel": "12A", "tune_id": before}
+        with self.assertRaises(HTTPError) as exc:
+            urlopen(Request(station_url, json.dumps(selection).encode(), headers), timeout=5)
+        self.assertEqual(exc.exception.code, 400)
+        selection["tune_id"] = status["tune_id"]
+        with urlopen(Request(station_url, json.dumps(selection).encode(), headers), timeout=5) as response:
+            self.assertEqual(json.load(response)["station"], 0xabcd)
+
         ctl.stop_manual()
         with self.assertRaises(HTTPError) as exc:
             urlopen(Request(artwork, headers=headers), timeout=5)
         self.assertEqual(exc.exception.code, 404)
+
+    def test_static_fm_scan_stays_silent_and_keeps_rds_results(self) -> None:
+        from queue import Empty
+        from unittest.mock import patch
+
+        import numpy as np
+
+        from alisdr.controller import Controller
+        from alisdr.manual_tuning import ManualSession, Tuning
+
+        stations = (92_100_000, 104_600_000)
+
+        class IQ:
+            def __init__(self):
+                self.random = np.random.default_rng(42)
+
+            def set_frequency(self, hz):
+                self.center = hz
+
+            def read(self, samples):
+                t = np.arange(samples) / 2_000_000
+                iq = 0.001 * (self.random.normal(size=samples) + 1j * self.random.normal(size=samples))
+                for hz in stations:
+                    offset = hz - self.center
+                    if abs(offset) < 900_000:
+                        iq += 0.1 * np.exp(2j * np.pi * offset * t + 5j * np.sin(2 * np.pi * 1600 * t))
+                return iq.astype(np.complex64)
+
+        session = ManualSession(Tuning(0, "WFM"), {}, False, lambda *_: None, lambda *_: None)
+        self.assertEqual(session._survey_fm(IQ(), 4096, 2_000_000), list(stations))
+
+        cfg = AppConfig()
+        cfg.device.driver = "simulated"
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        audio = ctl.subscribe_audio(broadcast=True)
+        self.addCleanup(ctl.unsubscribe_audio, audio, True)
+        with patch.object(ManualSession, "_survey_fm", return_value=stations), \
+             patch.object(ManualSession, "_identify_fm", side_effect=({"name": "Test FM", "pi": "1234"}, {})):
+            ctl.tune_manual({"receiver": 0}, scan_fm=True)
+            deadline = time.monotonic() + 5
+            while ctl.manual_status()["fm_scan"] is not None and time.monotonic() < deadline:
+                time.sleep(0.01)
+        status = ctl.manual_status()
+        self.assertIsNone(status["fm_scan"])
+        self.assertFalse(status["can_record"])
+        self.assertFalse(ctl.running)
+        self.assertEqual(status["fm_stations"], [
+            {"frequency_hz": stations[0], "name": "Test FM", "pi": "1234"},
+            {"frequency_hz": stations[1], "name": "", "pi": ""},
+        ])
+        with self.assertRaises(Empty):
+            audio.get_nowait()
+        ctl.tune_manual({"mode": "WFM", "frequency_hz": stations[0]})
+        self.assertEqual(ctl.manual_status()["fm_stations"], status["fm_stations"])
 
     def test_broadcast_fm_stereo_separation_and_mono_fallback(self) -> None:
         import numpy as np

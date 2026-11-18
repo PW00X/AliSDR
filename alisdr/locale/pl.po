@@ -4039,3 +4039,39 @@ msgstr "Wyszukiwanie stacji {name} na kanale {channel}…"
 
 msgid "Reorder favourite {name}"
 msgstr "Zmień pozycję ulubionej stacji {name}"
+
+msgid "Static"
+msgstr "Strojenie"
+
+msgid "Static tuning"
+msgstr "Strojenie stałe"
+
+msgid "Add to Channels"
+msgstr "Dodaj do kanałów"
+
+msgid "Add this frequency to Channels"
+msgstr "Dodaj tę częstotliwość do kanałów"
+
+msgid "Scan FM stations"
+msgstr "Skanuj stacje FM"
+
+msgid "FM stations"
+msgstr "Stacje FM"
+
+msgid "No FM stations found."
+msgstr "Nie znaleziono stacji FM."
+
+msgid "FM scan"
+msgstr "Skanowanie FM"
+
+msgid "Scanning FM stations…"
+msgstr "Skanowanie stacji FM…"
+
+msgid "Reading RDS ({done}/{total})…"
+msgstr "Odczytywanie RDS ({done}/{total})…"
+
+msgid "The receiver capture bandwidth is too narrow for FM scanning."
+msgstr "Pasmo odbiornika jest zbyt wąskie do skanowania FM."
+
+msgid "DAB decoder unavailable. Run the Linux source installer to build the DAB decoder."
+msgstr "Dekoder DAB jest niedostępny. Uruchom instalator dla systemu Linux, aby go zbudować."

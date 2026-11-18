@@ -28,7 +28,7 @@ from . import __version__, antenna_range, autostart, digital_voice, i18n, milita
 from .audio_transcode import ffmpeg_available, transcode_to_mp3
 from .config import DEFAULT_RECORDINGS_DIR, AppConfig, ScheduleEntry, VfoRangeConfig, _from_dict
 from .dab import AUDIO_RATE as BROADCAST_AUDIO_RATE, load_decoder
-from .manual_tuning import DAB_CHANNELS, ManualSession, Tuning
+from .manual_tuning import DAB_CHANNELS, FM_FREQUENCIES, ManualSession, Tuning
 from .models import BlacklistEntry, Channel, Modulation, snap_airband_hz
 from .playback.index import Library
 from .recorder import Recorder
@@ -178,6 +178,7 @@ class Controller:
         self._shared: Optional[SharedFrequencies] = None
         self._resume = False    # the scanner was running when its last receiver was taken
         self.manual_session: ManualSession | None = None
+        self._fm_stations: dict | None = None
         self._manual_error = ""
         self._manual_record_lock = threading.Lock()
         self._manual_recording: _ManualRecording | None = None
@@ -320,9 +321,14 @@ class Controller:
             for engine in self._engines:
                 engine.request_stop()
 
-    def tune_manual(self, body: dict) -> None:
+    def tune_manual(self, body: dict, scan_fm: bool = False) -> None:
+        if scan_fm:
+            body = {**body, "mode": "WFM", "frequency_hz": FM_FREQUENCIES[0]}
         tuning = Tuning.from_request(body)
+        rediscover = body.get("rediscover", False)
         wanted = body.get("station", 0)
+        if type(rediscover) is not bool or (rediscover and (tuning.mode != "DAB" or wanted)):
+            raise ValueError("Invalid DAB discovery request")
         if type(wanted) is not int or not 0 <= wanted <= 0xffffffff or (wanted and tuning.mode != "DAB"):
             raise ValueError("Invalid DAB service ID")
         with self._start_lock:
@@ -342,8 +348,8 @@ class Controller:
             device.update(gain_mode=gain_mode, gain_db=gain_db)
             old = self.manual_session
             can_reuse = (old is not None and old.is_alive() and not old.stop_requested.is_set()
-                         and old.device == device)
-            if can_reuse and old.tuning == tuning:
+                         and old.device == device and old.fm_scan is None and not scan_fm)
+            if can_reuse and old.tuning == tuning and not rediscover:
                 if wanted:
                     if old.station != wanted:
                         self._stop_manual_recording()
@@ -376,6 +382,10 @@ class Controller:
             self._manual_error = ""
             session = ManualSession(tuning, device, self.config.debug_mode, self._publish_manual_audio, self._manual_ended, library)
             session.pending_station = wanted
+            if scan_fm:
+                self._fm_stations = {}
+                session.fm_stations = self._fm_stations
+                session.fm_scan = {"stage": "sweep", "done": 0, "total": 0, "frequency_hz": tuning.frequency_hz}
             session.on_broadcast_audio = self._publish_broadcast_audio
             self.manual_session = session
             try:
@@ -482,14 +492,15 @@ class Controller:
             except OSError as exc:
                 self._manual_recording_failed(recording.recorder, exc)
 
-    def select_dab_station(self, sid: int, channel: str | None = None) -> None:
+    def select_dab_station(self, sid: int, channel: str | None = None, tune_id: str | None = None) -> None:
         if type(sid) is not int:
             raise ValueError("Invalid DAB service ID")
         with self._start_lock:
             session = self.manual_session
             if session is None or session.tuning.mode != "DAB":
                 raise RuntimeError(i18n.tr("Tune a DAB channel first."))
-            if channel is not None and channel != session.tuning.channel:
+            if ((channel is not None and channel != session.tuning.channel)
+                    or (tune_id is not None and tune_id != session.tune_id)):
                 raise ValueError(i18n.tr("The DAB channel changed. Try the station again."))
             if sid in session.stations and session.station != sid:
                 self._stop_manual_recording()
@@ -543,13 +554,18 @@ class Controller:
             if session and session.tuning.receiver == k and session.gain_range is not None:
                 gain_range = session.gain_range
             receivers.append({"id": k, "driver": driver, "gain_range": gain_range, "gain_index": native_airspy})
+        stations = self._fm_stations
+        stations = sorted(stations.copy().values(), key=lambda row: row["frequency_hz"]) if stations is not None else None
         result = {
             "recording": self._manual_recording is not None,
             "can_record": self._can_record_manual(session),
+            "fm_scan": session.fm_scan if session else None,
+            "fm_stations": stations,
             "receivers": receivers,
             "channels": DAB_CHANNELS,
             "favourites": self._manual_favourites(),
             "error": self._manual_error,
+            "tune_id": session.tune_id if session else None,
             "tuning": asdict(session.tuning) if session else None,
             "gain": {"mode": session.device["gain_mode"], "db": session.device["gain_db"]} if session else None,
             "state": session.state if session else "idle",
@@ -924,7 +940,7 @@ class Controller:
                 "stopping": any(e._stop_evt.is_set() for k, e in enumerate(self._engines) if k not in self._held),
                 "manual_tuning": session is not None,
                 "manual_tuning_recording": self._manual_recording is not None,
-                "manual_broadcast": bool(session and session.tuning.mode in ("DAB", "WFM")),
+                "manual_broadcast": bool(session and session.fm_scan is None and session.tuning.mode in ("DAB", "WFM")),
                 "manual_dab": bool(session and session.tuning.mode == "DAB"),
                 "solo_band": self._solo_band,
                 "uncovered": self._uncovered(),

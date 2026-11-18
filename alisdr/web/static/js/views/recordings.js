@@ -2,11 +2,13 @@
 // search transcripts, play with a seekable waveform, edit transcripts, and
 // favorite/transcribe/delete one or many.
 import {
-  LANGUAGE_NAMES, api, carrierHz, fmtChannel, confirmDialog, debounce, errorToast, fmtBytes, fmtDate, fmtDateShort, fmtDuration, fmtKhz, fmtTime,
-  formDialog, h, icon, modal, mount, prefs, qs, qualityBadge, select, seg, slider, t, toast, toggle,
+  LANGUAGE_NAMES, api, fmtChannel, confirmDialog, debounce, errorToast, fmtBytes, fmtDate, fmtDateShort, fmtDuration, fmtKhz, fmtTime,
+  h, icon, modal, mount, prefs, qs, qualityBadge, select, seg, slider, t, toast, toggle,
 } from '../core.js';
 import { liveAudio, makeLoudnessChain } from '../live-audio.js';
-import { S, cfg, on, patchConfig, saveChannels } from '../state.js';
+import { S, cfg, on, patchConfig } from '../state.js';
+
+import { openChannelForFrequency } from './channels.js';
 
 const PAGE = 120;
 // Kept across visits to the tab.
@@ -40,6 +42,9 @@ export function recordingsView(root) {
   let items = [], total = 0, loading = false, current = null, selected = new Set(), facets = null, anchor = null, lastRes = null;
   const audio = new Audio();
   audio.preload = 'metadata';
+  const storedVolume = Number(localStorage.getItem('recordingsVolume') ?? 1);
+  let playerVolume = Number.isFinite(storedVolume) ? Math.max(0, Math.min(1, storedVolume)) : 1;
+  audio.volume = playerVolume;
 
   // ---------------------------------------------------------- layout
   const facetList = h('div.list');
@@ -294,8 +299,11 @@ export function recordingsView(root) {
       const ctx = new Ctx();
       const c = makeLoudnessChain(ctx, 0);
       ctx.createMediaElementSource(audio).connect(c.input);
-      c.output.connect(ctx.destination);
-      chain = { ...c, ctx };
+      const outputVolume = ctx.createGain();
+      outputVolume.gain.value = playerVolume;
+      c.output.connect(outputVolume).connect(ctx.destination);
+      audio.volume = 1;
+      chain = { ...c, ctx, outputVolume };
     } catch (e) { console.warn('playback leveling unavailable:', e); }
     return chain;
   }
@@ -310,6 +318,15 @@ export function recordingsView(root) {
   let peaks = [];
   const wave = h('canvas');
   const waveBox = h('div.wave', { onclick: (e) => { const r = waveBox.getBoundingClientRect(); if (audio.duration) audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration; } }, wave);
+  const playerVolumeSlider = h('input', { type: 'range', min: 0, max: 1, step: 0.01,
+    value: playerVolume, 'aria-label': t('Volume'), title: t('Volume'),
+    oninput: (event) => {
+      playerVolume = Number(event.target.value);
+      localStorage.setItem('recordingsVolume', String(playerVolume));
+      if (chain) chain.outputVolume.gain.value = playerVolume;
+      else audio.volume = playerVolume;
+    },
+  });
   const playBtn = h('button.primary.icon', { title: t('Play or pause (Space)'), onclick: () => (audio.paused ? audio.play() : audio.pause()) });
   const timeText = h('span.mono.small.muted.time');
 
@@ -395,9 +412,10 @@ export function recordingsView(root) {
         playBtn,
         h('button.icon', { title: t('Next'), 'aria-label': t('Next'), onclick: () => step(1) }, icon('next')),
         timeText,
+        h('div.volume', icon('volume'), playerVolumeSlider),
         h('span.spacer'),
         h('span', { title: t('Plays quiet recordings louder and loud ones softer, so they all sound alike. The files are not changed.') }, toggle(t('Even out volume'), evenOut(), (v) => { localStorage.setItem('evenOut', v ? '1' : '0'); applyGain(current); })),
-        it.manual ? null : act(icon('plus'), t('Save frequency'), () => saveFrequency(it), t('Add this frequency to the Memory List')),
+        it.manual ? null : act(icon('plus'), t('Add to Channels'), () => saveFrequency(it), t('Add this frequency to Channels')),
         // Plain names, no logos: both are trademarks (Flightradar24 terms 10.3; ADS-B Exchange forbids using
         // its icon without the wordmark). The name stays visible on phones too - two same icons would be indistinguishable.
         ...(isAviation(it.freq_khz) ? [
@@ -454,24 +472,18 @@ export function recordingsView(root) {
   }
 
   async function saveFrequency(it) {
-    const channels = S.settings.channels;
-    const hz = carrierHz(it.freq_khz / 1000);  // filenames keep whole kHz; back onto the exact raster
-    const existing = channels.find((c) => c.freq_hz === hz);
-    const folders = [...new Set([...cfg().channel_folders, ...channels.map((c) => c.folder).filter(Boolean)])];
-    const v = await formDialog(t('Save {f} MHz', { f: fmtChannel(hz) }), [
-      { key: 'name', label: t('Name'), value: existing ? existing.name : '', placeholder: t('e.g. Downtown Tower') },
-      { key: 'folder', label: t('Folder'), type: 'select', value: existing ? existing.folder : '', options: [['', t('(no folder)')], ...folders.map((f) => [f, f])] },
-      { key: 'newFolder', label: t('New folder'), hint: t('Optional - a name typed here is used instead of the folder above.') },
-    ]);
-    if (!v) return;
-    const folder = v.newFolder.trim() || v.folder;
-    if (existing) Object.assign(existing, { name: v.name.trim(), folder });
-    else channels.push({ freq_hz: hz, name: v.name.trim(), modulation: 'AM', enabled: true, folder, weight: 0 });
-    if (folder && !cfg().channel_folders.includes(folder)) patchConfig({ channel_folders: [...cfg().channel_folders, folder] });
-    await saveChannels(channels);
-    toast(t('Saved to the Memory List'), 'good');
-    items.filter((x) => x.freq_khz === it.freq_khz).forEach((x) => { x.name = v.name.trim(); refreshRow(x); });
-    renderPlayer();
+    const hz = it.freq_khz * 1000;
+    const modulation = hz >= 87_500_000 && hz <= 108_000_000 ? 'WFM' : 'AM';
+    try {
+      if (await openChannelForFrequency(hz, it.name, modulation)) {
+        toast(t('Saved to the Memory List'), 'good');
+        await reload();
+        if (current?.id === it.id) {
+          current = items.find((item) => item.id === it.id) || current;
+          renderPlayer();
+        }
+      }
+    } catch (e) { errorToast(e); }
   }
 
   audio.addEventListener('play', updatePlayButton);

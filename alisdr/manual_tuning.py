@@ -3,14 +3,17 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass
+from uuid import uuid4
 
 import numpy as np
 
 from .agc import SoftwareAgc
 from .broadcast_fm import AUDIO_RATE as FM_AUDIO_RATE, BroadcastFM
+from .channelizer import channel_powers_from_spectrum, plan_windows, spectrum_cumsum
 from .dab import AUDIO_RATE as DAB_AUDIO_RATE, CHANNELS, SAMPLE_RATE, ChannelInput, Decoder
 from .dsp import Demodulator, StreamResampler, WFM_DISCRIMINATOR_RATE, level_dbfs
 from .i18n import tr
@@ -20,6 +23,10 @@ from .scanner_engine import AUDIO_RATE, SpectrumWorker
 from .sdr_backend import AcquisitionThread, create_backend, open_real_backend
 
 DAB_CHANNELS = tuple(CHANNELS)
+FM_FREQUENCIES = tuple(range(87_500_000, 108_000_001, 100_000))
+FM_SCAN_WIDTH_HZ = 90_000
+FM_SCAN_SNR_DB = 10
+FM_RDS_DWELL_S = 4
 DAB_DISCOVERY_TIMEOUT = 20
 DAB_GAIN_SETTLE_S = 5
 ANALOG_MODES = ("AM", "NFM", "WFM", "SSB", "USB", "LSB")
@@ -55,6 +62,7 @@ class Tuning:
 class ManualSession(threading.Thread):
     def __init__(self, tuning, device, debug, on_audio, on_end, dab_library=None):
         super().__init__(daemon=True, name="manual-tuning")
+        self.tune_id = uuid4().hex
         self.tuning = tuning
         self.device = device
         self.debug = debug
@@ -68,6 +76,8 @@ class ManualSession(threading.Thread):
         self.station_info = {}
         self.station_image = None
         self.on_broadcast_audio = lambda _pcm: None
+        self.fm_scan = None
+        self.fm_stations = None
         self.dab_error = ""
         self.synced = False
         self.state = "starting"
@@ -81,7 +91,9 @@ class ManualSession(threading.Thread):
     def run(self):
         error = ""
         try:
-            if self.tuning.mode == "DAB":
+            if self.fm_scan is not None:
+                self._scan_fm()
+            elif self.tuning.mode == "DAB":
                 self._dab()
             else:
                 self._analog()
@@ -90,6 +102,94 @@ class ManualSession(threading.Thread):
                 error = str(exc)
         finally:
             self.on_end(self, error)
+
+    def _scan_fm(self) -> None:
+        dev = self.device
+        raw = create_backend(
+            dev["driver"], dev.get("device_args", ""), dev["sample_rate_hz"],
+            "manual" if dev["gain_mode"] == "sw_auto" else dev["gain_mode"], dev["gain_db"],
+            debug_mode=self.debug, bias_tee=bool(dev.get("bias_tee")), async_read=dev["async_read"],
+        )
+        acquisition = None
+        try:
+            rate = float(getattr(raw, "sample_rate", 0) or dev["sample_rate_hz"])
+            if rate < 200_000:
+                raise RuntimeError(tr("The receiver capture bandwidth is too narrow for FM scanning."))
+            chunk = max(4096, round(rate * 0.03 / 4096) * 4096)
+            acquisition = AcquisitionThread(raw, chunk, max_queued=8, debug=self.debug)
+            self.gain_range = acquisition.gain_range_db
+            self.state = "fm_scanning"
+            agc = SoftwareAgc(dev["gain_db"]) if dev["gain_mode"] == "sw_auto" else None
+            candidates = self._survey_fm(acquisition, chunk, rate, agc)
+            for index, hz in enumerate(candidates, 1):
+                if self.stop_requested.is_set():
+                    break
+                self.fm_scan = {"stage": "rds", "done": index, "total": len(candidates), "frequency_hz": hz}
+                station = self._identify_fm(acquisition, chunk, rate, hz)
+                if not self.stop_requested.is_set():
+                    self.fm_stations[hz] = {"frequency_hz": hz, "name": station.get("name", ""), "pi": station.get("pi", "")}
+        finally:
+            (acquisition if acquisition is not None else raw).close()
+
+    def _survey_fm(self, acquisition, chunk: int, rate: float, agc: SoftwareAgc | None = None) -> list[int]:
+        windows = plan_windows(list(FM_FREQUENCIES), rate, FM_SCAN_WIDTH_HZ)
+        levels = {}
+        above_noise = set()
+        for index, window in enumerate(windows, 1):
+            if self.stop_requested.is_set():
+                return []
+            self.fm_scan = {"stage": "sweep", "done": index, "total": len(windows),
+                            "frequency_hz": window.center_hz}
+            acquisition.set_frequency(window.center_hz)
+            settled = acquisition.read(chunk)
+            if agc and settled.size:
+                new_gain = agc.step(float(np.max(np.abs(settled))), acquisition.gain_range_db)
+                if new_gain is not None:
+                    acquisition.set_gain("manual", new_gain)
+                    acquisition.read(chunk)
+            readings = []
+            references = []
+            for _ in range(3):
+                iq = acquisition.read(chunk)
+                spectrum = spectrum_cumsum(iq - iq.mean(), rate) if iq.size else None
+                if spectrum is None:
+                    continue
+                bins, cumulative = spectrum
+                # Estimate in-channel noise from the lower half of the capture
+                # so that a strong station does not raise its own threshold.
+                noise = np.percentile(np.diff(cumulative), 35) * FM_SCAN_WIDTH_HZ / (bins[1] - bins[0])
+                references.append(10 * np.log10(max(noise, 1e-12)))
+                readings.append(channel_powers_from_spectrum(spectrum, window.center_hz, window.freqs, FM_SCAN_WIDTH_HZ))
+            if not readings:
+                continue
+            threshold = float(np.median(references)) + FM_SCAN_SNR_DB
+            for hz in window.freqs:
+                levels[hz] = float(np.median([row[hz] for row in readings]))
+                if levels[hz] >= threshold:
+                    above_noise.add(hz)
+        # The same wide signal often spills into adjacent slots on the 100 kHz
+        # raster. Keep the local peak so a station is not listed twice.
+        return [hz for hz in sorted(above_noise)
+                if levels[hz] >= levels.get(hz - 100_000, -math.inf)
+                and levels[hz] > levels.get(hz + 100_000, -math.inf)]
+
+    def _identify_fm(self, acquisition, chunk: int, rate: float, hz: int) -> dict:
+        offset = min(125_000, (rate - WFM_DISCRIMINATOR_RATE) / 2)
+        acquisition.set_frequency(hz - offset)
+        acquisition.read(chunk)
+        demod = Demodulator(rate)
+        rds = RDSDecoder()
+        for _ in range(math.ceil(FM_RDS_DWELL_S * rate / chunk)):
+            if self.stop_requested.is_set():
+                break
+            iq = acquisition.read(chunk)
+            if not iq.size:
+                continue
+            composite, fm_rate = demod.fm_composite(iq, offset)
+            rds.feed(composite, fm_rate)
+            if rds.info.get("name"):
+                break
+        return rds.info
 
     def _analog(self):
         dev = self.device

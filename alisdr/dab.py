@@ -75,7 +75,7 @@ def load_decoder():
             library.falcon_dab_set_image.restype = None
         return library
     except (OSError, AttributeError) as exc:
-        raise RuntimeError(tr("DAB decoder unavailable. Run the receiver installer with --server --with-dab.")
+        raise RuntimeError(tr("DAB decoder unavailable. Run the Linux source installer to build the DAB decoder.")
                            + f" ({exc})") from exc
 
 

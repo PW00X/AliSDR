@@ -7,8 +7,7 @@ set -eu
 SRC=$(cd "$(dirname "$0")/../.." && pwd)
 DEST=/opt/alisdr
 HOME_DIR=/var/lib/alisdr
-UNIT=alisdr-receiver.service
-LEGACY_UNIT=falconsdr-receiver.service
+UNIT=alisdr-server.service
 LEGACY_HOME=/var/lib/falconsdr
 UNIT_DIR=/etc/systemd/system
 
@@ -34,11 +33,7 @@ rsync -a --delete --exclude .venv --exclude .git --exclude '__pycache__' \
     --exclude 'packaging/linux-deb/build*' --exclude 'packaging/linux-deb/out' "$SRC/" "$DEST/"
 [ -x "$DEST/.venv/bin/python" ] || python3 -m venv --system-site-packages "$DEST/.venv"
 "$DEST/.venv/bin/pip" install --quiet --upgrade -r "$DEST/requirements.txt"
-# An existing decoder can still be used when this update omits --with-dab.
-legacy_decoder=/opt/falconsdr/.venv/lib/libfalconsdr_dab.so
-if [ -f "$legacy_decoder" ] && [ ! -e "$DEST/.venv/lib/libalisdr_dab.so" ]; then
-    install -D -m 644 "$legacy_decoder" "$DEST/.venv/lib/libalisdr_dab.so"
-fi
+sh "$SRC/packaging/dab/install.sh" "$DEST/.venv/lib"
 
 install -D -m 644 "$SRC/packaging/linux-deb/60-rtl-sdr.rules" /etc/udev/rules.d/60-rtl-sdr.rules
 install -D -m 644 "$SRC/packaging/linux-deb/blacklist-rtl-dvb.conf" /etc/modprobe.d/blacklist-rtl-dvb.conf
@@ -53,17 +48,19 @@ if [ -n "$revision" ]; then
 fi
 # Retire the standalone legacy service before accepting its name as an alias.
 # Leave legacy drop-ins in place: systemd also reads drop-ins for unit aliases.
-legacy_path="$UNIT_DIR/$LEGACY_UNIT"
-if { [ -e "$legacy_path" ] || [ -L "$legacy_path" ]; } && ! [ "$legacy_path" -ef "$UNIT_DIR/$UNIT" ]; then
-    if [ -f "$legacy_path" ]; then
-        systemctl stop "$LEGACY_UNIT"
-        systemctl disable --quiet "$LEGACY_UNIT"
+for legacy_unit in alisdr-receiver.service falconsdr-receiver.service; do
+    legacy_path="$UNIT_DIR/$legacy_unit"
+    if { [ -e "$legacy_path" ] || [ -L "$legacy_path" ]; } && ! [ "$legacy_path" -ef "$UNIT_DIR/$UNIT" ]; then
+        if [ -f "$legacy_path" ]; then
+            systemctl stop "$legacy_unit"
+            systemctl disable --quiet "$legacy_unit"
+        fi
+        # Preserve a locally edited unit for reference after the migration.
+        if [ -e "$legacy_path" ] || [ -L "$legacy_path" ]; then
+            mv -f "$legacy_path" "$legacy_path.pre-alisdr"
+        fi
     fi
-    # A locally edited unit can still be consulted after the migration.
-    if [ -e "$legacy_path" ] || [ -L "$legacy_path" ]; then
-        mv -f "$legacy_path" "$legacy_path.pre-alisdr"
-    fi
-fi
+done
 # Move the service home only after the old receiver has closed any recordings.
 if [ -d "$LEGACY_HOME" ] && [ ! -e "$HOME_DIR" ]; then
     mv "$LEGACY_HOME" "$HOME_DIR"

@@ -16,7 +16,7 @@ program, three modes (`main.py`):
 
 - **local** (default) — this computer scans; UI on `http://127.0.0.1:8765`,
   opened in the browser automatically. A second launch just reopens it.
-- **server** (`--server`, systemd `alisdr-receiver.service`) — same,
+- **server** (`--server`, systemd `alisdr-server.service`) — same,
   reachable from the whole network (phones too). `sdr-mode` (the owner's
   mode switcher on the receiver) can use the legacy alias. Keep its clean
   SIGTERM shutdown (gotcha 41).

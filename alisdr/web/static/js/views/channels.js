@@ -42,6 +42,46 @@ function sorted(name, list) {
   });
 }
 
+function folders() {
+  return [...new Set([...cfg().channel_folders, ...S.settings.channels.map((c) => c.folder).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
+}
+
+
+export async function editChannelDialog(ch, defaults = {}) {
+  const isNew = !ch;
+  const initial = ch || defaults;
+  const v = await formDialog(isNew ? t('Add channel') : t('Edit channel'), [
+    { key: 'freq', label: t('Frequency (MHz)'), type: 'number', value: initial.freq_hz ? fmtChannel(initial.freq_hz) : '',
+      hint: t('Airband: type the channel as published, e.g. 126.805') },
+    { key: 'name', label: t('Name'), value: initial.name || '', placeholder: t('e.g. Downtown Tower') },
+    { key: 'mod', label: t('Modulation'), type: 'select', value: initial.modulation || 'AM', options: modOptions() },
+    { key: 'folder', label: t('Folder'), type: 'select', value: initial.folder || '',
+      options: [['', t('(no folder)')], ...folders().map((f) => [f, f])] },
+    { key: 'newFolder', label: t('New folder'), hint: t('Optional - a name typed here is used instead of the folder above.') },
+    { key: 'weight', label: t('Priority weight'), type: 'number', value: initial.weight || 0,
+      hint: t('0 = normal. Higher = checked more often.') },
+  ], isNew ? t('Add') : t('Save'));
+  if (!v || !(v.freq > 0)) return false;
+  const hz = carrierHz(v.freq);
+  const channels = S.settings.channels;
+  if (channels.some((c) => c.freq_hz === hz && c !== ch)) {
+    toast(t('{f} MHz is already in the list', { f: fmtChannel(hz) }), 'bad');
+    return false;
+  }
+  const folder = v.newFolder.trim() || v.folder;
+  const data = { freq_hz: hz, ch833: typedAs833(v.freq), name: v.name.trim(), modulation: v.mod, folder, weight: v.weight || 0 };
+  if (folder && !cfg().channel_folders.includes(folder)) patchConfig({ channel_folders: [...cfg().channel_folders, folder] });
+  await saveChannels(isNew ? [...channels, { ...data, enabled: true }]
+    : channels.map((c) => c === ch ? { ...c, ...data } : c));
+  return true;
+}
+
+export function openChannelForFrequency(freq_hz, name = '', modulation = 'AM') {
+  const exact = carrierHz(fmtChannel(freq_hz));
+  const existing = S.settings.channels.find((c) => c.freq_hz === exact);
+  return editChannelDialog(existing, { freq_hz: exact, name, modulation });
+}
+
 export function channelsView(root) {
   const offs = [];
   const body = h('div.col');
@@ -189,28 +229,11 @@ export function channelsView(root) {
   }
 
   // ---------------------------------------------------------- memory list
-  function folders() {
-    return [...new Set([...cfg().channel_folders, ...S.settings.channels.map((c) => c.folder).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
-  }
-
   async function editChannel(ch) {
-    const isNew = !ch;
-    const fl = folders();
-    const v = await formDialog(isNew ? t('Add channel') : t('Edit channel'), [
-      { key: 'freq', label: t('Frequency (MHz)'), type: 'number', value: ch ? fmtChannel(ch.freq_hz) : '', hint: t('Airband: type the channel as published, e.g. 126.805') },
-      { key: 'name', label: t('Name'), value: ch ? ch.name : '', placeholder: t('e.g. Downtown Tower') },
-      { key: 'mod', label: t('Modulation'), type: 'select', value: ch ? ch.modulation : 'AM', options: modOptions() },
-      { key: 'folder', label: t('Folder'), type: 'select', value: ch ? ch.folder : '', options: [['', t('(no folder)')], ...fl.map((f) => [f, f])] },
-      { key: 'weight', label: t('Priority weight'), type: 'number', value: ch ? ch.weight : 0, hint: t('0 = normal. Higher = checked more often.') },
-    ], isNew ? t('Add') : t('Save'));
-    if (!v || !(v.freq > 0)) return;
-    const hz = carrierHz(v.freq);
-    const channels = S.settings.channels;
-    if (channels.some((c) => c.freq_hz === hz && c !== ch)) { toast(t('{f} MHz is already in the list', { f: fmtChannel(hz) }), 'bad'); return; }
-    const data = { freq_hz: hz, ch833: typedAs833(v.freq), name: v.name.trim(), modulation: v.mod, folder: v.folder, weight: v.weight || 0 };
-    if (isNew) channels.push({ ...data, enabled: true }); else Object.assign(ch, data);
-    await saveChannels(channels);
-    render();
+    if (await editChannelDialog(ch)) {
+      sel.clear();
+      render();
+    }
   }
 
   async function newFolder() {

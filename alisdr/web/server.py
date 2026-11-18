@@ -305,9 +305,11 @@ def make_handler(app: App):
             path = urlparse(self.path).path
             if path == "/api/manual/tune":
                 ctl.tune_manual(self._body())
+            elif path == "/api/manual/fm-scan":
+                ctl.tune_manual(self._body(), scan_fm=True)
             elif path == "/api/manual/dab-station":
                 body = self._body()
-                ctl.select_dab_station(body.get("sid"), body.get("channel"))
+                ctl.select_dab_station(body.get("sid"), body.get("channel"), body.get("tune_id"))
             elif path == "/api/manual/record":
                 ctl.record_manual(self._body().get("enabled"))
             elif path == "/api/manual/stop":
@@ -731,6 +733,7 @@ def make_handler(app: App):
         ("POST", "/api/manual/tune"): Handler.manual,
         ("POST", "/api/manual/record"): Handler.manual,
         ("POST", "/api/manual/stop"): Handler.manual,
+        ("POST", "/api/manual/fm-scan"): Handler.manual,
         ("POST", "/api/manual/dab-station"): Handler.manual,
         ("GET", "/api/manual/image"): Handler.manual_image,
         ("POST", "/api/scanner/start"): Handler.scanner,

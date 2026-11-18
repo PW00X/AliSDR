@@ -14,7 +14,7 @@ const app = document.getElementById('app');
 
 const ROUTES = {
   listen: { label: () => t('Scan'), icon: 'listen', view: listenView },
-  manual: { label: () => t('Manual'), icon: 'headphones', view: manualView },
+  manual: { label: () => t('Static'), icon: 'headphones', view: manualView },
   recordings: { label: () => t('Recordings'), icon: 'library', view: recordingsView },
   // What the add-on decoders found. Shown once add-ons are in use (Add-ons is the always-visible showcase); with
   // nothing received yet it explains itself and points to Add-ons.
@@ -140,7 +140,7 @@ function shell() {
     mount(status,
       live && (live.recording || live.manual_tuning_recording) ? h('span.chip.bad.live', { title: t('Recording') }, h('span.dot'), 'REC') : null,
       live && live.manual_tuning
-        ? h('span.chip.good.live', h('span.dot'), t('Manual tuning'))
+        ? h('span.chip.good.live', h('span.dot'), t('Static tuning'))
         : live && live.addon
         ? h('span.chip.good.live', h('span.dot'), t('Add-on running'))
         : h('span.chip', { class: running ? (signal ? 'good live' : 'accent') : '' }, h('span.dot'),

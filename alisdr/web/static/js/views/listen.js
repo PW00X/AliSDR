@@ -1,5 +1,6 @@
 // "Listen": the live scanner - what's on air now, controls, spectrum, quick
 // settings, the scanned bands and the activity feed.
+import { openChannelForFrequency } from './channels.js';
 import { NETWORK, groupDevices, groupOf, groupOfExtra, heldGroups, isTwice, nextGroup, takenByExtra, usableFor } from './dongles.js';
 import { api, confirmDialog, errorToast, fmtChannel, fmtMHz, h, icon, modal, mount, select, seg, slider, t, toast, toggle } from '../core.js';
 import { BOOST_STEPS_DB, liveAudio } from '../live-audio.js';
@@ -245,6 +246,15 @@ export function listenView(root) {
   const skipBtn = h('button', { onclick: () => command('skip'), title: t('Leave this frequency for now') }, icon('skip'), t('Skip'));
   const blBtn = h('button', { onclick: () => command('blacklist'), title: t('Leave it and never stop on it again (adds it to the blacklist)') }, icon('ban'), t('Skip + blacklist'));
   const holdBtn = h('button', { onclick: () => command('hold', { enabled: !(S.live && S.live.hold) }), title: t('Stay on this frequency - the scanner stops moving on') }, icon('pause'), t('Hold'));
+  const addChannelBtn = h('button', { disabled: true, title: t('Add this frequency to Channels'),
+    onclick: async () => {
+      const primary = S.live?.frequencies?.[0];
+      if (!primary) return;
+      const [hz, name] = primary;
+      const band = cfg().bands.find((b) => hz >= b.start_hz && hz <= b.stop_hz);
+      try { await openChannelForFrequency(hz, name, band?.modulation); } catch (e) { errorToast(e); }
+    },
+  }, icon('plus'), t('Add to Channels'));
   const recBtn = h('button.recbtn', { onclick: () => toggleManualRecord(), title: t('Continuous recording of what you hear, including silence') }, icon('record'), t('Record'));
   const iqBtn = h('button.ghost.small', { onclick: () => toggleRawIq(), title: t('Raw wideband IQ (SigMF) - about 19 MB per second') }, t('Raw IQ'));
   const autoRec = toggle(t('Auto-record transmissions'), cfg().recording.enabled, async (v, e) => {
@@ -266,7 +276,7 @@ export function listenView(root) {
     h('div.col', { style: { gap: '4px' } },
       h('div.meter', meterFill, meterMark),
       h('div.meter-legend', h('span', '-100'), levelText, h('span', '0 dBFS'))),
-    h('div.controls', startBtn, h('div.row', listenBtn, h('div.volume', icon('volume'), volume)), skipBtn, blBtn, holdBtn, recBtn),
+    h('div.controls', startBtn, h('div.row', listenBtn, h('div.volume', icon('volume'), volume)), skipBtn, blBtn, holdBtn, recBtn, addChannelBtn),
     h('div.row.wrap', autoRec, h('span.spacer'), h('span.faint.small', t('Boost')), boost, iqBtn));
 
   // ---------------------------------------------------------- an external add-on (rtl_433, VDL2) holds the receiver
@@ -425,6 +435,7 @@ export function listenView(root) {
     renderRangeNotice(live);
     mount(stateChip, h('span.dot'), live.stopping ? t('Stopping…') : stateLabel(live.state));
     const [primary, ...rest] = live.frequencies || [];
+    addChannelBtn.disabled = !primary;
     const active = live.state === 'SIGNAL_DETECTED' || live.state === 'LINGER';
     if (primary) {
       mount(freqEl, fmtChannel(primary[0]), h('small', 'MHz'));

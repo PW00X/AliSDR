@@ -71,6 +71,8 @@ export function manualView(root) {
   const frequencyField = h('label.field', t('Frequency (MHz)'), frequency);
   const channelField = h('label.field', t('DAB channel'), channel);
   const tune = h('button.primary.big', { type: 'submit', disabled: true }, icon('play'), t('Tune'));
+  const scanFm = h('button.big', { type: 'button', hidden: true, disabled: true },
+    icon('refresh'), t('Scan FM stations'));
   const stop = h('button.big', { type: 'button', disabled: true }, icon('stop'), t('Stop tuning'));
   const record = h('button.recbtn.big', { type: 'button', disabled: true,
     title: t('Continuous recording of what you hear, including silence') }, icon('record'), t('Record'));
@@ -92,8 +94,10 @@ export function manualView(root) {
   const stationEmpty = h('p.muted', t('No favourites saved.'));
   const favouritesCard = h('section.card.col', { hidden: true },
     h('div.card-head', h('h2', t('Favourites'))), favouriteRows, stationEmpty);
+  const stationHeading = h('h2');
+  const noFmStations = h('p.muted', { hidden: true }, t('No FM stations found.'));
   const stations = h('section.card.col', { hidden: true },
-    h('div.card-head', h('h2', t('DAB/DAB+ stations'))), stationRows);
+    h('div.card-head', stationHeading), stationRows, noFmStations);
   const stationInfo = h('div.col');
   const info = h('section.col', { hidden: true }, h('h2', t('Station information')), stationInfo);
   const canvas = h('canvas', { height: 260, role: 'img', 'aria-label': t('Live spectrum and waterfall around the tuned frequency.') });
@@ -133,6 +137,8 @@ export function manualView(root) {
   const updateControls = () => {
     tune.disabled = !ready || busy || (mode.value === 'DAB' && channel.value === 'favourites');
     stop.disabled = busy || !active;
+    scanFm.hidden = mode.value !== 'WFM';
+    scanFm.disabled = !ready || busy || Boolean(latest?.fm_scan);
     const recording = Boolean(latest?.recording);
     record.disabled = busy || (!recording && !latest?.can_record);
     if (recording !== record.classList.contains('on')) {
@@ -160,42 +166,75 @@ export function manualView(root) {
       },
     }, saved ? '★' : '☆');
   };
+  const cancelDab = (message) => {
+    requestedStation = null;
+    liveAudio.stop();
+    if (message) errorToast(new Error(message));
+  };
   const playDab = async (request) => {
     if (destroyed || requestedStation !== request) return;
-    const { entry, prepared } = request;
-    const ok = await change('/api/manual/dab-station', { sid: entry.id, channel: entry.channel });
+    const { entry, prepared, tuneId } = request;
+    const result = await change('/api/manual/dab-station', { sid: entry.id, channel: entry.channel, tune_id: tuneId });
     if (requestedStation !== request) return;
-    requestedStation = null;
-    if (!ok) {
-      liveAudio.stop();
+    if (!result) {
+      cancelDab();
       return;
     }
+    requestedStation = null;
     try {
       await prepared;
-      if (destroyed || requestedStation || active?.channel !== entry.channel || playingStation !== entry.id) return;
+      if (destroyed || requestedStation || latest?.tune_id !== tuneId || playingStation !== entry.id) return;
       liveAudio.useBroadcast(true);
       await liveAudio.start();
     } catch (e) {
       if (!destroyed) errorToast(e);
     }
   };
+  const startDabDiscovery = async (request) => {
+    if (destroyed || requestedStation !== request) return;
+    request.waiting = false;
+    request.sawStations = false;
+    request.deadline = performance.now() + 35_000;
+    request.attempts++;
+    // Keep station selection out of Tune. Start a new discovery even when
+    // the receiver is already on this ensemble, so an old list cannot win.
+    const result = await change('/api/manual/tune', {
+      ...request.values, mode: 'DAB', channel: request.entry.channel, rediscover: true,
+    });
+    if (requestedStation !== request) return;
+    if (!result) {
+      cancelDab();
+      return;
+    }
+    request.tuneId = result.tune_id;
+    request.waiting = true;
+    advanceDab(result);
+  };
   const advanceDab = (data) => {
     const request = requestedStation;
-    if (!request || request.selecting) return;
-    const { entry, receiver: targetReceiver, deadline } = request;
-    if (active?.mode === 'DAB' && active.channel === entry.channel && active.receiver === targetReceiver
-        && data.state === 'listening' && data.stations.some(({ id }) => id === entry.id)) {
-      request.selecting = true;
+    if (!request?.waiting) return;
+    const { entry, tuneId, deadline } = request;
+    if (data.tuning && (!tuneId || data.tune_id !== tuneId)) {
+      cancelDab(t('The DAB channel changed. Try the station again.'));
+      return;
+    }
+    if (data.tuning && data.stations.length) request.sawStations = true;
+    if (data.tuning?.channel === entry.channel && data.state === 'listening'
+        && data.stations.some(({ id }) => id === entry.id)) {
+      request.waiting = false;
       queueMicrotask(() => { void playDab(request); });
-    } else if (data.error || performance.now() >= deadline) {
-      requestedStation = null;
-      liveAudio.stop();
-      if (!data.error) errorToast(new Error(t('Saved station {name} was not found on {channel}.', {
-        name: entry.name || String(entry.id), channel: entry.channel,
-      })));
+    } else if (!data.tuning || performance.now() >= deadline) {
+      request.waiting = false;
+      if (!request.sawStations && request.attempts === 1 && (data.error || data.tuning)) {
+        queueMicrotask(() => { void startDabDiscovery(request); });
+      } else {
+        cancelDab(data.error || t('Saved station {name} was not found on {channel}.', {
+          name: entry.name || String(entry.id), channel: entry.channel,
+        }));
+      }
     }
   };
-  const playEntry = async (entry, current) => {
+  const playEntry = async (entry, current, favourite) => {
     if (busy) return;
     if (current && liveAudio.playing) {
       liveAudio.stop();
@@ -205,20 +244,14 @@ export function manualView(root) {
     if (entry.mode === 'DAB') {
       liveAudio.stop();
       const prepared = liveAudio.prepare();
-      // Observe rejections immediately, even if discovery is still pending.
-      prepared.catch(() => {});
-      const request = { entry, prepared, receiver: values.receiver, deadline: performance.now() + 35_000 };
+      prepared.catch(() => {});  // Discovery can outlast a rejected audio permission request.
+      const request = { entry, prepared, values, attempts: 0 };
       requestedStation = request;
-      if (active?.mode === 'DAB' && active.channel === entry.channel && active.receiver === values.receiver) {
-        advanceDab(latest);
+      if (!favourite && active?.channel === entry.channel && active.receiver === values.receiver) {
+        request.tuneId = latest.tune_id;
+        await playDab(request);
       } else {
-        // Discover the ensemble through the same request as Tune. Select the
-        // saved service only after the receiver returns this channel's list.
-        const ok = await change('/api/manual/tune', { ...values, mode: 'DAB', channel: entry.channel });
-        if (!ok && requestedStation === request) {
-          requestedStation = null;
-          liveAudio.stop();
-        }
+        await startDabDiscovery(request);
       }
       return;
     }
@@ -292,17 +325,21 @@ export function manualView(root) {
     const showingDab = mode.value === 'DAB';
     const showingFM = mode.value === 'WFM';
     const tunedDab = showingDab && active?.mode === 'DAB' && channel.value === active.channel;
-    const found = tunedDab ? latest.stations.map((entry) => ({ ...entry, mode: 'DAB', channel: active.channel })) : [];
+    const fmResults = showingFM && Array.isArray(latest.fm_stations);
+    const found = tunedDab ? latest.stations.map((entry) => ({ ...entry, mode: 'DAB', channel: active.channel }))
+      : fmResults ? latest.fm_stations.map((entry) => ({ ...entry, mode: 'WFM' })) : [];
     const saved = favourites.filter((entry) => entry.mode === mode.value);
     favouritesCard.hidden = !showingDab && !showingFM;
-    stations.hidden = !found.length;
+    stations.hidden = !found.length && !(fmResults && !latest.fm_scan);
+    noFmStations.hidden = !fmResults || Boolean(latest.fm_scan) || found.length > 0;
+    stationHeading.textContent = showingFM ? t('FM stations') : t('DAB/DAB+ stations');
     stationEmpty.hidden = saved.length > 0;
     const nextStationKey = JSON.stringify([found, saved, active, playingStation, liveAudio.playing]);
     if (nextStationKey !== stationKey) {
       stationKey = nextStationKey;
       const row = (entry, index = -1) => {
         const dab = entry.mode === 'DAB';
-        const current = active?.mode === entry.mode && (dab
+        const current = !latest.fm_scan && active?.mode === entry.mode && (dab
           ? active.channel === entry.channel && playingStation === entry.id
           : active.frequency_hz === entry.frequency_hz);
         const label = entry.name || (dab ? String(entry.id) : formatFM(entry.frequency_hz));
@@ -311,7 +348,7 @@ export function manualView(root) {
         const playing = current && liveAudio.playing;
         return h('li.manual-station', h('button.manual-station-play', {
           type: 'button', 'aria-label': `${playing ? t('Stop listening') : t('Play station')}: ${label}`,
-          onclick: () => playEntry(entry, current),
+          onclick: () => playEntry(entry, current, index >= 0),
         }, icon(playing ? 'stop' : 'play'), h('span.col', h('strong', label),
           sub ? h('small.muted', sub) : null)), favouriteButton(entry), index >= 0 ? dragHandle(entry, index) : null);
       };
@@ -319,7 +356,7 @@ export function manualView(root) {
       mount(stationRows, ...found.map((entry) => row(entry)));
     }
     const dab = active?.mode === 'DAB';
-    const fm = active?.mode === 'WFM';
+    const fm = active?.mode === 'WFM' && !latest.fm_scan;
     info.hidden = !dab && !fm;
     frequencyDisplay.hidden = !info.hidden;
     const meta = latest.station_info || {};
@@ -352,7 +389,7 @@ export function manualView(root) {
     updateStationCards();
   };
   const updateListen = () => {
-    audio.hidden = !active;
+    audio.hidden = !active || Boolean(latest?.fm_scan);
     listen.hidden = !active || active.mode === 'DAB';
     mount(listen, icon(liveAudio.playing ? 'mute' : 'headphones'),
       liveAudio.playing ? t('Stop listening') : t('Listen live'));
@@ -394,9 +431,10 @@ export function manualView(root) {
     if (initial || receiverKey !== previousReceiverKey) updateGain();
     devicePanel.lockDevice(active || S.live?.running);
     spectrumHint.hidden = active?.mode === 'DAB';
-    readout.textContent = active?.mode === 'DAB' ? active.channel
+    const fmScan = data.fm_scan;
+    readout.textContent = fmScan ? formatFM(fmScan.frequency_hz) : active?.mode === 'DAB' ? active.channel
       : active ? `${fmtMHz(active.frequency_hz, 3)} MHz` : '—';
-    detail.textContent = active?.mode === 'DAB' ? 'DAB/DAB+' : active?.mode === 'WFM' ? t('FM broadcast') : active?.mode || '';
+    detail.textContent = fmScan ? t('FM scan') : active?.mode === 'DAB' ? 'DAB/DAB+' : active?.mode === 'WFM' ? t('FM broadcast') : active?.mode || '';
     meter.hidden = data.level == null || !active;
     if (!meter.hidden) {
       meterFill.style.width = `${Math.max(0, Math.min(100, 100 + data.level))}%`;
@@ -410,6 +448,9 @@ export function manualView(root) {
       idle: () => t('Ready to tune.'),
       starting: () => t('Opening receiver…'),
       discovering: () => t('Waiting for DAB stations on {channel}…', active),
+      fm_scanning: () => fmScan.stage === 'rds'
+        ? t('Reading RDS ({done}/{total})…', fmScan)
+        : t('Scanning FM stations…'),
       listening: () => active.mode === 'DAB'
         ? t('DAB channel {channel}', active)
         : t('Tuned to {frequency} MHz ({mode})', { frequency: active.frequency_hz / 1e6, mode: active.mode }),
@@ -443,13 +484,13 @@ export function manualView(root) {
     busy = true;
     updateControls();
     try {
-      if (path === '/api/manual/tune') await syncConfig();
+      if (path === '/api/manual/tune' || path === '/api/manual/fm-scan') await syncConfig();
       const data = await api.post(path, body);
-      if (data.tuning) liveAudio.useBroadcast(['DAB', 'WFM'].includes(data.tuning.mode));
+      if (data.tuning) liveAudio.useBroadcast(!data.fm_scan && ['DAB', 'WFM'].includes(data.tuning.mode));
       if (destroyed) return;
       busy = false;
       render(data);
-      return true;
+      return data;
     } catch (e) {
       if (!destroyed) errorToast(e);
     } finally {
@@ -470,6 +511,11 @@ export function manualView(root) {
     frequency.value = (hz / 1e6).toFixed(6);
     frequency.focus();
   });
+  scanFm.addEventListener('click', () => {
+    requestedStation = null;
+    liveAudio.stop();
+    change('/api/manual/fm-scan', tuneValues());
+  });
   record.addEventListener('click', async () => {
     const enabled = !latest?.recording;
     if (enabled && !(await confirmRecording())) return;
@@ -483,7 +529,7 @@ export function manualView(root) {
     }
   });
   mount(root, h('div.page.manual-tuning',
-    h('div.page-head', h('h1', t('Manual tuning'))),
+    h('div.page-head', h('h1', t('Static tuning'))),
     h('div.grid.listen',
     h('div.col',
     h('section.card.hero', h('div.row', status), frequencyDisplay, info, meter,
@@ -496,7 +542,7 @@ export function manualView(root) {
       } },
       h('div.row.wrap', h('label.field', t('Modulation'), mode),
         frequencyField, channelField),
-      h('div.controls', tune, stop, record, audio))),
+      h('div.controls', tune, scanFm, stop, record, audio))),
     spectrumCard, stations),
     h('div.col', favouritesCard, deviceCard))));
   updateMode();

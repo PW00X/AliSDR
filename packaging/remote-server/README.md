@@ -11,12 +11,12 @@ On the receiver (Debian, Ubuntu, Raspberry Pi OS - 64-bit recommended),
 one line installs or updates it and starts the service:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server --with-dab
+curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server
 ```
 
 It installs this fork's `master` branch and keeps its checkout in
 `/opt/alisdr-src`. Set `ALISDR_REF=<tag or branch>` before `bash` to
-choose a different ref. The optional `--with-dab` flag builds AliSDR's
+choose a different ref. The installer builds AliSDR's
 in-process DAB/DAB+ decoder on the receiver. Or, from a checkout of
 this repository:
 
@@ -35,10 +35,10 @@ rule and DVB-T driver blacklist, and the systemd unit. Re-run it after
 `git pull` to update; settings and recordings stay. An older install that ran
 as root has its settings moved over automatically the first time.
 
-The web client opens on **Manual**. Scanning begins when you press
-**Start** on **Scan**. Stopping `alisdr-receiver.service` closes open
+The web client opens on **Static**. Scanning begins when you press
+**Start** on **Scan**. Stopping `alisdr-server.service` closes open
 recordings cleanly. On upgrade, the installer replaces the standalone
-receiver unit with an alias to `alisdr-receiver.service` so existing scripts and unit overrides continue to work. The upgrade
+receiver units with aliases to `alisdr-server.service` so existing scripts and unit overrides continue to work. The upgrade
 moves the existing service data to `/var/lib/alisdr`.
 
 ## Transcription and copies on your PC
@@ -67,4 +67,4 @@ lxc config device add INSTANCE rtlsdr usb vendorid=0bda productid=2838
 ```
 
 The service reconnects by itself once the device appears. Check with
-`rtl_test -t` and `systemctl status alisdr-receiver`.
+`rtl_test -t` and `systemctl status alisdr-server`.

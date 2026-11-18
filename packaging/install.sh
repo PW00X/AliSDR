@@ -1,7 +1,7 @@
 #!/bin/sh
 # AliSDR one-line installer:
 #
-#   curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server --with-dab
+#   curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server
 #
 # Installs the fork from source by default. With ALISDR_REPO set to a
 # repository that publishes releases, picks the matching artifact:
@@ -25,7 +25,7 @@
 #     packaging/remote-server/install.sh, systemd service started (Debian,
 #     Ubuntu, Raspberry Pi OS). Use ALISDR_REF=<branch|tag> to pick a
 #     version; re-run to update.
-#   - `--with-dab` -> build the native DAB decoder on Debian-based systems.
+# Debian-based source and server installs build the native DAB decoder automatically.
 #
 # After installing, unplug and replug the RTL-SDR dongle once (udev rule),
 # then run `alisdr` - the UI opens at http://127.0.0.1:8765.
@@ -39,12 +39,10 @@ REF="${ALISDR_REF:-${FALCONSDR_REF:-}}"
 FROM_SOURCE=0
 SERVER=0
 WITH_SDR_LIBS=0
-WITH_DAB=0
 for a in "$@"; do
   [ "$a" = "--with-sdr-libs" ] && WITH_SDR_LIBS=1
   [ "$a" = "--from-source" ] && FROM_SOURCE=1
   [ "$a" = "--server" ] && SERVER=1
-  [ "$a" = "--with-dab" ] && WITH_DAB=1
 done
 
 say() { printf '%s\n' "$*"; }
@@ -229,7 +227,7 @@ install_from_source() {
   python3 -m venv --system-site-packages .venv
   .venv/bin/pip install -r requirements.txt
   if [ "$WITH_SDR_LIBS" = "1" ]; then install_sdr_libs; fi
-  if [ "$WITH_DAB" = 1 ]; then sh packaging/dab/install.sh .venv/lib; fi
+  if have_apt && [ -f packaging/dab/install.sh ]; then sh packaging/dab/install.sh .venv/lib; fi
   cat <<EOF
 
 ${REPO##*/} $version is ready. Start it with:
@@ -272,14 +270,16 @@ install_server() {
     $SUDO git -c advice.detachedHead=false clone -q --depth 1 --branch "$ref" "https://github.com/$REPO.git" "$src"
   fi
   revision="$($SUDO git -C "$src" rev-parse --verify HEAD)"
-  # Pinned older revisions still ship the original unit and install paths.
   app=alisdr
-  if [ ! -f "$src/packaging/remote-server/alisdr-receiver.service" ]; then
-    app=falconsdr
-  fi
-  unit="$app-receiver"
-  if [ "$WITH_DAB" = 1 ]; then
-    $SUDO sh "$src/packaging/dab/install.sh" "/opt/$app/.venv/lib"
+  if [ -f "$src/packaging/remote-server/alisdr-server.service" ]; then
+    unit=alisdr-server
+  else
+    # Older pinned checkouts built DAB separately and used the receiver name.
+    [ -f "$src/alisdr/__init__.py" ] || app=falconsdr
+    unit="$app-receiver"
+    if [ -f "$src/packaging/dab/install.sh" ]; then
+      $SUDO sh "$src/packaging/dab/install.sh" "/opt/$app/.venv/lib"
+    fi
   fi
   $SUDO sh "$src/packaging/remote-server/install.sh" >/dev/null
   $SUDO systemctl enable --quiet --now "$unit.service"
@@ -315,7 +315,6 @@ main() {
     install_from_source
     return
   fi
-  [ "$WITH_DAB" = 0 ] || die "--with-dab requires --server or --from-source"
   # No prebuilt bundle runs here: musl-based distros (Alpine, ...) can't
   # execute the glibc-linked AppImage, and there is no musl asset.
   if is_musl; then

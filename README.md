@@ -107,7 +107,7 @@ headless receiver you listen to from any phone or PC on your network.
 | Receiver | How |
 |---|---|
 | RTL-SDR (incl. RTL-SDR Blog V3/V4) | built in on Linux, Windows and macOS |
-| HackRF, Airspy | built in on Windows, `.deb`, `.rpm`, AppImage and (since 1.4.1) macOS (experimental) |
+| HackRF, Airspy | native libhackrf/libairspy support (experimental), or SoapySDR |
 | An RTL-SDR on another computer | over the network through its `rtl_tcp` server (since 1.5.0, see [Network receiver](#network-receiver-rtl_tcp)) |
 | SDRplay, LimeSDR, USRP, … | through SoapySDR, Linux source install (not tested) |
 
@@ -191,194 +191,52 @@ one run each.
 
 ## Installation
 
-### One-line installer (Linux)
+### Linux desktop or headless server
 
-Installs this fork from source, including **Manual tuning**. On Debian or
-Ubuntu, make sure `git`, `python3` and `python3-venv` are installed. Run the
-command from a directory where you want the `AliSDR` checkout:
+The installer fetches the AliSDR source and installs its Python dependencies.
+On Debian-based systems, it also builds the native DAB/DAB+ decoder.
 
-```
-curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --with-dab
-```
+For a local desktop checkout:
 
-The optional `--with-dab` flag builds the DAB decoder on apt-based distributions.
-Run the same command again from the same directory to update
-the fork. Restart AliSDR after updating.
-
-The source install supports SoapySDR hardware (LimeSDR, SDRplay, USRP, and
-others) when you install the relevant SoapySDR modules for your distribution.
-The built-in HackRF/Airspy access needs their system libraries, which a source
-install does not bring along: add `--with-sdr-libs` (installs `libhackrf0` and
-`libairspy0` with apt, or `hackrf` and `airspyone_host` with dnf, using sudo):
-`curl -fsSL … | bash -s -- --from-source --with-sdr-libs`.
-
-### Ubuntu / Debian - .deb package
-
-Download the `.deb` from [Releases](../../releases) and install it:
-
-```
-sudo apt install ./alisdr_<version>_amd64.deb
+```sh
+curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash
 ```
 
-Start **AliSDR** from the application menu. Unplug and replug the dongle
-once after installing - the package adds a udev rule for USB access and stops
-the DVB-T TV driver from taking the dongle.
+Launch it with `.venv/bin/python main.py` from the AliSDR checkout. Use
+`--with-sdr-libs` to install the system HackRF and Airspy libraries on
+supported distributions. For SoapySDR, install the distribution's Python
+bindings and the driver for your receiver.
 
-This package is self-contained (RTL-SDR, plus HackRF and Airspy natively -
-experimental; no Python needed). For SoapySDR devices, run from source instead.
+On the headless receiver (Debian, Ubuntu or Raspberry Pi OS):
 
-### Fedora / openSUSE - .rpm package
-
-Download the `.rpm` from [Releases](../../releases) and install it:
-
-```
-sudo dnf install ./alisdr-<version>-1.<arch>.rpm
+```sh
+curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server
 ```
 
-Same self-contained bundle and the same udev/DVB-T handling as the `.deb`;
-replug the dongle once after installing. Needs glibc 2.38+ (current
-Fedora / openSUSE Tumbleweed); RHEL/Rocky 9 are too old for this build -
-run from source there instead.
+Open `http://<receiver-ip>:8765` in your browser. The service starts at boot
+and opens on **Static**. Start scanning from **Scan**. Run the same command
+again to update while keeping your settings and recordings. The service is
+`alisdr-server.service`. See the [headless receiver guide](packaging/remote-server/README.md)
+for details.
 
-### Arch Linux
+### From a checkout
 
-```
-cd packaging/aur && makepkg -si
-```
+Install Python 3, Git and the driver for your SDR. From a checkout, create an
+environment, install the dependencies, and start the app:
 
-The recipe builds from the AliSDR Git tag and uses Arch system packages.
-
-### Any distribution - AppImage
-
-Download `AliSDR-<version>-<arch>.AppImage` from
-[Releases](../../releases), make it executable and run it - no install, no
-root:
-
-```
-chmod +x AliSDR-*.AppImage
-./AliSDR-*.AppImage
-```
-
-One manual step on a machine with no RTL-SDR software installed yet: copy
-`packaging/linux-deb/60-rtl-sdr.rules` to `/etc/udev/rules.d/`, reload udev
-and replug the dongle (the `.deb`/`.rpm` do this for you).
-
-### Windows - installer or portable ZIP
-
-Download from [Releases](../../releases) either
-`AliSDR-<version>-windows-x64-setup.exe` (installs for your user, no
-administrator rights needed) or `AliSDR-<version>-windows-x64-portable.zip`
-(unzip anywhere and run `alisdr.exe`). Both are self-contained - no Python
-needed; MP3 recording works out of the box and transcription installs from
-Settings like in any other install. The program is not code-signed yet: if
-SmartScreen says "Windows protected your PC", choose **More info → Run
-anyway**.
-
-**RTL-SDR driver:** Windows needs the WinUSB driver on the dongle, installed
-once with [Zadig](https://zadig.akeo.ie/). If SDR++, SDR# or another SDR
-program already works with your dongle, it's already done. Otherwise: plug in
-the dongle → run Zadig → *Options → List All Devices* → pick
-**"Bulk-In, Interface (Interface 0)"** (or "RTL2838UHIDIR"; not Interface 1)
-→ target driver **WinUSB** → *Replace Driver* → replug the dongle. The same
-steps are in the app (Listen → SDR device). A HackRF or Airspy may need the
-same driver step; the built-in access to them is untested on Windows with real
-hardware.
-
-AliSDR runs in the background with its interface in the browser; quit it
-in Settings → Advanced. "Start with the system" is there too (off by default).
-
-### macOS - experimental
-
-Download `AliSDR-<version>-macos-arm64-experimental.zip` (Apple Silicon:
-M1 and newer) or `…-macos-x86_64-…` (Intel Macs) from
-[Releases](../../releases), unzip it and move **AliSDR** to Applications.
-These builds are made automatically and pass the same self-test as the other
-packages, but haven't been tried on a real Mac with an SDR yet - feedback in
-[Discussions](../../discussions) is very welcome.
-
-The app isn't signed by Apple. The first time, try to open it, then go to
-System Settings → Privacy & Security → **Open Anyway** (since macOS 15 Sequoia
-right-click → Open no longer skips this check; on older macOS it does). If
-macOS says the app "is damaged", clear the download flag in Terminal:
-
-```
-xattr -dr com.apple.quarantine /Applications/AliSDR.app
-```
-
-Builds before 1.5.0 had a broken signature seal (a licence file was added
-after the app was signed), which is a likely reason macOS calls a downloaded
-app "damaged". From 1.5.0 the build seals it again and checks the signature,
-so the message should no longer appear; if it does, the command above is the
-fix (and please tell us in [Discussions](../../discussions)).
-
-An RTL-SDR needs no extra driver on macOS. Builds since 1.4.1 also carry the
-HackRF and Airspy libraries (built-in access, experimental); they only
-check that the libraries load - no real Mac with a HackRF or Airspy has tried them.
-
-### From source (Linux, Windows, macOS)
-
-Requires Python 3.10+.
-
-```
+```sh
 git clone https://github.com/PW00X/AliSDR.git
 cd AliSDR
-python3 -m venv --system-site-packages .venv       # lets the venv see python3-soapysdr (Linux)
-.venv/bin/pip install -r requirements.txt        # Windows: .venv\Scripts\pip ...
-.venv/bin/python main.py                          # Windows: .venv\Scripts\python main.py
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python main.py
 ```
 
-The interface opens at `http://127.0.0.1:8765`. To update: `git pull`, run the
-`pip install` line again and restart (or run the one-liner with
-`--from-source` again from the folder above `AliSDR/`).
-
-- **Linux:** for RTL-SDR access without root, install your distribution's
-  `rtl-sdr` package (udev rules) or copy `packaging/linux-deb/60-rtl-sdr.rules`
-  to `/etc/udev/rules.d/`. For SoapySDR devices install `python3-soapysdr` and
-  the device's `soapysdr-module-*` (e.g. `sudo apt install python3-soapysdr
-  soapysdr-module-hackrf`); the venv must be created with
-  `--system-site-packages`, as above, or it cannot see them. HackRF and Airspy
-  can also be opened without SoapySDR (experimental, *SDR device → Access
-  method*; the Windows, `.deb`, `.rpm` and AppImage builds already carry the libraries):
-  `sudo apt install libhackrf0 libairspy0`, or run the one-line installer with
-  `--with-sdr-libs`.
-- **Windows:** the dongle needs the WinUSB driver - see *RTL-SDR driver*
-  above.
-- **MP3 recordings** use the ffmpeg that comes with the `imageio-ffmpeg`
-  package (or a system `ffmpeg` on PATH); on platforms without a wheel
-  (32-bit ARM) install ffmpeg from the system, otherwise recordings stay WAV.
-
-### Updating and removing
-
-Quit AliSDR, then install the newer `.deb`, `.rpm` or Windows installer over
-the old one - settings, channels, favorites and recordings are kept. Start it
-again afterwards (a copy left running through the update shows errors). An
-AppImage is replaced by downloading the new one. A source install is updated
-by running the `--from-source` line again from the folder that holds
-`AliSDR/` (it pulls the checkout and refreshes the venv), or by `git pull`
-in the checkout and the `pip install` line; the headless receiver, by its own
-line again (see below). Remove with `sudo apt remove
-alisdr`, `sudo dnf remove alisdr` or Windows *Settings → Apps*; your
-recordings and settings stay on disk (see
-[Where things are stored](#where-things-are-stored)).
-
-### Headless receiver
-
-On a Linux machine with the SDR attached (Debian, Ubuntu, Raspberry Pi OS):
-
-```
-curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server --with-dab
-```
-
-It installs this fork's `master` branch as a service that starts on boot and ends
-with the address to open from any device on your network
-(`http://<receiver-ip>:8765`). Run the same line again to update - settings
-and recordings are kept. The web client opens on **Manual**. Use **Start**
-on **Scan** to begin scanning. Details, other versions and helper computers for
-transcription: [packaging/remote-server/README.md](packaging/remote-server/README.md).
-It also installs `libhackrf0` and `libairspy0` (small), so a HackRF or Airspy
-works through the built-in access without extra steps. The service sees the system's SoapySDR: `sudo apt install python3-soapysdr
-soapysdr-module-<your receiver>` and restart it (`sudo systemctl restart
-alisdr-receiver`), then pick the access method under *SDR device*.
+On Windows, use `py -m venv .venv` and
+`.venv\Scripts\python.exe` for the two Python commands. RTL-SDR devices on
+Windows need the WinUSB driver. Select the device in AliSDR after installing
+its driver. For Debian-based systems, the one-line installer also builds
+DAB and prepares the receiver service when invoked with `--server`.
 
 ### Network receiver (rtl_tcp)
 
@@ -414,13 +272,13 @@ Good to know:
 2. Raise or lower the **trigger level** until real transmissions open and
    noise doesn't.
 3. Switch on **recording** when you're happy with what it stops on.
-4. Name the frequencies you hear in the **Channels** page (or straight from a
-   recording) - names show up everywhere, including search.
+4. Use **Add to Channels** from **Scan** or a recording to save its frequency
+   and other channel settings.
 
-### Manual tuning and DAB/DAB+
+### Static tuning, FM and DAB/DAB+
 
-Open **Manual** from the top navigation. For a headless receiver,
-run the [headless installer](#headless-receiver) on the receiver host. It
+Open **Static** from the top navigation. For a headless receiver,
+run the [headless installer](#linux-desktop-or-headless-server) on the receiver host. It
 restarts the service and verifies that the installed revision is serving the UI.
 
 Manual opens with DAB/DAB+ selected on a new browser and remembers the
@@ -431,22 +289,24 @@ or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
 tuning plays continuously, even below the scanner's trigger level. WFM
 streams 48 kHz audio and blends towards mono when the stereo pilot is weak.
 Station information shows the RDS service name, programme ID and RadioText
-when decoded. Use the star to save the tuned FM frequency.
+when decoded. Use the star to save the tuned FM frequency. With FM selected on **Static**, press
+**Scan FM stations** to scan 87.5–108 MHz silently and fill the station list.
+Receivable frequencies appear even when their RDS name is unavailable.
 
-Manual defaults to **Auto (hardware)**. To set a different gain mode or level,
+Static defaults to **Auto (hardware)**. To set a different gain mode or level,
 press **Tune** to apply them. The Scan page keeps its own configured gain.
 With the native Airspy driver, the slider shows the 0–21 sensitivity index.
 
 For digital broadcast radio on the Linux receiver, run the headless installer
-with `--server --with-dab`. AliSDR's Python receiver feeds IQ from the
+with `--server`. AliSDR's Python receiver feeds IQ from the
 selected SDR to the [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline)
 shared library and sends decoded audio through AliSDR's live audio stream.
 
-In **Manual tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
+In **Static tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
 **Tune**. Press a station in the list to play it, or use its star to
 add or remove it. **Favourites** is selected first in the DAB channel menu each
-time Manual opens. Play or remove saved stations without tuning an ensemble
-first. Drag the handle next to a favourite to change its order. The browser
+time Static opens. Playing a saved station first tunes its channel and
+looks for the station in the newly discovered ensemble. Drag the handle next to a favourite to change its order. The browser
 stores FM and DAB favourites in a cookie so each profile has its own list. The central station information displays the
 ensemble, codec, broadcast text and DAB slideshow artwork when available.
 
@@ -455,7 +315,7 @@ If reception fails, the receiver reports whether it synchronized or found
 audio stations. The browser receives stereo audio at 48 kHz. The spectrum,
 waterfall and signal meter are available during DAB reception. On a headless receiver, a timeout
 also logs the capture rate, gain and any reported IQ loss to
-`journalctl -u alisdr-receiver`.
+`journalctl -u alisdr-server`.
 
 Use **Record** once tuned to save the audio to **Recordings**. For DAB,
 select a station first. FM and DAB capture stereo audio. **Stop recording**
@@ -490,19 +350,18 @@ ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.
 
 ## Command line
 
-`alisdr` for the installed packages (Windows: `alisdr.exe` in its install
-folder), `python main.py` from source:
+Run from the source checkout.
 
 ```
-alisdr               local mode: scan on this computer, UI on 127.0.0.1:8765
-alisdr --server      reachable from the whole network
-alisdr --start       start scanning right away
-alisdr --local       scan locally even if this computer is set up as a client of a server
-alisdr --port 9000   another port
-alisdr --no-browser  don't open the browser
-alisdr --version     show the version
-alisdr --self-test   check this install has everything it needs
-alisdr --probe-sdr   measure the receiver with the scanner stopped (see Hardware)
+python3 main.py         local mode: scan on this computer, UI on 127.0.0.1:8765
+python3 main.py --server      reachable from the whole network
+python3 main.py --start       start scanning right away
+python3 main.py --local       scan locally even if this computer is set up as a client of a server
+python3 main.py --port 9000   another port
+python3 main.py --no-browser  don't open the browser
+python3 main.py --version     show the version
+python3 main.py --self-test   check this install has everything it needs
+python3 main.py --probe-sdr   measure the receiver with the scanner stopped (see Hardware)
 ```
 
 ## Where things are stored
@@ -563,9 +422,7 @@ are responsible for how you use this program.
 ## License
 
 GPL-3.0-or-later (see [LICENSE](LICENSE)) - required by `pyrtlsdr` and the
-bundled `librtlsdr`. The Windows, Linux and (since 1.4.1) macOS packages list every bundled component
-and its license in `THIRD-PARTY-LICENSES.txt` (ffmpeg in them is a GPLv3
-build; `libhackrf` and `libairspy` are BSD-3-Clause, `libusb` LGPL-2.1).
+the native librtlsdr dependency. The optional native receiver libraries carry their own licenses.
 Transcription software and Whisper models are not bundled: they are
 downloaded on the user's own request from their publishers (faster-whisper,
 CTranslate2 and the default model `Systran/faster-whisper-large-v3` are MIT-licensed, as

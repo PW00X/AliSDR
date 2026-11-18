@@ -17,4 +17,4 @@ RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-Alias=falconsdr-receiver.service
+Alias=alisdr-receiver.service falconsdr-receiver.service
