@@ -32,7 +32,7 @@ function writeFavourites(entries) {
   }
 }
 
-export function manualView(root) {
+export function manualView(root, modes) {
   const receiver = h('select', { required: true });
   const mode = h('select', {}, ...[...analogModes, 'DAB'].map((value) =>
     h('option', { value }, value === 'DAB' ? 'DAB/DAB+' : value === 'WFM' ? `${t('FM broadcast')} (WFM)` : value)));
@@ -534,9 +534,9 @@ export function manualView(root) {
     }
   });
   mount(root, h('div.page.manual-tuning',
-    h('div.page-head', h('h1', t('Static tuning'))),
+    h('div.page-head', h('h1', t('Listen'))),
     h('div.grid.listen',
-    h('div.col',
+    h('div.col', modes,
     h('section.card.hero', h('div.row', status), frequencyDisplay, info, meter,
       h('form.col', { onsubmit: (event) => {
         event.preventDefault();

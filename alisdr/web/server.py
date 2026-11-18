@@ -214,7 +214,7 @@ def make_handler(app: App):
             if path == "/api/session":
                 return self._json({
                     "authenticated": self._token_ok(), "mode": "server",
-                    "navigation": "manual-scan",
+                    "navigation": "listen",
                     "dab_backend": "in-process",
                     "revision": _INSTALLED_REVISION,
                 })
@@ -617,7 +617,7 @@ def make_handler(app: App):
             self._json(ctl.heartbeat(str(body["name"]), body.get("info", {})))
 
         def w_claim(self, _query: dict) -> None:
-            self._json({"job": lib.claim_job(str(self._body()["name"]))})
+            self._json({"job": ctl.claim_transcription(str(self._body()["name"]))})
 
         def w_result(self, _query: dict) -> None:
             body = self._body()

@@ -1,4 +1,4 @@
-"""Keep receiver-side Whisper cancellable, including native model loading."""
+"""Keep Whisper cancellable, including native model loading."""
 from __future__ import annotations
 
 import multiprocessing

@@ -6,7 +6,7 @@ import {
   h, icon, modal, mount, prefs, qs, qualityBadge, select, seg, slider, t, toast, toggle,
 } from '../core.js';
 import { liveAudio, makeLoudnessChain } from '../live-audio.js';
-import { S, cfg, on, patchConfig } from '../state.js';
+import { S, cfg, on } from '../state.js';
 
 import { openChannelForFrequency } from './channels.js';
 
@@ -110,7 +110,6 @@ export function recordingsView(root) {
         h('span', t('{n} recordings', { n: total.toLocaleString() })), '·', h('span', fmtBytes(res.total_bytes)),
         res.pending ? h('span.chip.accent', t('{n} waiting for transcription', { n: res.pending.toLocaleString() })) : null,
         h('span.spacer'),
-        toggle(t('Auto-transcribe'), cfg().transcription.enabled, (v) => patchConfig({ transcription: { enabled: v } })),
         toggle(t('UTC'), prefs.utc, (v) => { prefs.utc = v; reload(); }),
         toggle(t('Auto-play next'), F.autoNext, (v) => { F.autoNext = v; localStorage.setItem('autonext', v ? '1' : '0'); }));
   }

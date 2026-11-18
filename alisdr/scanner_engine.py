@@ -1846,6 +1846,11 @@ class ScannerEngine(threading.Thread):
             return False
         return len(self._slots) >= limit
 
+    @property
+    def decoder_active(self) -> bool:
+        return any(slot.data_decoder is not None or slot.dsd is not None
+                   for slot in self._slots.copy().values())
+
     def _open_slot(self, freq_hz: int, window: ScanWindow, level_dbfs: float) -> None:
         if self._shared is not None and not self._shared.claim(freq_hz, self):
             return  # another dongle opened it between our check and now

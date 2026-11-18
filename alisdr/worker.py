@@ -33,7 +33,7 @@ from .config import CONFIG_DIR, TranscriptionConfig, _from_dict, atomic_write_te
 from .playback.models import QualityMetrics, Recording
 from .playback.organizer import iter_all_recordings, parse_filename
 from .playback.transcription_availability import is_transcription_installed
-from .playback.transcription_engine import ModelUnavailable, transcribe_recording
+from .playback.transcription_engine import ModelUnavailable
 from .playback.transcription_install import model_cached, model_download_bytes
 from .playback.transcription_process import TranscriptionPaused, TranscriptionProcess
 
@@ -102,7 +102,8 @@ class Worker(threading.Thread):
     def __init__(self, base_url: str, token: "str | Callable[[], str]", name: str = "", local_root: Optional[Path] = None,
                  embedded: bool = False, on_detach: Optional[Callable[[], None]] = None,
                  on_restart: Optional[Callable[[], None]] = None,
-                 dab_active: Optional[Callable[[], bool]] = None) -> None:
+                 dab_active: Optional[Callable[[], bool]] = None,
+                 decoders_paused: Optional[Callable[[], bool]] = None) -> None:
         super().__init__(daemon=True, name="worker")
         self.api = Api(base_url, token)
         self.name = name or socket.gethostname()
@@ -113,8 +114,10 @@ class Worker(threading.Thread):
         self._stop_event = threading.Event()
         self._wake = threading.Event()  # a command arrived - don't sit out the idle pause
         self._dab_active = dab_active if embedded and dab_active else lambda: False
-        self._local_transcription = TranscriptionProcess(
-            lambda: self._stop_event.is_set() or self._dab_active()) if embedded else None
+        self._server_paused = False
+        self._decoders_paused = decoders_paused or (lambda: self._server_paused)
+        self._transcription = TranscriptionProcess(
+            lambda: self._stop_event.is_set() or bool(self._pause_reason()))
         self._log: deque[str] = deque(maxlen=40)
         self._status = "idle"
         self._status_since = time.time()
@@ -173,8 +176,10 @@ class Worker(threading.Thread):
                     self._settings = reply["settings"]
                     self._tconfig = _from_dict(TranscriptionConfig, reply["transcription"])
                     self._commands += reply.get("commands", [])
-                    if self._commands:
+                    paused = bool(reply.get("paused_for_decoders"))
+                    if self._commands or paused != self._server_paused:
                         self._wake.set()
+                    self._server_paused = paused
                 if not self._connected:
                     self._connected = True
                     self.say("connected")
@@ -182,7 +187,9 @@ class Worker(threading.Thread):
                 if self._connected:
                     self.say(f"server unreachable: {exc}")
                 self._connected = False
-            self._hb_wake.wait(_HEARTBEAT_S)
+            monitor_decoders = (self._tconfig.only_when_decoders_idle
+                                and self._status in ("transcribing", "paused_decoders"))
+            self._hb_wake.wait(_MIN_HEARTBEAT_GAP_S if monitor_decoders else _HEARTBEAT_S)
             self._hb_wake.clear()
             self._stop_event.wait(max(0.0, _MIN_HEARTBEAT_GAP_S - (time.monotonic() - sent)))
 
@@ -193,9 +200,13 @@ class Worker(threading.Thread):
         self.pause_transcription()
 
     def pause_transcription(self) -> None:
-        if self._local_transcription is not None:
-            self._local_transcription.close()
+        self._transcription.close()
         self._wake.set()
+
+    def _pause_reason(self) -> str:
+        if self._dab_active():
+            return "paused_dab"
+        return "paused_decoders" if self._decoders_paused() else ""
 
     def run(self) -> None:
         threading.Thread(target=self._heartbeat_loop, daemon=True, name="worker-heartbeat").start()
@@ -213,12 +224,10 @@ class Worker(threading.Thread):
                     self._last_mirror = time.monotonic()
                     self._mirror() if self._settings.get("mirror") else self._count_local_only()
                 can_transcribe = self._settings.get("transcribe") and self._installed
-                if can_transcribe and not self._dab_active() and not self._stop_event.is_set():
+                if can_transcribe and not self._pause_reason() and not self._stop_event.is_set():
                     did_work = self._transcribe_one()
-                if can_transcribe and self._dab_active():
-                    self._set_status("paused_dab")
-                else:
-                    self._set_status("transcribing" if did_work else "idle")
+                paused = self._pause_reason() if can_transcribe else ""
+                self._set_status(paused or ("transcribing" if did_work else "idle"))
                 if not did_work:
                     self._wake.wait(_IDLE_S)
                     self._wake.clear()
@@ -249,8 +258,7 @@ class Worker(threading.Thread):
     # -- transcription ----------------------------------------------------------
     def _install(self, with_gpu: bool) -> None:
         from .playback.transcription_install import install_transcription
-        if self._local_transcription is not None:
-            self._local_transcription.close()
+        self._transcription.close()
         self._set_status("installing")
         self.say("installing transcription - several GB to download, this can take a few minutes")
         ok, needs_restart, message = install_transcription(with_gpu, self._log_line)
@@ -263,8 +271,7 @@ class Worker(threading.Thread):
 
     def _uninstall(self, with_models: bool) -> None:
         from .playback.transcription_install import uninstall_transcription
-        if self._local_transcription is not None:
-            self._local_transcription.close()
+        self._transcription.close()
         self._set_status("uninstalling")
         self.say("uninstalling transcription…")
         with self._lock:
@@ -304,11 +311,7 @@ class Worker(threading.Thread):
                 tconfig = self._tconfig
             self._expect_model_download(tconfig)
             try:
-                language = job.get("language")
-                if self._local_transcription is not None:
-                    result = self._local_transcription.transcribe(rec, tconfig, language)
-                else:
-                    result = transcribe_recording(rec, tconfig, forced_language=language)
+                result = self._transcription.transcribe(rec, tconfig, job.get("language"))
             finally:
                 self._downloading = None
             self.api.post("/api/worker/result", {"id": rel, "key": job["key"], "result": result.__dict__})

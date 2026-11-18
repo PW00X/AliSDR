@@ -218,7 +218,7 @@ function stateClass(live) {
   return 'accent';
 }
 
-export function listenView(root) {
+export function listenView(root, modes) {
   setFastPolling(true);
   const offs = [];
   const page = h('div.page');
@@ -376,8 +376,8 @@ export function listenView(root) {
   const feed = h('div.feed');
   const feedCard = h('section.card', h('div.card-head', h('h2', t('Activity'))), feed);
 
-  mount(page, h('div.page-head', h('h1', t('Scan'))), h('div.grid.listen',
-    h('div.col', { style: { gap: '16px' } }, addonPanel, hero, spectrumCard, bandsCard),
+  mount(page, h('div.page-head', h('h1', t('Listen'))), h('div.grid.listen',
+    h('div.col', { style: { gap: '16px' } }, modes, addonPanel, hero, spectrumCard, bandsCard),
     h('div.col', { style: { gap: '16px' } }, quick, device, feedCard)));
 
   // ---------------------------------------------------------- behaviour

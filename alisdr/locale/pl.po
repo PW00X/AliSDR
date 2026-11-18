@@ -1870,6 +1870,15 @@ msgstr "transkrybuje"
 msgid "Transcription paused during DAB"
 msgstr "Transkrypcja wstrzymana podczas odbioru DAB"
 
+msgid "Waiting for decoders to go idle"
+msgstr "Oczekiwanie na zakończenie pracy dekoderów"
+
+msgid "Transcribe only when decoders are idle"
+msgstr "Transkrybuj tylko wtedy, gdy dekodery są bezczynne"
+
+msgid "Pause transcription while DAB, FM RDS, digital voice or a decoder add-on is active."
+msgstr "Wstrzymaj transkrypcję podczas pracy dekodera DAB, FM RDS, głosu cyfrowego lub dekodera z dodatku."
+
 msgid "copying recordings"
 msgstr "kopiuje nagrania"
 
@@ -3919,6 +3928,12 @@ msgstr "Radio FM"
 
 msgid "Tune"
 msgstr "Dostrój"
+
+msgid "Tuning"
+msgstr "Strojenie"
+
+msgid "Receiver mode"
+msgstr "Tryb odbiornika"
 
 msgid "Stop tuning"
 msgstr "Zakończ strojenie"

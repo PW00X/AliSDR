@@ -17,7 +17,6 @@ const ADDON_SECTIONS = [
 ];
 const SECTIONS = [
   ['recording', () => t('Recording')],
-  ['addons', () => t('Transcription & add-ons')],     // a signpost: these settings moved to the Add-ons page
   ['presets', () => t('Band presets')],
   ['location', () => t('Location')],
   ['appearance', () => t('Language & listening')],
@@ -71,9 +70,9 @@ function numberInput(value, onchange, attrs = {}) {
 }
 
 export function settingsView(root, hash, scope = 'settings') {
-  const moved = (hash.match(/^#\/settings\/(transcription|digital)/) || [])[1];
+  const moved = (hash.match(/^#\/settings\/(transcription|digital|addons)$/) || [])[1];
   if (scope === 'settings' && moved) {   // old links (a greyed-out modulation, bookmarks)
-    location.replace(`#/addons/${moved}`);
+    location.replace(moved === 'addons' ? '#/addons' : `#/addons/${moved}`);
     return { destroy() {} };
   }
   const offs = [];
@@ -189,6 +188,10 @@ export function settingsView(root, hash, scope = 'settings') {
   let fastPoll = false;
   function renderTranscription() {
     const tc = cfg().transcription;
+    const idleLabel = t('Transcribe only when decoders are idle');
+    const idleToggle = toggle('', tc.only_when_decoders_idle,
+      (v) => patchConfig({ transcription: { only_when_decoders_idle: v } }));
+    idleToggle.firstChild.setAttribute('aria-label', idleLabel);
     const langs = h('input', { value: tc.candidate_languages.join(', '), style: { width: '140px' }, onchange: (e) => patchConfig({ transcription: { candidate_languages: e.target.value.split(/[,\s]+/).filter(Boolean) } }) });
     const advanced = h('details',
       h('summary.small.muted', { style: { cursor: 'pointer' } }, t('Advanced')),
@@ -198,6 +201,7 @@ export function settingsView(root, hash, scope = 'settings') {
     mount(body('transcription'),
       setting(t('Transcribe new recordings automatically'), t('Transcription runs on whichever computers below have it switched on - the server itself, or your PC with a GPU.'),
         toggle('', tc.enabled, (v) => patchConfig({ transcription: { enabled: v } }))),
+      setting(idleLabel, t('Pause transcription while DAB, FM RDS, digital voice or a decoder add-on is active.'), idleToggle),
       setting(t('Main model'), t('Transcribes every recording and detects its language - English too, unless an English model is set below. A bigger model is more accurate and slower; the first use downloads it.'),
         modelPicker(mainModels(), tc.generic_model, (v) => { if (v) patchConfig({ transcription: { generic_model: v } }); })),
       setting(t('English model (optional)'), t('Only for English, e.g. tuned for air traffic control. None: the main model does English too - one download, less memory.'),
@@ -256,7 +260,7 @@ export function settingsView(root, hash, scope = 'settings') {
     };
     const wt = waiting.get(w.name);
     const busy = !!wt || BUSY.includes(info.status);
-    const status = { idle: t('idle'), transcribing: t('transcribing'), paused_dab: t('Transcription paused during DAB'), copying: t('copying recordings'), uploading: t('uploading recordings'), installing: t('installing transcription…'), uninstalling: t('uninstalling transcription…'), downloading: t('downloading the model…') }[info.status] || info.status;
+    const status = { idle: t('idle'), transcribing: t('transcribing'), paused_dab: t('Transcription paused during DAB'), paused_decoders: t('Waiting for decoders to go idle'), copying: t('copying recordings'), uploading: t('uploading recordings'), installing: t('installing transcription…'), uninstalling: t('uninstalling transcription…'), downloading: t('downloading the model…') }[info.status] || info.status;
     // What is going on right now, for the operations that take a while.
     const forS = info.status_for_s ? ` (${fmtDuration(info.status_for_s)})` : '';
     const progress = wt && !BUSY.includes(info.status)
@@ -496,16 +500,6 @@ export function settingsView(root, hash, scope = 'settings') {
 
   let stopDecoders = null;
   let stopNotify = null;
-  function renderAddonsSignpost() {
-    mount(body('addons'),
-      h('p.muted', { style: { margin: 0 } }, t('Transcription, digital voice and the decoders (ACARS, APRS, VDL2, rtl_433) now have their own page.')),
-      h('div.row.wrap',
-        h('button.primary', { onclick: () => { location.hash = '#/addons/transcription'; } }, icon('settings'), t('Go to transcription settings')),
-        h('button', { onclick: () => { location.hash = '#/addons'; } }, t('All add-on settings'))),
-      h('p.faint.small', { style: { margin: 0 } },
-        t('For example: the Whisper model and the computers that transcribe · DMR and C4FM digital voice · ACARS and APRS decoders · rtl_433 sensors on 433 or 868 MHz · VDL2.')));
-  }
-
   function renderAll() {
     if (scope === 'addons') {
       renderTranscription(); renderDigital();
@@ -513,7 +507,8 @@ export function settingsView(root, hash, scope = 'settings') {
       if (!stopNotify) stopNotify = notifyCard(body('notify'));
       return;
     }
-    renderLocation(); renderPresets(); renderAppearance(); renderAdvanced();
+    renderRecording(); renderPresets(); renderLocation(); renderAppearance();
+    renderStorage(); renderAccess(); renderAdvanced();
   }
   renderAll();
   // Every second while something is going on with a computer (so a click shows its effect), else every 3 s.

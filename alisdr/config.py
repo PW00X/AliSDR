@@ -300,6 +300,7 @@ class NoiseReductionConfig:
 @dataclass
 class TranscriptionConfig:
     enabled: bool = True         # automatic background transcription of new recordings (see worker.py)
+    only_when_decoders_idle: bool = False
     generic_model: str = "large-v3"  # transcribes every language, and detects which one it is
     # Optional: a model for English only (e.g. "jacktol/whisper-medium.en-fine-tuned-for-ATC-faster-whisper",
     # tuned for aviation). Empty = generic_model does English too: one download, one model in memory.

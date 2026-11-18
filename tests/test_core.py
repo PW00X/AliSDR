@@ -2319,18 +2319,18 @@ def _test_transcription_process(connection):
 
 
 class WorkerReceptionTest(unittest.TestCase):
+    def wait_for(self, predicate) -> None:
+        deadline = time.monotonic() + 10
+        while not predicate() and time.monotonic() < deadline:
+            time.sleep(.02)
+        self.assertTrue(predicate())
+
     def test_dab_preempts_receiver_transcription_and_requeues_it(self) -> None:
         from unittest.mock import patch
 
         from alisdr.controller import Controller
         from alisdr.web.server import App, serve
         from alisdr.worker import Api, Worker
-
-        def wait_for(predicate) -> None:
-            deadline = time.monotonic() + 10
-            while not predicate() and time.monotonic() < deadline:
-                time.sleep(.02)
-            self.assertTrue(predicate())
 
         cfg = AppConfig()
         root = Path(tempfile.mkdtemp(dir=_HOME))
@@ -2351,7 +2351,7 @@ class WorkerReceptionTest(unittest.TestCase):
         process_at_dab_open = []
 
         def listen(session):
-            process_at_dab_open.append(worker._local_transcription._process)
+            process_at_dab_open.append(worker._transcription._process)
             dab_started.set()
             session.stop_requested.wait(10)
 
@@ -2365,11 +2365,11 @@ class WorkerReceptionTest(unittest.TestCase):
             ctl.before_dab = worker.pause_transcription
             worker.start()
             try:
-                wait_for(recording.with_suffix(".started").is_file)
+                self.wait_for(recording.with_suffix(".started").is_file)
                 ctl.tune_manual({"mode": "DAB", "channel": "12A"})
                 self.assertTrue(dab_started.wait(2))
                 self.assertEqual(process_at_dab_open, [None])
-                wait_for(lambda: worker._status == "paused_dab")
+                self.wait_for(lambda: worker._status == "paused_dab")
                 self.assertIsNone(ctl.library.get(rel).transcript)
 
                 job = remote.post("/api/worker/claim", {"name": "remote"})["job"]
@@ -2377,9 +2377,63 @@ class WorkerReceptionTest(unittest.TestCase):
                 remote.post("/api/worker/release", {"id": rel})
                 recording.with_suffix(".resume").touch()
                 ctl.stop_manual()
-                wait_for(lambda: ctl.library.get(rel).transcript is not None)
+                self.wait_for(lambda: ctl.library.get(rel).transcript is not None)
                 result = ctl.library.get(rel).transcript
                 self.assertEqual((result.text, result.language), ("receiver test", "en"))
+            finally:
+                worker.stop()
+                worker.join(2)
+
+    def test_idle_only_waits_for_an_active_decoder_even_on_a_remote_worker(self) -> None:
+        from unittest.mock import patch
+
+        from alisdr.controller import Controller
+        from alisdr.web.server import App, serve
+        from alisdr.worker import Api, Worker
+
+        cfg = AppConfig()
+        root = Path(tempfile.mkdtemp(dir=_HOME))
+        cfg.recording.output_dir = str(root)
+        rel = "2026-01-01/" + NAME.format(khz=121500)
+        recording = _wav(root, rel)
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        ctl.library.rescan()
+        ctl.library.request_transcription([rel], "en")
+        http = serve(App(cfg, ctl, ""), "127.0.0.1", 0)
+        self.addCleanup(http.server_close)
+        self.addCleanup(http.shutdown)
+        base = f"http://127.0.0.1:{http.server_port}"
+        api = Api(base, "")
+
+        # A held receiver is busy even while its add-on is starting.
+        ctl._addon_dongles["vdl2"] = 0
+        job = api.post("/api/worker/claim", {"name": "probe"})["job"]
+        self.assertEqual(job["id"], rel)  # Existing configurations allow this.
+        api.post("/api/worker/release", {"id": rel})
+        ctl.config.transcription.only_when_decoders_idle = True
+        self.assertIsNone(api.post("/api/worker/claim", {"name": "probe"})["job"])
+        ctl._addon_dongles.clear()
+
+        with patch("alisdr.playback.transcription_process._serve", _test_transcription_process), \
+                patch("alisdr.worker.is_transcription_installed", return_value=True), \
+                patch("alisdr.worker.model_cached", return_value=True), \
+                patch("alisdr.worker._HEARTBEAT_S", .1), \
+                patch("alisdr.worker._MIN_HEARTBEAT_GAP_S", .1), \
+                patch("alisdr.worker._IDLE_S", .05):
+            worker = Worker(base, "", name="remote", local_root=root)
+            worker.start()
+            try:
+                self.wait_for(recording.with_suffix(".started").is_file)
+                ctl._addon_dongles["vdl2"] = 0
+                self.wait_for(lambda: worker._status == "paused_decoders")
+                self.assertIsNone(worker._transcription._process)
+                self.assertIsNone(ctl.library.get(rel).transcript)
+                self.assertIsNone(api.post("/api/worker/claim", {"name": "probe"})["job"])
+                recording.with_suffix(".resume").touch()
+                ctl._addon_dongles.clear()
+                self.wait_for(lambda: ctl.library.get(rel).transcript is not None)
+                self.assertEqual(ctl.library.get(rel).transcript.text, "receiver test")
             finally:
                 worker.stop()
                 worker.join(2)

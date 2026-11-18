@@ -13,7 +13,7 @@ headless receiver you listen to from any phone or PC on your network.
 > Listening to and recording some radio services is restricted or illegal in
 > many countries - see [Legal](#legal).
 
-![Scan page: frequency display, live spectrum and waterfall, receiver settings](docs/screenshot-listen.png)
+![Scan mode: frequency display, live spectrum and waterfall, receiver settings](docs/screenshot-listen.png)
 
 
 ## Features
@@ -38,7 +38,7 @@ headless receiver you listen to from any phone or PC on your network.
   10 MHz); the plan is shared in proportion to their capture widths.
 - Optional **antenna range** per dongle (SDR device card): one on a 2 m
   antenna scans only 144-146 MHz, one on a 70 cm antenna only 430-440 MHz.
-  What no range reaches is listed on the Scan page.
+  Frequencies outside the receivers' coverage are listed under **Listen → Scan**.
 - Optional, experimental digital voice: DMR and Yaesu System Fusion (C4FM)
   through [dsd-fme](https://github.com/lwvmobile/dsd-fme), installed from
   Add-ons → Digital voice. Encrypted calls stay muted.
@@ -131,7 +131,7 @@ libhackrf both scan, libhackrf reported no lost samples) by
 **Testing a receiver:** stop the scanner and run `python3 main.py --probe-sdr`
 (add `hackrf_native` / `hackrf` /
 `airspy_native` / `airspy` to pick the way it is opened, or `rtl_tcp` to
-measure the server whose address is saved on the Scan page). It measures the
+measure the server whose address is saved under **Listen → Scan**). It measures the
 gain steps, the DC spike, how many blocks after a retune still hold the old
 frequency, and sample losses, and prints one `RESULT {...}`
 line - please paste it into an issue together with your receiver's model.
@@ -192,7 +192,7 @@ curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/insta
 ```
 
 Open `http://<receiver-ip>:8765` in your browser. The service starts at boot
-and opens on **Static**. Start scanning from **Scan**. Run the same command
+and opens on **Listen → Tune**. Select **Scan** in the tuner to start scanning. Run the same command
 again to update while keeping your settings and recordings. The service is
 `alisdr-server.service`. See the [headless receiver guide](packaging/remote-server/README.md)
 for details.
@@ -219,7 +219,7 @@ the DAB decoder from the checkout on Debian-based Linux, run
 An RTL-SDR plugged into another computer (a Raspberry Pi at the antenna, a
 box in the attic, a phone running an `rtl_tcp` app) can be the receiver of
 the scanner: on that computer run `rtl_tcp -a 0.0.0.0` (package `rtl-sdr`),
-then on the Scan page choose *SDR device → Network receiver (rtl_tcp)* and
+then under **Listen → Scan** choose *SDR device → Network receiver (rtl_tcp)* and
 type its address (`192.168.1.20` or `192.168.1.20:1234`). Scanning, recording,
 transcription and the web interface stay on the computer running AliSDR.
 
@@ -243,21 +243,21 @@ Good to know:
 
 ## First steps
 
-1. **Scan** page: pick your SDR, then add a band (or a preset) and press
-   Start.
+1. Open **Listen → Scan**, pick your SDR, add a band (or a preset), and press
+   **Start**.
 2. Raise or lower the **trigger level** until real transmissions open and
    noise doesn't.
 3. Switch on **recording** when you're happy with what it stops on.
 4. Use **Add to Channels** from **Scan** or a recording to save its frequency
    and other channel settings.
 
-### Static tuning, FM and DAB/DAB+
+### Tuning FM and DAB/DAB+
 
-Open **Static** from the top navigation. For a headless receiver,
+Open **Listen → Tune**. For a headless receiver,
 run the [headless installer](#headless-linux-server) on the receiver host. It
 restarts the service and verifies that the installed revision is serving the UI.
 
-Manual opens with DAB/DAB+ selected on a new browser and remembers the
+Tune opens with DAB/DAB+ selected on a new browser and remembers the
 last modulation you chose. For analog tuning, select a receiver and enter
 a frequency in MHz. Use WFM for broadcast FM,
 or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
@@ -265,23 +265,23 @@ or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
 tuning plays continuously, even below the scanner's trigger level. WFM
 streams 48 kHz audio and blends towards mono when the stereo pilot is weak.
 Station information shows the RDS service name, programme ID and RadioText
-when decoded. Use the star to save the tuned FM frequency. With FM selected on **Static**, press
+when decoded. Use the star to save the tuned FM frequency. With FM selected in **Tune**, press
 **Scan FM stations** to scan 87.5–108 MHz silently and fill the station list.
 By default, the list shows stations whose RDS name was decoded. Use
 **Show stations without RDS names** to see the other frequencies found by the scan.
 
-Static defaults to **Auto (hardware)**. To set a different gain mode or level,
-press **Tune** to apply them. The Scan page keeps its own configured gain.
+Tune defaults to **Auto (hardware)**. To set a different gain mode or level,
+press **Tune** to apply them. Scan keeps its own configured gain.
 With the native Airspy driver, the slider shows the 0–21 sensitivity index.
 
 The Linux installer builds DAB/DAB+ by default. AliSDR's Python receiver feeds IQ from the
 selected SDR to the [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline)
 shared library and sends decoded audio through AliSDR's live audio stream.
 
-In **Static tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
+In **Tune**, choose **DAB/DAB+**, pick a Band III channel, and press
 **Tune**. Press a station in the list to play it, or use its star to
 add or remove it. **Favourites** is selected first in the DAB channel menu each
-time Static opens. Playing a saved station first tunes its channel and
+time Tune opens. Playing a saved station first tunes its channel and
 looks for the station in the newly discovered ensemble. Drag the handle next to a favourite to change its order. The browser
 stores FM and DAB favourites in a cookie so each profile has its own list. The central station information displays the
 ensemble, codec, broadcast text and DAB slideshow artwork when available.
@@ -299,7 +299,7 @@ saves the file while you keep listening. Saved recordings include the station
 name when decoded. Switching broadcast stations, stopping tuning or starting
 Scan finishes an active broadcast recording.
 
-**Tune** stops scanning across all receivers. **Start** on the Scan tab
+Pressing **Tune** stops scanning across all receivers. **Start** in Scan mode
 ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.
 
 ## Tips for good recordings

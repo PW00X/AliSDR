@@ -35,8 +35,8 @@ rule and DVB-T driver blacklist, and the systemd unit. Re-run it after
 `git pull` to update; settings and recordings stay. An older install that ran
 as root has its settings moved over automatically the first time.
 
-The web client opens on **Static**. Scanning begins when you press
-**Start** on **Scan**. Stopping `alisdr-server.service` closes open
+The web client opens on **Listen → Tune**. To scan, select **Scan**
+in the tuner and press **Start**. Stopping `alisdr-server.service` closes open
 recordings cleanly. On upgrade, the installer replaces the standalone
 receiver units with aliases to `alisdr-server.service` so existing scripts and unit overrides continue to work. The upgrade
 moves the existing service data to `/var/lib/alisdr`.
@@ -58,6 +58,9 @@ under **Add-ons → Transcription & computers**.
 While the receiver tunes or plays DAB/DAB+, transcription on the receiver
 pauses. An interrupted recording returns to the queue and can be processed
 by another computer or retried on the receiver after DAB tuning ends.
+To pause all workers during receiver decoding, enable **Transcribe only when
+decoders are idle**. Workers started from an older checkout need the updated
+source to interrupt a job they already started.
 
 ## USB passthrough
 

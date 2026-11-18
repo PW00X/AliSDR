@@ -12,9 +12,18 @@ import { statsView } from './views/stats.js';
 
 const app = document.getElementById('app');
 
+function receiverView(root, hash) {
+  const active = hash === '#/listen/scan' ? 'scan' : 'tune';
+  const modes = h('div.seg.tuner-mode', { role: 'group', 'aria-label': t('Receiver mode') },
+    ...[['tune', t('Tune')], ['scan', t('Scan')]].map(([value, label]) => h('button', {
+      type: 'button', class: active === value ? 'active' : '', 'aria-pressed': String(active === value),
+      onclick: () => { if (active !== value) location.hash = `#/listen/${value}`; },
+    }, label)));
+  return active === 'scan' ? listenView(root, modes) : manualView(root, modes);
+}
+
 const ROUTES = {
-  manual: { label: () => t('Static'), icon: 'headphones', view: manualView },
-  listen: { label: () => t('Scan'), icon: 'listen', view: listenView },
+  listen: { label: () => t('Listen'), icon: 'listen', view: receiverView },
   recordings: { label: () => t('Recordings'), icon: 'library', view: recordingsView },
   // What the add-on decoders found. Shown once add-ons are in use (Add-ons is the always-visible showcase); with
   // nothing received yet it explains itself and points to Add-ons.
@@ -65,8 +74,11 @@ function loginPage() {
 let current = null;
 
 function shell() {
-  const defaultRoute = 'manual';
-  const routeKey = () => (location.hash.match(/^#\/(\w+)/) || [])[1] || defaultRoute;
+  const defaultRoute = 'listen';
+  const routeKey = () => {
+    const key = (location.hash.match(/^#\/(\w+)/) || [])[1];
+    return key && key !== 'manual' ? key : defaultRoute;
+  };
   const nav = h('nav.nav');
   const status = h('div.status');
   const content = h('main');
@@ -96,7 +108,7 @@ function shell() {
     mount(status,
       live && (live.recording || live.manual_tuning_recording) ? h('span.chip.bad.live', { title: t('Recording') }, h('span.dot'), 'REC') : null,
       live && live.manual_tuning
-        ? h('span.chip.good.live', h('span.dot'), t('Static tuning'))
+        ? h('span.chip.good.live', h('span.dot'), t('Tuning'))
         : live && live.addon
         ? h('span.chip.good.live', h('span.dot'), t('Add-on running'))
         : h('span.chip', { class: running ? (signal ? 'good live' : 'accent') : '' }, h('span.dot'),

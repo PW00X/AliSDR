@@ -407,6 +407,17 @@ class Controller:
         session = self.manual_session
         return session is not None and session.tuning.mode == "DAB"
 
+    def transcription_paused(self) -> bool:
+        if not self.config.transcription.only_when_decoders_idle:
+            return False
+        session = self.manual_session
+        manual_decoder = session is not None and (
+            session.tuning.mode == "DAB" or (
+                session.tuning.mode == "WFM"
+                and (session.fm_scan is None or session.fm_scan["stage"] == "rds")))
+        return manual_decoder or bool(self._addon_dongles) or any(
+            engine.decoder_active for engine in self._engines)
+
     def record_manual(self, enabled: bool) -> None:
         if type(enabled) is not bool:
             raise ValueError(i18n.tr("Invalid recording request."))
@@ -1149,8 +1160,14 @@ class Controller:
         return {
             "settings": self.worker_settings(name),
             "transcription": asdict(self.config.transcription),
+            "paused_for_decoders": self.transcription_paused(),
             "commands": commands,
         }
+
+    def claim_transcription(self, name: str) -> Optional[dict]:
+        if self.transcription_paused():
+            return None
+        return self.library.claim_job(name)
 
     def update_worker(self, name: str, settings: dict) -> None:
         merged = self.worker_settings(name)
