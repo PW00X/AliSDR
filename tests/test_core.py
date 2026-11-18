@@ -2791,9 +2791,10 @@ class ManualTuningTest(unittest.TestCase):
                 after = wait_for(lambda live: live["state"] == "SIGNAL_DETECTED" and live["spectrum"]
                                  and np.percentile(live["spectrum"]["db"], 20) > before_floor + 20)
                 self.assertGreater(after["level"], before["level"] + 20)
+                center = receivers[0].freq_hz
                 fail_read.set()
-                wait_for(lambda live: len(receivers) > 1 and live["state"] == "SIGNAL_DETECTED")
-                self.assertAlmostEqual(receivers[-1].freq_hz, receivers[0].freq_hz)
+                wait_for(lambda live: len(receivers) > 1 and receivers[-1].freq_hz == center
+                         and live["state"] == "SIGNAL_DETECTED")
             finally:
                 ctl.shutdown()
 
