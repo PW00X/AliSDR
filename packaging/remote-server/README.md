@@ -35,8 +35,9 @@ rule and DVB-T driver blacklist, and the systemd unit. Re-run it after
 `git pull` to update; settings and recordings stay. An older install that ran
 as root has its settings moved over automatically the first time.
 
-The web client opens on **Listen → Tune**. To scan, select **Scan**
-in the tuner and press **Start**. Stopping `alisdr-server.service` closes open
+**Listen** opens in **Tune** when idle and **Scan** when the scanner is
+running. To scan, select **Scan** in the tuner and press **Start**.
+Stopping `alisdr-server.service` closes open
 recordings cleanly. On upgrade, the installer replaces the standalone
 receiver units with aliases to `alisdr-server.service` so existing scripts and unit overrides continue to work. The upgrade
 moves the existing service data to `/var/lib/alisdr`.

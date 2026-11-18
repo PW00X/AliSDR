@@ -13,13 +13,26 @@ import { statsView } from './views/stats.js';
 const app = document.getElementById('app');
 
 function receiverView(root, hash) {
-  const active = hash === '#/listen/scan' ? 'scan' : 'tune';
-  const modes = h('div.seg.tuner-mode', { role: 'group', 'aria-label': t('Receiver mode') },
-    ...[['tune', t('Tune')], ['scan', t('Scan')]].map(([value, label]) => h('button', {
-      type: 'button', class: active === value ? 'active' : '', 'aria-pressed': String(active === value),
-      onclick: () => { if (active !== value) location.hash = `#/listen/${value}`; },
-    }, label)));
-  return active === 'scan' ? listenView(root, modes) : manualView(root, modes);
+  function show(active) {
+    const modes = h('div.seg.tuner-mode', { role: 'group', 'aria-label': t('Receiver mode') },
+      ...[['tune', t('Tune')], ['scan', t('Scan')]].map(([value, label]) => h('button', {
+        type: 'button', class: active === value ? 'active' : '', 'aria-pressed': String(active === value),
+        onclick: () => { if (active !== value) location.hash = `#/listen/${value}`; },
+      }, label)));
+    return active === 'scan' ? listenView(root, modes) : manualView(root, modes);
+  }
+  if (hash === '#/listen/scan') return show('scan');
+  if (hash === '#/listen/tune' || hash === '#/manual') return show('tune');
+
+  let closed = false;
+  let view;
+  mount(root, h('div.page', h('div.page-head', h('h1', t('Listen'))), h('div.empty', t('Loading…'))));
+  // Choose from a fresh server snapshot when entering through the Listen
+  // tab. An explicit mode in the URL takes precedence.
+  api.get('/api/live?since_log=' + S.logId).catch(() => S.live).then((live) => {
+    if (!closed) view = show(live?.running ? 'scan' : 'tune');
+  }).catch(errorToast);
+  return { destroy() { closed = true; view?.destroy(); } };
 }
 
 const ROUTES = {

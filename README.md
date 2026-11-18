@@ -192,7 +192,8 @@ curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/insta
 ```
 
 Open `http://<receiver-ip>:2424` in your browser. The service starts at boot
-and opens on **Listen → Tune**. Select **Scan** in the tuner to start scanning. Run the same command
+and opens **Listen** in **Tune** when idle or **Scan** when scanning. Select
+**Scan** in the tuner to start scanning. Run the same command
 again to update while keeping your settings and recordings. The service is
 `alisdr-server.service`. See the [headless receiver guide](packaging/remote-server/README.md)
 for details.
