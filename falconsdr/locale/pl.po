@@ -3893,6 +3893,12 @@ msgstr "Ten odbiornik jest już użyty wyżej - można go otworzyć tylko raz."
 msgid "Manual tuning"
 msgstr "Strojenie ręczne"
 
+msgid "Starting gain (dB)"
+msgstr "Wzmocnienie początkowe (dB)"
+
+msgid "Enter a valid receiver gain."
+msgstr "Wpisz prawidłowe wzmocnienie odbiornika."
+
 msgid "DAB/DAB+ stations"
 msgstr "Stacje DAB/DAB+"
 

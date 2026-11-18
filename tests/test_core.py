@@ -2602,6 +2602,15 @@ class ManualTuningTest(unittest.TestCase):
         ctl.tune_manual({"receiver": 0, "mode": "NFM", "frequency_hz": 145_500_000})
         self.assertIs(ctl.manual_session, session)
         self.assertEqual(ctl.manual_status()["tuning"]["frequency_hz"], 145_500_000)
+        with self.assertRaises(ValueError):
+            ctl.tune_manual({"mode": "NFM", "frequency_hz": 145_500_000, "gain_db": float("nan")})
+        self.assertIs(ctl.manual_session, session)
+        saved_gain = cfg.device.gain_db
+        ctl.tune_manual({"mode": "NFM", "frequency_hz": 145_500_000, "gain_mode": "manual", "gain_db": 25})
+        self.assertIsNot(ctl.manual_session, session)
+        self.assertFalse(session.is_alive())
+        self.assertEqual(ctl.manual_status()["gain"], {"mode": "manual", "db": 25})
+        self.assertEqual(cfg.device.gain_db, saved_gain)
         ctl.stop_manual()
         self.assertIsNone(ctl.manual_status()["tuning"])
         self.assertTrue(ctl.running)

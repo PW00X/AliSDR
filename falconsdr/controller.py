@@ -287,11 +287,19 @@ class Controller:
             if devices[k] is not None:
                 device.update({"device_args": "", "bias_tee": False, **devices[k]})
             device["sample_rate_hz"] = antenna_range.device_rates(self.config)[k]
+            gain_mode = body.get("gain_mode", device["gain_mode"])
+            gain_db = body.get("gain_db", device["gain_db"])
+            if (gain_mode not in ("manual", "auto", "sw_auto")
+                    or type(gain_db) not in (int, float) or not -100 <= gain_db <= 100):
+                raise ValueError(i18n.tr("Enter a valid receiver gain."))
+            device.update(gain_mode=gain_mode, gain_db=gain_db)
             old = self.manual_session
-            if old is not None and old.tuning == tuning and old.is_alive() and not old.stop_requested.is_set():
+            can_reuse = (old is not None and old.is_alive() and not old.stop_requested.is_set()
+                         and old.device == device)
+            if can_reuse and old.tuning == tuning:
                 return
             same_receiver = old is not None and old.tuning.receiver == k
-            if same_receiver and tuning.mode != "DAB" and old.tuning.mode != "DAB" and old.is_alive() and not old.stop_requested.is_set():
+            if can_reuse and same_receiver and tuning.mode != "DAB" and old.tuning.mode != "DAB":
                 old.state = "starting"
                 old.tuning = tuning
                 return
@@ -367,6 +375,7 @@ class Controller:
             "channels": DAB_CHANNELS,
             "error": self._manual_error,
             "tuning": asdict(session.tuning) if session else None,
+            "gain": {"mode": session.device["gain_mode"], "db": session.device["gain_db"]} if session else None,
             "state": session.state if session else "idle",
             "stations": [],
             "spectrum": session.spectrum if session and session.state == "listening" else None,

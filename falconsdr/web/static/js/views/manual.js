@@ -1,6 +1,6 @@
 import { api, errorToast, fmtMHz, h, icon, mount, t } from '../core.js';
 import { liveAudio } from '../live-audio.js';
-import { on } from '../state.js';
+import { cfg, on } from '../state.js';
 import { spectrumPainter } from './listen.js';
 
 const analogModes = ['AM', 'NFM', 'WFM', 'SSB', 'USB', 'LSB'];
@@ -14,6 +14,23 @@ export function manualView(root) {
     value: '99.5', required: true,
   });
   const channel = h('select');
+  const gainMode = h('select', {},
+    h('option', { value: 'manual' }, t('Manual')),
+    h('option', { value: 'auto' }, t('Auto (hardware)')),
+    h('option', { value: 'sw_auto' }, t('Auto (software)')));
+  const gainDb = h('input', { type: 'number', min: -100, max: 100, step: 'any', required: true });
+  const gainLabel = h('span');
+  const gainField = h('label.field', gainLabel, gainDb);
+  const setGain = (mode, db) => {
+    gainMode.value = mode;
+    gainDb.value = db;
+    updateGain();
+  };
+  function updateGain() {
+    gainField.hidden = gainDb.disabled = gainMode.value === 'auto';
+    gainLabel.textContent = gainMode.value === 'sw_auto' ? t('Starting gain (dB)') : t('Gain (dB)');
+  }
+  setGain(cfg().device.gain_mode, cfg().device.gain_db);
   const frequencyField = h('label.field', t('Frequency (MHz)'), frequency);
   const channelField = h('label.field', t('DAB channel'), channel);
   const tune = h('button.primary.big', { type: 'submit', disabled: true }, icon('play'), t('Tune'));
@@ -85,6 +102,7 @@ export function manualView(root) {
         mode.value = active.mode;
         if (active.channel) channel.value = active.channel;
         if (active.frequency_hz) frequency.value = active.frequency_hz / 1e6;
+        if (data.gain) setGain(data.gain.mode, data.gain.db);
       }
       updateMode();
     }
@@ -158,6 +176,7 @@ export function manualView(root) {
     }
   };
   mode.addEventListener('change', updateMode);
+  gainMode.addEventListener('change', updateGain);
   canvas.addEventListener('click', (event) => {
     if (!frame) return;
     mode.value = mode.value === 'DAB' ? 'WFM' : mode.value;
@@ -194,10 +213,12 @@ export function manualView(root) {
         change('/api/manual/tune', {
           receiver: Number(receiver.value), mode: mode.value,
           frequency_hz: Math.round(Number(frequency.value) * 1e6), channel: channel.value,
+          gain_mode: gainMode.value, gain_db: Number(gainDb.value),
         });
       } },
       h('div.row.wrap', h('label.field', t('Modulation'), mode),
         frequencyField, channelField),
+      h('div.row.wrap', h('label.field', t('Gain mode'), gainMode), gainField),
       h('div.controls', tune, stop, analogAudio))),
     spectrumCard),
     h('div.col',

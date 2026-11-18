@@ -432,6 +432,9 @@ or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
 tuning plays continuously, even below the scanner's trigger level. WFM uses
 the app's mono live-audio stream.
 
+Set the gain mode and level on the Manual page for analog or DAB, then
+press **Tune** to apply them. The Scan page keeps its own configured gain.
+
 For digital broadcast radio on the Linux receiver, run the headless installer
 with `--server --with-dab`. FalconSDR's Python receiver feeds IQ from the
 selected SDR to the [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline)
