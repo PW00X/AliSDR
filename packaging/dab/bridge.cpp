@@ -7,6 +7,7 @@
 using Station = void (*)(uint32_t, const char *, int);
 using Audio = void (*)(const int16_t *, int, int);
 using Reception = void (*)(bool, int16_t, int32_t);
+using Metadata = void (*)(uint32_t, const char *);
 
 struct Receiver final : deviceHandler {
     RingBuffer<std::complex<float>> iq{1 << 20};
@@ -16,6 +17,8 @@ struct Receiver final : deviceHandler {
     std::map<uint32_t, int> advertised;
     std::atomic<uint32_t> requested{0};
     std::atomic<uint32_t> selected{0};
+    std::atomic<Metadata> metadata{nullptr};
+    std::string ensemble;
     Station station;
     Audio audio;
     Reception reception;
@@ -24,6 +27,9 @@ struct Receiver final : deviceHandler {
         api.dabMode = 1;
         api.thresholdValue = 3;
         api.syncsignal_Handler = [](bool, void *) {};
+        api.name_of_ensemble = [](const std::string &name, int32_t, void *context) {
+            static_cast<Receiver *>(context)->ensemble = name;
+        };
         api.serviceName = [](const std::string &name, int32_t id, uint16_t, void *context) {
             static_cast<Receiver *>(context)->names[static_cast<uint32_t>(id)] = name;
         };
@@ -32,6 +38,12 @@ struct Receiver final : deviceHandler {
             self.reception(synced, snr, offset);
             if (synced)
                 self.update_services();
+        };
+        api.dataOut_Handler = [](const char *label, void *context) {
+            auto &self = *static_cast<Receiver *>(context);
+            const auto sid = self.selected.load();
+            if (auto callback = self.metadata.load())
+                if (sid && sid == self.requested.load()) callback(sid, label);
         };
         api.audioOut_Handler = [](int16_t *samples, int count, int rate, bool, void *context) {
             auto &self = *static_cast<Receiver *>(context);
@@ -51,6 +63,8 @@ struct Receiver final : deviceHandler {
 
     // The FIC updates and service lookups run on the decoder thread.
     void update_services() {
+        if (!ensemble.empty())
+            if (auto callback = metadata.load()) callback(0, ensemble.c_str());
         const auto wanted = requested.load();
         for (const auto &entry : names) {
             if (!is_audioService(decoder, entry.second))
@@ -91,5 +105,9 @@ DAB_API int falcon_dab_push(void *handle, const void *samples, int count) {
 
 DAB_API void falcon_dab_select(void *handle, uint32_t sid) {
     static_cast<Receiver *>(handle)->requested.store(sid);
+}
+
+DAB_API void falcon_dab_set_metadata(void *handle, Metadata callback) {
+    static_cast<Receiver *>(handle)->metadata.store(callback);
 }
 }

@@ -1120,8 +1120,8 @@ msgstr "Nagranie ręczne"
 msgid "Before you start"
 msgstr "Zanim zaczniesz"
 
-msgid "FalconSDR can tune to a wide range of radio frequencies, some of which may be restricted or illegal to listen to or record where you live.\n\nUsing this software does not authorize you to listen to or record any transmission. Radio monitoring and recording laws vary significantly between countries - some places allow listening to most frequencies but restrict recording or sharing what you hear; others restrict listening to non-public or certain public-safety/aviation communications entirely.\n\nYou are solely responsible for knowing and following the laws that apply to you. If you're unsure, check your local telecommunications regulations before using the scanning or recording features."
-msgstr "FalconSDR może przestrajać się na szeroki zakres częstotliwości radiowych, z których część może być objęta ograniczeniami albo nielegalna do słuchania lub nagrywania w Twoim kraju.\n\nKorzystanie z tego programu nie upoważnia Cię do słuchania ani nagrywania żadnej transmisji. Przepisy dotyczące nasłuchu i nagrywania radiowego znacząco różnią się między krajami - w niektórych miejscach wolno słuchać większości częstotliwości, ale nagrywanie lub udostępnianie tego, co usłyszysz, jest ograniczone; w innych zabroniony jest sam nasłuch łączności niepublicznej lub niektórych służb (bezpieczeństwa publicznego, lotnictwa).\n\nPonosisz wyłączną odpowiedzialność za znajomość i przestrzeganie przepisów, które Cię obowiązują. Jeśli nie masz pewności, sprawdź lokalne przepisy telekomunikacyjne, zanim zaczniesz korzystać z funkcji skanowania lub nagrywania."
+msgid "AliSDR can tune to a wide range of radio frequencies, some of which may be restricted or illegal to listen to or record where you live.\n\nUsing this software does not authorize you to listen to or record any transmission. Radio monitoring and recording laws vary significantly between countries - some places allow listening to most frequencies but restrict recording or sharing what you hear; others restrict listening to non-public or certain public-safety/aviation communications entirely.\n\nYou are solely responsible for knowing and following the laws that apply to you. If you're unsure, check your local telecommunications regulations before using the scanning or recording features."
+msgstr "AliSDR może przestrajać się na szeroki zakres częstotliwości radiowych, z których część może być objęta ograniczeniami albo nielegalna do słuchania lub nagrywania w Twoim kraju.\n\nKorzystanie z tego programu nie upoważnia Cię do słuchania ani nagrywania żadnej transmisji. Przepisy dotyczące nasłuchu i nagrywania radiowego znacząco różnią się między krajami - w niektórych miejscach wolno słuchać większości częstotliwości, ale nagrywanie lub udostępnianie tego, co usłyszysz, jest ograniczone; w innych zabroniony jest sam nasłuch łączności niepublicznej lub niektórych służb (bezpieczeństwa publicznego, lotnictwa).\n\nPonosisz wyłączną odpowiedzialność za znajomość i przestrzeganie przepisów, które Cię obowiązują. Jeśli nie masz pewności, sprawdź lokalne przepisy telekomunikacyjne, zanim zaczniesz korzystać z funkcji skanowania lub nagrywania."
 
 msgid "Before you record"
 msgstr "Zanim zaczniesz nagrywać"
@@ -1309,8 +1309,8 @@ msgstr "Zaloguj"
 msgid "The password was set in Settings → Access. To remove it, delete \"access_token\" from config.json on the receiver."
 msgstr "Hasło ustawiono w Ustawieniach → Dostęp. Aby je usunąć, skasuj „access_token” z config.json na odbiorniku."
 
-msgid "This computer works for a FalconSDR server"
-msgstr "Ten komputer pracuje dla serwera FalconSDR"
+msgid "This computer works for a AliSDR server"
+msgstr "Ten komputer pracuje dla serwera AliSDR"
 
 msgid "Connected"
 msgstr "Połączono"
@@ -1849,8 +1849,8 @@ msgstr "Komputery"
 msgid "Add another computer (e.g. your PC with a GPU)"
 msgstr "Dodaj kolejny komputer (np. PC z kartą graficzną)"
 
-msgid "On that computer start FalconSDR, open Settings → Connect to a server and enter:"
-msgstr "Na tamtym komputerze uruchom FalconSDR, otwórz Ustawienia → Połączenie z serwerem i wpisz:"
+msgid "On that computer start AliSDR, open Settings → Connect to a server and enter:"
+msgstr "Na tamtym komputerze uruchom AliSDR, otwórz Ustawienia → Połączenie z serwerem i wpisz:"
 
 msgid "…and this server's password."
 msgstr "…oraz hasło tego serwera."
@@ -1942,8 +1942,8 @@ msgstr "Połączono - otwieram serwer…"
 msgid "Connect"
 msgstr "Połącz"
 
-msgid "Have a FalconSDR server elsewhere (e.g. an always-on receiver)? Connect this computer to it: it stops scanning on its own and instead transcribes and/or keeps copies of the server's recordings. You can come back to local mode any time."
-msgstr "Masz serwer FalconSDR gdzie indziej (np. stale działający odbiornik)? Połącz z nim ten komputer: przestanie sam skanować, a zamiast tego będzie transkrybował i/lub trzymał kopie nagrań z serwera. Do trybu lokalnego możesz wrócić w każdej chwili."
+msgid "Have a AliSDR server elsewhere (e.g. an always-on receiver)? Connect this computer to it: it stops scanning on its own and instead transcribes and/or keeps copies of the server's recordings. You can come back to local mode any time."
+msgstr "Masz serwer AliSDR gdzie indziej (np. stale działający odbiornik)? Połącz z nim ten komputer: przestanie sam skanować, a zamiast tego będzie transkrybował i/lub trzymał kopie nagrań z serwera. Do trybu lokalnego możesz wrócić w każdej chwili."
 
 msgid "New password"
 msgstr "Nowe hasło"
@@ -2233,8 +2233,8 @@ msgstr "{weak:.4f} MHz wygląda na odbicie {strong:.4f} MHz - odrzucam."
 msgid "Working for the server {url} - press Ctrl+C to stop."
 msgstr "Pracuję dla serwera {url} - Ctrl+C kończy."
 
-msgid "Quit FalconSDR"
-msgstr "Zamknij FalconSDR"
+msgid "Quit AliSDR"
+msgstr "Zamknij AliSDR"
 
 msgid "Stops the scanner and closes the program running in the background. Start it again from the menu or with the same command."
 msgstr "Zatrzymuje skaner i zamyka program działający w tle. Uruchomisz go ponownie z menu albo tą samą komendą."
@@ -2320,8 +2320,8 @@ msgstr "Wybierz ten folder"
 msgid "Start with the system"
 msgstr "Uruchamiaj razem z systemem"
 
-msgid "Starts FalconSDR in the background when you log in to this computer, without opening the browser."
-msgstr "Uruchamia FalconSDR w tle po zalogowaniu się na tym komputerze, bez otwierania przeglądarki."
+msgid "Starts AliSDR in the background when you log in to this computer, without opening the browser."
+msgstr "Uruchamia AliSDR w tle po zalogowaniu się na tym komputerze, bez otwierania przeglądarki."
 
 msgid "RTL-SDR driver for Windows"
 msgstr "Sterownik RTL-SDR dla Windows"
@@ -2509,8 +2509,8 @@ msgstr "Instalacja głosu cyfrowego"
 msgid "Experimental"
 msgstr "Eksperymentalne"
 
-msgid "Digital voice is new in FalconSDR and hasn't been tested with every system and receiver yet."
-msgstr "Głos cyfrowy to nowość w FalconSDR i nie był jeszcze sprawdzony na każdym systemie i odbiorniku."
+msgid "Digital voice is new in AliSDR and hasn't been tested with every system and receiver yet."
+msgstr "Głos cyfrowy to nowość w AliSDR i nie był jeszcze sprawdzony na każdym systemie i odbiorniku."
 
 msgid "If something doesn't work, please report it - it helps a lot:"
 msgstr "Jeśli coś nie działa, zgłoś to - to bardzo pomaga:"
@@ -2530,8 +2530,8 @@ msgstr "Usuwa dekoder dsd-fme. Kanały DMR i C4FM będą wtedy odtwarzane jako z
 msgid "Digital voice installed - pick DMR or C4FM as a band's or channel's modulation."
 msgstr "Głos cyfrowy zainstalowany - wybierz DMR lub C4FM jako modulację pasma albo kanału."
 
-msgid "Optional add-on: listens to DMR and Yaesu System Fusion (C4FM) voice using dsd-fme, an independent open-source decoder that FalconSDR downloads from its authors. It runs on the machine that scans. Encrypted calls stay muted - nothing is ever decrypted."
-msgstr "Opcjonalny dodatek: odsłuch głosu DMR i Yaesu System Fusion (C4FM) przez dsd-fme - niezależny dekoder open source, który FalconSDR pobiera od jego autorów. Działa na komputerze, który skanuje. Rozmowy szyfrowane pozostają wyciszone - nic nie jest odszyfrowywane."
+msgid "Optional add-on: listens to DMR and Yaesu System Fusion (C4FM) voice using dsd-fme, an independent open-source decoder that AliSDR downloads from its authors. It runs on the machine that scans. Encrypted calls stay muted - nothing is ever decrypted."
+msgstr "Opcjonalny dodatek: odsłuch głosu DMR i Yaesu System Fusion (C4FM) przez dsd-fme - niezależny dekoder open source, który AliSDR pobiera od jego autorów. Działa na komputerze, który skanuje. Rozmowy szyfrowane pozostają wyciszone - nic nie jest odszyfrowywane."
 
 msgid "Decoder"
 msgstr "Dekoder"
@@ -2602,11 +2602,11 @@ msgstr "Włącz tylko wtedy, gdy takie urządzenie jest podłączone, a Twój do
 msgid "Turn on"
 msgstr "Włącz"
 
-msgid "FalconSDR switches it off whenever scanning stops."
-msgstr "FalconSDR wyłącza je zawsze, gdy skanowanie się zatrzymuje."
+msgid "AliSDR switches it off whenever scanning stops."
+msgstr "AliSDR wyłącza je zawsze, gdy skanowanie się zatrzymuje."
 
-msgid "Transcription is uninstalled - restart FalconSDR on this computer to remove its files."
-msgstr "Transkrypcja odinstalowana - uruchom ponownie FalconSDR na tym komputerze, żeby usunąć jej pliki."
+msgid "Transcription is uninstalled - restart AliSDR on this computer to remove its files."
+msgstr "Transkrypcja odinstalowana - uruchom ponownie AliSDR na tym komputerze, żeby usunąć jej pliki."
 
 msgid "Restart now"
 msgstr "Uruchom ponownie teraz"
@@ -2711,8 +2711,8 @@ msgstr "pobieranie modelu…"
 msgid "command sent…"
 msgstr "polecenie wysłane…"
 
-msgid "{name} hasn't answered yet ({s}) - is FalconSDR running there and connected?"
-msgstr "{name} jeszcze nie odpowiada ({s}) - czy działa tam FalconSDR i jest połączony?"
+msgid "{name} hasn't answered yet ({s}) - is AliSDR running there and connected?"
+msgstr "{name} jeszcze nie odpowiada ({s}) - czy działa tam AliSDR i jest połączony?"
 
 msgid "Sent to {name} - waiting for it to pick the command up (a few seconds)…"
 msgstr "Wysłano do {name} - czekam, aż odbierze polecenie (kilka sekund)…"
@@ -2735,14 +2735,14 @@ msgstr "libairspy (eksperymentalne)"
 msgid "Access method"
 msgstr "Sposób dostępu"
 
-msgid "How FalconSDR talks to this receiver. The first choice is the default; the other one is the fallback when it will not open, and a way to compare."
-msgstr "Jak FalconSDR komunikuje się z tym odbiornikiem. Pierwszy wybór jest domyślny; drugi to rozwiązanie awaryjne, gdy tamten się nie otwiera, i sposób na porównanie."
+msgid "How AliSDR talks to this receiver. The first choice is the default; the other one is the fallback when it will not open, and a way to compare."
+msgstr "Jak AliSDR komunikuje się z tym odbiornikiem. Pierwszy wybór jest domyślny; drugi to rozwiązanie awaryjne, gdy tamten się nie otwiera, i sposób na porównanie."
 
 msgid "{name} is plugged in but not listed. Install its SoapySDR module (e.g. soapysdr-module-hackrf), allow USB access (udev rules or the plugdev group), then reload this page."
 msgstr "{name} jest podłączony, ale nie ma go na liście. Zainstaluj jego moduł SoapySDR (np. soapysdr-module-hackrf), zezwól na dostęp do USB (reguły udev lub grupa plugdev) i odśwież stronę."
 
-msgid "{name} is plugged in, but SoapySDR is not available to FalconSDR (the Python module python3-soapysdr is not visible to it). Install python3-soapysdr and soapysdr-module-<your receiver>, then reinstall with install.sh --from-source, or install libhackrf0 / libairspy0 for the experimental native access."
-msgstr "{name} jest podłączony, ale FalconSDR nie ma dostępu do SoapySDR (moduł Pythona python3-soapysdr jest dla niego niewidoczny). Zainstaluj python3-soapysdr i soapysdr-module-<twój odbiornik>, a potem zainstaluj ponownie przez install.sh --from-source, albo zainstaluj libhackrf0 / libairspy0, by użyć eksperymentalnego dostępu natywnego."
+msgid "{name} is plugged in, but SoapySDR is not available to AliSDR (the Python module python3-soapysdr is not visible to it). Install python3-soapysdr and soapysdr-module-<your receiver>, then reinstall with install.sh --from-source, or install libhackrf0 / libairspy0 for the experimental native access."
+msgstr "{name} jest podłączony, ale AliSDR nie ma dostępu do SoapySDR (moduł Pythona python3-soapysdr jest dla niego niewidoczny). Zainstaluj python3-soapysdr i soapysdr-module-<twój odbiornik>, a potem zainstaluj ponownie przez install.sh --from-source, albo zainstaluj libhackrf0 / libairspy0, by użyć eksperymentalnego dostępu natywnego."
 
 msgid "The receiver did not open with {method}. Stop the scanner and try {other} under SDR device → Access method."
 msgstr "Odbiornik nie otworzył się przez {method}. Zatrzymaj skaner i spróbuj {other} w sekcji Urządzenie SDR → Sposób dostępu."
@@ -2777,8 +2777,8 @@ msgstr "Poprzednie uruchomienie zakończyło się podczas ciągłego odczytu RTL
 msgid "Continuous RTL-SDR reading"
 msgstr "Ciągły odczyt RTL-SDR"
 
-msgid "While the scanner stays on a frequency, an RTL-SDR read through librtlsdr (Windows, macOS and the receiver) is read as a continuous stream, which removes the buzz caused by lost samples. If it crashes the driver on your receiver, FalconSDR switches it off by itself and says so in the Activity list; the buzz may come back. Takes effect the next time scanning starts."
-msgstr "Gdy skaner zostaje na jednej częstotliwości, RTL-SDR obsługiwany przez librtlsdr (Windows, macOS i odbiornik) jest czytany ciągłym strumieniem, co usuwa brzęczenie od gubionych próbek. Jeśli zawiesza to sterownik Twojego odbiornika, FalconSDR sam go wyłączy i napisze o tym w Aktywności; brzęczenie może wrócić. Działa od następnego uruchomienia skanowania."
+msgid "While the scanner stays on a frequency, an RTL-SDR read through librtlsdr (Windows, macOS and the receiver) is read as a continuous stream, which removes the buzz caused by lost samples. If it crashes the driver on your receiver, AliSDR switches it off by itself and says so in the Activity list; the buzz may come back. Takes effect the next time scanning starts."
+msgstr "Gdy skaner zostaje na jednej częstotliwości, RTL-SDR obsługiwany przez librtlsdr (Windows, macOS i odbiornik) jest czytany ciągłym strumieniem, co usuwa brzęczenie od gubionych próbek. Jeśli zawiesza to sterownik Twojego odbiornika, AliSDR sam go wyłączy i napisze o tym w Aktywności; brzęczenie może wrócić. Działa od następnego uruchomienia skanowania."
 
 msgid "Sort by {col}"
 msgstr "Sortuj według: {col}"
@@ -2876,8 +2876,8 @@ msgstr "Ścieżka programu"
 msgid "Program"
 msgstr "Program"
 
-msgid "Where it is installed, if FalconSDR does not find it by itself."
-msgstr "Gdzie jest zainstalowany, jeśli FalconSDR sam go nie znajduje."
+msgid "Where it is installed, if AliSDR does not find it by itself."
+msgstr "Gdzie jest zainstalowany, jeśli AliSDR sam go nie znajduje."
 
 msgid "Project page"
 msgstr "Strona projektu"
@@ -2903,8 +2903,8 @@ msgstr "Uruchom (wstrzymuje skaner)"
 msgid "It needs the receiver for itself: the scanner stops while it runs."
 msgstr "Potrzebuje odbiornika tylko dla siebie: skaner zatrzymuje się na czas jego pracy."
 
-msgid "Optional decoders. The built-in ones read the channels your scanner stops on; the separate programs are installed by you and use the receiver on their own - FalconSDR only starts and stops them and shows what they decode in Messages."
-msgstr "Opcjonalne dekodery. Wbudowane czytają kanały, na których zatrzymuje się skaner; osobne programy instalujesz sam i używają odbiornika na własną rękę - FalconSDR tylko je uruchamia i zatrzymuje oraz pokazuje w Wiadomościach, co zdekodowały."
+msgid "Optional decoders. The built-in ones read the channels your scanner stops on; the separate programs are installed by you and use the receiver on their own - AliSDR only starts and stops them and shows what they decode in Messages."
+msgstr "Opcjonalne dekodery. Wbudowane czytają kanały, na których zatrzymuje się skaner; osobne programy instalujesz sam i używają odbiornika na własną rękę - AliSDR tylko je uruchamia i zatrzymuje oraz pokazuje w Wiadomościach, co zdekodowały."
 
 msgid "Hear and record data channels too"
 msgstr "Słuchaj i nagrywaj też kanały danych"
@@ -2993,11 +2993,11 @@ msgstr "Odbiornik był jeszcze zajęty - próbuję ponownie."
 msgid "No such receiver"
 msgstr "Nie ma takiego odbiornika"
 
-msgid "It is downloaded or built from the author's own release; FalconSDR does not ship it."
-msgstr "Jest pobierany lub budowany z wydania samego autora; FalconSDR go nie dostarcza."
+msgid "It is downloaded or built from the author's own release; AliSDR does not ship it."
+msgstr "Jest pobierany lub budowany z wydania samego autora; AliSDR go nie dostarcza."
 
-msgid "Install what the build needs first (this needs administrator rights, so FalconSDR does not run it):"
-msgstr "Najpierw zainstaluj to, czego potrzebuje budowanie (wymaga uprawnień administratora, więc FalconSDR tego nie uruchamia):"
+msgid "Install what the build needs first (this needs administrator rights, so AliSDR does not run it):"
+msgstr "Najpierw zainstaluj to, czego potrzebuje budowanie (wymaga uprawnień administratora, więc AliSDR tego nie uruchamia):"
 
 msgid "Receiver 1 (main)"
 msgstr "Odbiornik 1 (główny)"
@@ -3985,3 +3985,24 @@ msgstr "Nie udało się zsynchronizować sygnału DAB na kanale {channel}."
 
 msgid "The DAB station is selected, but no audio is being decoded."
 msgstr "Wybrano stację DAB, ale dekoder nie odbiera dźwięku."
+
+msgid "Favourites"
+msgstr "Ulubione"
+
+msgid "No favourites saved."
+msgstr "Brak zapisanych ulubionych stacji."
+
+msgid "Add to favourites"
+msgstr "Dodaj do ulubionych"
+
+msgid "Remove from favourites"
+msgstr "Usuń z ulubionych"
+
+msgid "Station information"
+msgstr "Informacje o stacji"
+
+msgid "Ensemble"
+msgstr "Multipleks"
+
+msgid "Tune to the station first."
+msgstr "Najpierw dostrój się do stacji."

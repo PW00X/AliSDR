@@ -142,6 +142,7 @@ class Demodulator:
     def __init__(self, sample_rate: float, audio_rate: int = 12500):
         self.sample_rate = sample_rate
         self.audio_rate = audio_rate
+        self.on_fm_composite = None
         self._dc_zi = np.zeros(1)  # lfilter state for the AM DC-blocker, see demod()
         self._prev_phase = 0.0
         self._mix_index = 0
@@ -244,6 +245,9 @@ class Demodulator:
         phase = np.unwrap(np.concatenate(([self._prev_phase], phase)))
         self._prev_phase = phase[-1]
         composite = np.clip(np.diff(phase), -3.0, 3.0)
+
+        if self.on_fm_composite is not None and intermediate_rate > 120000:
+            self.on_fm_composite(composite, intermediate_rate)
 
         audio, self._deemph_zi = self._deemphasize(composite, intermediate_rate, self._deemph_zi)
         if intermediate_rate != self.audio_rate:

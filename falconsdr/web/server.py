@@ -117,7 +117,7 @@ def make_handler(app: App):
     zip_lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "FalconSDR/2"
+        server_version = "AliSDR/2"
 
         # -- plumbing -----------------------------------------------------
         def log_message(self, _format: str, *_args: object) -> None:
@@ -255,20 +255,24 @@ def make_handler(app: App):
             self._json(ctl.live(int(_qs(query, "since_log", 0) or 0)))
 
         def audio(self, _query: dict) -> None:
+            dab = _qs(_query, "dab", "") == "1"
+            if dab:
+                from ..dab import AUDIO_RATE as DAB_AUDIO_RATE
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Cache-Control", "no-store")
-            self.send_header("X-Sample-Rate", str(ctl.live()["audio_rate"]))
+            self.send_header("X-Sample-Rate", str(DAB_AUDIO_RATE if dab else ctl.live()["audio_rate"]))
+            self.send_header("X-Audio-Channels", "2" if dab else "1")
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
-            q = ctl.subscribe_audio()
+            q = ctl.subscribe_audio(dab=True) if dab else ctl.subscribe_audio()
             try:
                 while True:
                     try:
                         chunks = [q.get(timeout=_KEEPALIVE_S)]
                     except queue.Empty:
-                        chunks = [_KEEPALIVE]
+                        chunks = [bytes(1920) if dab else _KEEPALIVE]
                     while True:
                         try:
                             chunks.append(q.get_nowait())
@@ -279,7 +283,10 @@ def make_handler(app: App):
             except OSError:
                 pass
             finally:
-                ctl.unsubscribe_audio(q)
+                if dab:
+                    ctl.unsubscribe_audio(q, dab=True)
+                else:
+                    ctl.unsubscribe_audio(q)
 
         def scanner(self, query: dict) -> None:
             action = self.path.split("?")[0].rsplit("/", 1)[-1]
@@ -298,6 +305,8 @@ def make_handler(app: App):
                 ctl.tune_manual(self._body())
             elif path == "/api/manual/dab-station":
                 ctl.select_dab_station(self._body().get("sid"))
+            elif path == "/api/manual/favourite":
+                ctl.change_manual_favourite(self._body())
             elif path == "/api/manual/stop":
                 self._body()
                 ctl.stop_manual()
@@ -711,6 +720,7 @@ def make_handler(app: App):
         ("POST", "/api/manual/tune"): Handler.manual,
         ("POST", "/api/manual/stop"): Handler.manual,
         ("POST", "/api/manual/dab-station"): Handler.manual,
+        ("POST", "/api/manual/favourite"): Handler.manual,
         ("POST", "/api/scanner/start"): Handler.scanner,
         ("POST", "/api/scanner/stop"): Handler.scanner,
         ("POST", "/api/scanner/skip"): Handler.scanner,

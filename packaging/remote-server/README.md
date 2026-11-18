@@ -11,7 +11,7 @@ On the receiver (Debian, Ubuntu, Raspberry Pi OS - 64-bit recommended),
 one line installs or updates it and starts the service:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --server --with-dab
+curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server --with-dab
 ```
 
 It installs this fork's `master` branch and keeps its checkout in

@@ -369,6 +369,7 @@ class AppConfig:
     memory_list_enabled: bool = True
     # Memory List folders, kept so empty ones don't disappear.
     channel_folders: list[str] = field(default_factory=list)
+    manual_favourites: list[dict] = field(default_factory=list)
     # "auto" (the browser's/OS's language), "en" or a code with a
     # falconsdr/locale/<code>.po file.
     language: str = "auto"
@@ -423,6 +424,7 @@ class AppConfig:
             default_blacklist_margin_hz=raw.get("default_blacklist_margin_hz", 5000),
             memory_channel_bandwidth_hz=raw.get("memory_channel_bandwidth_hz", 12_500),
             channel_folders=list(raw.get("channel_folders", [])),
+            manual_favourites=raw["manual_favourites"] if isinstance(raw.get("manual_favourites"), list) else [],
             memory_list_enabled=raw.get("memory_list_enabled", True),
             language=raw.get("language", "auto"),
             legal_disclaimer=_from_dict(LegalDisclaimerConfig, raw.get("legal_disclaimer", {})),

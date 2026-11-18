@@ -322,7 +322,7 @@ export function recordingsView(root) {
     ensureChain();
     applyGain(it);
     if (autoplay) audio.play().catch(() => {});
-    if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: [freqLabel(it), it.name].filter(Boolean).join(' · '), artist: `${fmtDateShort(it.time)} ${fmtTime(it.time)}`, album: 'FalconSDR' });
+    if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: [freqLabel(it), it.name].filter(Boolean).join(' · '), artist: `${fmtDateShort(it.time)} ${fmtTime(it.time)}`, album: 'AliSDR' });
     peaks = [];
     api.get('/api/recording/peaks?id=' + encodeURIComponent(it.id)).then((p) => { if (current === it) { peaks = p; drawWave(); } }).catch(() => {});
     renderPlayer();

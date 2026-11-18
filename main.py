@@ -1,4 +1,4 @@
-"""FalconSDR entry point - starts the web UI (and opens it in the browser).
+"""AliSDR entry point - starts the web UI (and opens it in the browser).
 
   python main.py            this computer scans: UI on http://127.0.0.1:8765
                             (or, if connected to a server, works as its helper:
@@ -78,14 +78,14 @@ def _already_running(port: int) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="FalconSDR")
+    parser = argparse.ArgumentParser(description="AliSDR")
     parser.add_argument("--server", action="store_true", help="headless receiver reachable over the network")
     parser.add_argument("--local", action="store_true", help="scan locally even if connected to a server")
     parser.add_argument("--host", default=None)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--start", action="store_true", help="start scanning immediately")
     parser.add_argument("--no-browser", action="store_true")
-    parser.add_argument("--version", action="version", version=f"FalconSDR {__version__}")
+    parser.add_argument("--version", action="version", version=f"AliSDR {__version__}")
     parser.add_argument("--self-test", action="store_true", help="check this install has everything it needs, then exit")
     parser.add_argument("--list-native-sdr", action="store_true", help=argparse.SUPPRESS)  # asked by the server itself
     parser.add_argument("--probe-sdr", nargs="?", const="", default=None, metavar="DRIVER",
@@ -132,7 +132,7 @@ def main() -> int:
 
     token = config.access_token  # optional - empty = no login needed
     if args.server:
-        print(f"FalconSDR server: http://{socket.gethostname()}:{args.port}/", flush=True)
+        print(f"AliSDR server: http://{socket.gethostname()}:{args.port}/", flush=True)
 
     stop = threading.Event()
     restart = threading.Event()

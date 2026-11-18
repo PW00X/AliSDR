@@ -127,6 +127,7 @@ class Controller:
         self._log_id = 0
         self._audio_lock = threading.Lock()
         self._audio_subscribers: list[queue.Queue] = []
+        self._dab_audio_subscribers: list[queue.Queue] = []
         self.workers: dict[str, dict] = {}   # name -> last heartbeat (in memory only)
         self.worker_commands: dict[str, list[str]] = {}
         self.library = Library(self.config, self.open_recording_paths, self.freq_names)
@@ -278,6 +279,9 @@ class Controller:
 
     def tune_manual(self, body: dict) -> None:
         tuning = Tuning.from_request(body)
+        wanted = body.get("station", 0)
+        if type(wanted) is not int or not 0 <= wanted <= 0xffffffff or (wanted and tuning.mode != "DAB"):
+            raise ValueError("Invalid DAB service ID")
         with self._start_lock:
             devices = self._devices()
             k = tuning.receiver
@@ -297,6 +301,8 @@ class Controller:
             can_reuse = (old is not None and old.is_alive() and not old.stop_requested.is_set()
                          and old.device == device)
             if can_reuse and old.tuning == tuning:
+                if wanted:
+                    old.pending_station = wanted
                 return
             same_receiver = old is not None and old.tuning.receiver == k
             if can_reuse and same_receiver and tuning.mode != "DAB" and old.tuning.mode != "DAB":
@@ -308,14 +314,13 @@ class Controller:
             library = load_decoder() if tuning.mode == "DAB" else None
             with self._lock:
                 engines = list(self._engines)
-            resume = any(e.is_alive() and not e._stop_evt.is_set() for e in engines)
             for engine in engines:
                 engine.request_stop()
             for engine in engines:
                 self._join(engine, 8)
             if any(e.is_alive() for e in engines):
                 raise RuntimeError(i18n.tr("Scanner is still stopping - try again"))
-            self._resume = self._resume or resume
+            self._resume = False
             self._stop_manual_locked(release=False)
             if old is not None and not same_receiver:
                 self._held.discard(old.tuning.receiver)
@@ -323,12 +328,14 @@ class Controller:
                 self._held.add(k)
             self._manual_error = ""
             session = ManualSession(tuning, device, self.config.debug_mode, self._publish_audio, self._manual_ended, library)
+            session.pending_station = wanted
+            session.on_dab_audio = self._publish_dab_audio
             self.manual_session = session
             try:
                 session.start()
             except Exception:
                 self.manual_session = None
-                self._release_receiver(k)
+                self._held.discard(k)
                 raise
 
     def stop_manual(self) -> None:
@@ -345,6 +352,54 @@ class Controller:
                 raise RuntimeError(i18n.tr("Tune a DAB channel first."))
             session.select_station(sid)
 
+    def change_manual_favourite(self, body: dict) -> None:
+        mode, enabled = body.get("mode"), body.get("enabled")
+        if mode == "DAB":
+            channel, sid = body.get("channel"), body.get("sid")
+            if channel not in DAB_CHANNELS or type(sid) is not int or not 0 < sid <= 0xffffffff:
+                raise ValueError("Invalid DAB favourite")
+            key = {"mode": mode, "channel": channel, "id": sid}
+        elif mode == "WFM":
+            hz = body.get("frequency_hz")
+            if type(hz) is not int or not 1 <= hz <= 6_000_000_000:
+                raise ValueError("Invalid FM favourite")
+            key = {"mode": mode, "frequency_hz": hz}
+        else:
+            raise ValueError("Invalid favourite mode")
+        if type(enabled) is not bool:
+            raise ValueError("Invalid favourite action")
+        with self._start_lock:
+            previous = self.config.manual_favourites
+            favourites = [entry for entry in self._manual_favourites()
+                          if not all(entry.get(k) == v for k, v in key.items())]
+            if enabled:
+                session = self.manual_session
+                if not session or session.tuning.mode != mode:
+                    raise ValueError(i18n.tr("Tune to the station first."))
+                if mode == "DAB":
+                    station = session.stations.get(sid) if session.tuning.channel == channel else None
+                    if station is None:
+                        raise ValueError(i18n.tr("DAB station is unavailable."))
+                    favourite = {**station, **key}
+                else:
+                    if session.tuning.frequency_hz != hz:
+                        raise ValueError(i18n.tr("Tune to the station first."))
+                    favourite = {**key, "name": session.station_info.get("name", "")}
+                favourites.append(favourite)
+            self.config.manual_favourites = favourites
+            try:
+                self.config.save()
+            except Exception:
+                self.config.manual_favourites = previous
+                raise
+
+    def _manual_favourites(self) -> list[dict]:
+        return [entry for entry in self.config.manual_favourites if isinstance(entry, dict)
+                and isinstance(entry.get("name"), str) and (
+                    entry.get("mode") == "DAB" and entry.get("channel") in DAB_CHANNELS
+                    and type(entry.get("id")) is int
+                    or entry.get("mode") == "WFM" and type(entry.get("frequency_hz")) is int)]
+
     def _stop_manual_locked(self, release=True) -> None:
         session = self.manual_session
         if session is None:
@@ -355,7 +410,7 @@ class Controller:
             raise RuntimeError(i18n.tr("The receiver is still stopping. Try again."))
         self.manual_session = None
         if release:
-            self._release_receiver(session.tuning.receiver)
+            self._held.discard(session.tuning.receiver)
 
     def _manual_ended(self, session: ManualSession, error: str) -> None:
         def release() -> None:
@@ -363,7 +418,7 @@ class Controller:
                 if self.manual_session is session:
                     self.manual_session = None
                     self._manual_error = error
-                    self._release_receiver(session.tuning.receiver)
+                    self._held.discard(session.tuning.receiver)
         threading.Thread(target=release, daemon=True, name="manual-release").start()
 
     def manual_status(self) -> dict:
@@ -380,6 +435,7 @@ class Controller:
         result = {
             "receivers": receivers,
             "channels": DAB_CHANNELS,
+            "favourites": self._manual_favourites(),
             "error": self._manual_error,
             "tuning": asdict(session.tuning) if session else None,
             "gain": {"mode": session.device["gain_mode"], "db": session.device["gain_db"]} if session else None,
@@ -387,6 +443,7 @@ class Controller:
             "stations": [],
             "spectrum": session.spectrum if session and session.state == "listening" else None,
             "level": session.level if session else None,
+            "station_info": session.station_info.copy() if session else {},
         }
         if session and session.tuning.mode == "DAB":
             result["stations"] = sorted(session.stations.copy().values(), key=lambda station: (station["name"].casefold(), station["id"]))
@@ -679,8 +736,14 @@ class Controller:
 
     def _publish_audio(self, mono: Any) -> None:
         pcm16 = (np.clip(np.asarray(mono, dtype=np.float32), -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
+        self._publish_pcm(pcm16, self._audio_subscribers)
+
+    def _publish_dab_audio(self, pcm16: bytes) -> None:
+        self._publish_pcm(pcm16, self._dab_audio_subscribers)
+
+    def _publish_pcm(self, pcm16: bytes, subscribers: list[queue.Queue]) -> None:
         with self._audio_lock:
-            for q in self._audio_subscribers:
+            for q in subscribers:
                 try:
                     q.put_nowait(pcm16)
                 except queue.Full:
@@ -690,21 +753,22 @@ class Controller:
                     except (queue.Empty, queue.Full):
                         pass
 
-    def subscribe_audio(self) -> queue.Queue:
+    def subscribe_audio(self, dab: bool = False) -> queue.Queue:
         q: queue.Queue = queue.Queue(maxsize=_AUDIO_QUEUE_SIZE)
         with self._audio_lock:
-            self._audio_subscribers.append(q)
+            (self._dab_audio_subscribers if dab else self._audio_subscribers).append(q)
         return q
 
-    def unsubscribe_audio(self, q: queue.Queue) -> None:
+    def unsubscribe_audio(self, q: queue.Queue, dab: bool = False) -> None:
         with self._audio_lock:
-            if q in self._audio_subscribers:
-                self._audio_subscribers.remove(q)
+            subscribers = self._dab_audio_subscribers if dab else self._audio_subscribers
+            if q in subscribers:
+                subscribers.remove(q)
 
     @property
     def listeners(self) -> int:
         with self._audio_lock:
-            return len(self._audio_subscribers)
+            return len(self._audio_subscribers) + len(self._dab_audio_subscribers)
 
     # -- snapshots --------------------------------------------------------------
     def _merged_live_locked(self) -> dict[str, Any]:
@@ -732,6 +796,7 @@ class Controller:
                 "running": bool(self._engines),
                 "stopping": any(e._stop_evt.is_set() for k, e in enumerate(self._engines) if k not in self._held),
                 "manual_tuning": self.manual_session is not None,
+                "manual_dab": bool(self.manual_session and self.manual_session.tuning.mode == "DAB"),
                 "solo_band": self._solo_band,
                 "uncovered": self._uncovered(),
                 "schedule_active": schedule.active_indices(self.config),

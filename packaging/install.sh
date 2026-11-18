@@ -1,7 +1,7 @@
 #!/bin/sh
-# FalconSDR one-line installer:
+# AliSDR one-line installer:
 #
-#   curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --server --with-dab
+#   curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server --with-dab
 #
 # Installs the fork from source by default. With FALCONSDR_REPO set to a
 # repository that publishes releases, picks the matching artifact:
@@ -15,9 +15,9 @@
 #     also the fallback for unsupported CPU architectures, musl-based
 #     distros such as Alpine (the AppImage needs glibc and won't run
 #     there), and releases that don't publish the matching asset yet).
-#     Run it again - from the folder that holds FalconSDR/ - to update: it
+#     Run it again from the folder that holds the checkout to update. It
 #     pulls the checkout, resets the venv's settings and reinstalls the
-#     requirements; restart FalconSDR afterwards. HackRF/Airspy without
+#     requirements; restart AliSDR afterwards. HackRF/Airspy without
 #     SoapySDR (experimental) need the system libraries libhackrf/libairspy,
 #     which pip cannot provide: add --with-sdr-libs to have them installed
 #     (apt: libhackrf0 libairspy0, dnf: hackrf airspyone_host; uses sudo).
@@ -31,7 +31,8 @@
 # then run `falconsdr` - the UI opens at http://127.0.0.1:8765.
 set -eu
 
-FORK="PW00X/FalconSDR"
+FORK="PW00X/AliSDR"
+LEGACY_FORK="PW00X/FalconSDR"
 REPO="${FALCONSDR_REPO:-$FORK}"
 VERSION="${FALCONSDR_VERSION:-latest}"
 REF="${FALCONSDR_REF:-}"
@@ -110,8 +111,12 @@ have_pacman() { command -v pacman >/dev/null 2>&1; }
 
 check_origin() {
   checkout="$1"; shift
-  case "$("$@" git -C "$checkout" remote get-url origin 2>/dev/null || true)" in
-    "https://github.com/$REPO"|"https://github.com/$REPO.git"|"git@github.com:$REPO.git") ;;
+  origin="$("$@" git -C "$checkout" remote get-url origin 2>/dev/null || true)"
+  case "$REPO:$origin" in
+    "$REPO:https://github.com/$REPO"|"$REPO:https://github.com/$REPO.git"|"$REPO:git@github.com:$REPO.git") ;;
+    "$FORK:https://github.com/$LEGACY_FORK"|"$FORK:https://github.com/$LEGACY_FORK.git"|"$FORK:git@github.com:$LEGACY_FORK.git")
+      "$@" git -C "$checkout" remote set-url origin "https://github.com/$FORK.git"
+      ;;
     *) die "expected $REPO at $checkout. Move the existing checkout aside before installing this fork." ;;
   esac
 }
@@ -209,13 +214,17 @@ install_sdr_libs() {
 }
 
 install_from_source() {
-  say "Installing FalconSDR from source (SoapySDR-capable path)..."
+  say "Installing ${REPO##*/} from source (SoapySDR-capable path)..."
   need python3; need git
   # Started from inside a checkout (the folder the program runs from): use it, never clone a copy into it.
   if [ -f main.py ] && [ -d falconsdr ] && [ -e .git ]; then :
   else
-    if [ ! -d FalconSDR ]; then git clone "https://github.com/$REPO.git" FalconSDR; fi
-    cd FalconSDR
+    checkout=${REPO##*/}
+    if [ "$REPO" = "$FORK" ] && [ ! -d "$checkout" ] && [ -d FalconSDR/.git ]; then
+      checkout=FalconSDR
+    fi
+    if [ ! -d "$checkout" ]; then git clone "https://github.com/$REPO.git" "$checkout"; fi
+    cd "$checkout"
   fi
   # A checkout that already exists is updated, not just reinstalled: this is also the update command.
   if [ -e .git ]; then
@@ -232,10 +241,10 @@ install_from_source() {
   if [ "$WITH_DAB" = 1 ]; then sh packaging/dab/install.sh .venv/lib; fi
   cat <<EOF
 
-FalconSDR $version is ready. Start it with:
+${REPO##*/} $version is ready. Start it with:
   .venv/bin/python main.py
 (Already running? Stop it first, then start it again to use this version. To update later,
-run this same command again from the folder that contains FalconSDR/.)
+run this same command again from the folder that contains the checkout.)
 (RTL-SDR udev rule: packaging/linux-deb/60-rtl-sdr.rules - see the README.
 SoapySDR hardware: sudo apt install python3-soapysdr soapysdr-module-<device>, then restart.
 HackRF/Airspy also work without SoapySDR (experimental): add --with-sdr-libs to this command,
@@ -257,7 +266,7 @@ install_server() {
     ref="${REF:-$(release_tag)}"
   fi
   [ -n "$ref" ] || die "couldn't find the latest release (GitHub API) - set FALCONSDR_REF=v1.1.0 or similar"
-  say "Fetching FalconSDR ($ref)..."
+  say "Fetching ${REPO##*/} ($ref)..."
   if [ -d "$src/.git" ]; then
     previous_origin="$($SUDO git -C "$src" remote get-url origin)"
     case "$REPO:$previous_origin" in
@@ -290,16 +299,16 @@ install_server() {
       fi
       retries=$((retries - 1))
       [ "$retries" -gt 0 ] ||
-        die "Port 8765 is not serving headless revision $revision. Check for an older FalconSDR process and run: journalctl -u falconsdr-receiver -n 50 --no-pager"
+        die "Port 8765 is not serving headless revision $revision. Check for an older receiver process and run: journalctl -u falconsdr-receiver -n 50 --no-pager"
       sleep 2
     done
   else
     sleep 2
   fi
   systemctl is-active --quiet falconsdr-receiver.service ||
-    die "FalconSDR $version is installed, but the service didn't start - see: journalctl -u falconsdr-receiver"
+    die "${REPO##*/} $version is installed, but the service didn't start - see: journalctl -u falconsdr-receiver"
   say ""
-  say "FalconSDR $version ($revision) is installed and running (service falconsdr-receiver, starts on boot)."
+  say "${REPO##*/} $version ($revision) is installed and running (service falconsdr-receiver, starts on boot)."
   say "Open it from any device on your network:  http://${ip:-<server-ip>}:8765/"
   say "To update later, run the same command again."
 }

@@ -9,10 +9,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from .agc import SoftwareAgc
-from .dab import CHANNELS, SAMPLE_RATE, ChannelInput, Decoder
+from .dab import AUDIO_RATE as DAB_AUDIO_RATE, CHANNELS, SAMPLE_RATE, ChannelInput, Decoder
 from .dsp import Demodulator, StreamResampler, WFM_DISCRIMINATOR_RATE, level_dbfs
 from .i18n import tr
 from .models import Modulation, resolve_ssb_sideband
+from .rds import RDSDecoder
 from .scanner_engine import AUDIO_RATE, SpectrumWorker
 from .sdr_backend import AcquisitionThread, create_backend, open_real_backend
 
@@ -42,7 +43,7 @@ class Tuning:
             channel = body.get("channel")
             if channel not in DAB_CHANNELS:
                 raise ValueError(tr("Choose a DAB channel."))
-            return cls(receiver, mode, channel=channel)
+            return cls(receiver, mode, frequency_hz=CHANNELS[channel], channel=channel)
         frequency = body.get("frequency_hz")
         if mode not in ANALOG_MODES or type(frequency) is not int or not 1 <= frequency <= 6_000_000_000:
             raise ValueError(tr("Enter a frequency between 0 and 6000 MHz and select a modulation."))
@@ -61,6 +62,9 @@ class ManualSession(threading.Thread):
         self.stop_requested = threading.Event()
         self.stations = {}
         self.station = 0
+        self.pending_station = 0
+        self.station_info = {}
+        self.on_dab_audio = lambda _pcm: None
         self.dab_error = ""
         self.synced = False
         self.state = "starting"
@@ -115,6 +119,11 @@ class ManualSession(threading.Thread):
                     acquisition.set_frequency(freq - offset)
                     mode = resolve_ssb_sideband(Modulation(tuning.mode), freq)
                     demod = Demodulator(rate, AUDIO_RATE)
+                    self.station_info = {}
+                    if mode == Modulation.WFM:
+                        rds = RDSDecoder()
+                        demod.on_fm_composite = rds.feed
+                        self.station_info = rds.info
                     acquisition.read(chunk)  # discard the first block while the tuner settles
                 iq = acquisition.read(chunk)
                 if software_gain and iq.size:
@@ -140,6 +149,8 @@ class ManualSession(threading.Thread):
         if sid not in self.stations or self.stop_requested.is_set():
             raise ValueError(tr("DAB station is unavailable."))
         self.station = sid
+        self.pending_station = 0
+        self.station_info.pop("text", None)
 
     def _dab_station(self, sid, name, codec):
         label = name.decode("utf-8", errors="replace").strip()
@@ -147,6 +158,10 @@ class ManualSession(threading.Thread):
 
     def _dab_reception(self, synced, _snr, _offset):
         self.synced = synced
+
+    def _dab_metadata(self, sid, label):
+        if label and (sid == 0 or sid == self.station):
+            self.station_info["ensemble" if sid == 0 else "text"] = label.decode("utf-8", errors="replace").strip()
 
     def _dab(self):
         dev = self.device
@@ -158,6 +173,7 @@ class ManualSession(threading.Thread):
             bias_tee=bool(dev.get("bias_tee")), async_read=dev["async_read"],
         )
         acquisition = decoder = None
+        spectrum = SpectrumWorker(self._update_spectrum)
         try:
             rate = float(getattr(raw, "sample_rate", 0) or SAMPLE_RATE)
             if rate < 1_536_000:
@@ -188,7 +204,7 @@ class ManualSession(threading.Thread):
             stream_stats = getattr(raw, "stream_stats", None)
             lost_before = stream_stats()[0] if stream_stats else 0.0
             dropped_before = acquisition.chunks_dropped
-            decoder = Decoder(self.dab_library, self._dab_station, self._dab_reception)
+            decoder = Decoder(self.dab_library, self._dab_station, self._dab_reception, self._dab_metadata)
             self.state = "discovering"
             started = time.monotonic()
             next_meter = started
@@ -201,6 +217,7 @@ class ManualSession(threading.Thread):
                 conditioned = channel.process(iq)
                 if now >= next_meter:
                     self.level = level_dbfs(conditioned)
+                    spectrum.submit(iq, rate, frequency, 0)
                     next_meter = now + 0.35
                 decoder.push(conditioned)
                 if self.stations:
@@ -217,6 +234,8 @@ class ManualSession(threading.Thread):
                                if self.synced else "No DAB signal could be synchronized on channel {channel}.")
                     raise RuntimeError(tr(message).format(channel=self.tuning.channel))
 
+                if self.pending_station in self.stations:
+                    self.select_station(self.pending_station)
                 sid = self.station
                 if sid != previous_sid:
                     decoder.select(sid)
@@ -228,14 +247,26 @@ class ManualSession(threading.Thread):
                         break
                     if audio_rate != previous_rate:
                         audio_resampler = StreamResampler(audio_rate, AUDIO_RATE)
+                        stereo_resamplers = None if audio_rate == DAB_AUDIO_RATE else [
+                            StreamResampler(audio_rate, DAB_AUDIO_RATE) for _ in range(2)
+                        ]
                         previous_rate = audio_rate
-                    mono = pcm.reshape(-1, 2).mean(axis=1, dtype=np.float32) / 32768.0
+                    stereo = pcm.reshape(-1, 2)
+                    if stereo_resamplers:
+                        channels = [resampler.process(stereo[:, i].astype(np.float32)).real
+                                    for i, resampler in enumerate(stereo_resamplers)]
+                        stereo_out = np.clip(np.column_stack(channels), -32768, 32767).astype("<i2")
+                    else:
+                        stereo_out = stereo.astype("<i2", copy=False)
+                    self.on_dab_audio(stereo_out.tobytes())
+                    mono = stereo.mean(axis=1, dtype=np.float32) / 32768.0
                     self.on_audio(audio_resampler.process(mono).real)
                     last_audio = now
                     self.dab_error = ""
                 if sid and now - last_audio >= 12:
                     self.dab_error = tr("The DAB station is selected, but no audio is being decoded.")
         finally:
+            spectrum.stop()
             if decoder is not None:
                 decoder.close()
             (acquisition if acquisition is not None else raw).close()

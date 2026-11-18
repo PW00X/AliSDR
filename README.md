@@ -1,4 +1,4 @@
-# FalconSDR
+# AliSDR
 
 <img src="packaging/icons/falconsdr.png" width="96" align="right" alt="">
 
@@ -125,7 +125,7 @@ are installed.
 
 HackRF captures 2-20 MHz (the default 2.4 MHz is the safest start); an Airspy
 only the fixed widths its board has (for instance 2.5 and 10 MHz on an Airspy
-R2), and FalconSDR picks the nearest. A wider capture needs more processor -
+R2), and AliSDR picks the nearest. A wider capture needs more processor -
 on a 4-core mini PC about 1, 8 and 19 ms of every 30 ms block go to the
 spectrum at 2.4, 10 and 20 MHz, plus 2, 9 and 17 ms for each transmission being
 recorded. The macOS builds carry the HackRF/Airspy libraries since 1.4.1
@@ -198,15 +198,15 @@ one run each.
 
 Installs this fork from source, including **Manual tuning**. On Debian or
 Ubuntu, make sure `git`, `python3` and `python3-venv` are installed. Run the
-command from a directory where you want the `FalconSDR` checkout:
+command from a directory where you want the `AliSDR` checkout:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --with-dab
+curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --with-dab
 ```
 
 The optional `--with-dab` flag builds the DAB decoder on apt-based distributions.
 Run the same command again from the same directory to update
-the fork. Restart FalconSDR after updating.
+the fork. Restart AliSDR after updating.
 
 The source install supports SoapySDR hardware (LimeSDR, SDRplay, USRP, and
 others) when you install the relevant SoapySDR modules for your distribution.
@@ -370,7 +370,7 @@ recordings and settings stay on disk (see
 On a Linux machine with the SDR attached (Debian, Ubuntu, Raspberry Pi OS):
 
 ```
-curl -fsSL https://raw.githubusercontent.com/PW00X/FalconSDR/master/packaging/install.sh | bash -s -- --server --with-dab
+curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash -s -- --server --with-dab
 ```
 
 It installs this fork's `master` branch as a service that starts on boot and ends
@@ -390,7 +390,7 @@ box in the attic, a phone running an `rtl_tcp` app) can be the receiver of
 the scanner: on that computer run `rtl_tcp -a 0.0.0.0` (package `rtl-sdr`),
 then on the Scan page choose *SDR device → Network receiver (rtl_tcp)* and
 type its address (`192.168.1.20` or `192.168.1.20:1234`). Scanning, recording,
-transcription and the web interface stay on the computer running FalconSDR.
+transcription and the web interface stay on the computer running AliSDR.
 
 Good to know:
 - `rtl_tcp` serves **one program at a time** and the stream is **not
@@ -402,7 +402,7 @@ Good to know:
   after ~180 ms instead of ~100 ms, and a full cycle of 9 capture windows
   took 2.5 s instead of 1.8 s. Scanning many windows is slower; one frequency
   or a few windows are not affected.
-- If `rtl_tcp` stops, FalconSDR shows *Reconnecting* and resumes by itself
+- If `rtl_tcp` stops, AliSDR shows *Reconnecting* and resumes by itself
   once the server is back (run `rtl_tcp` as a service that restarts).
 - It does not make a weak USB host stronger: the server still reads the
   dongle over its own USB.
@@ -430,31 +430,35 @@ Select a receiver and enter a frequency in MHz. Use WFM for broadcast FM,
 or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
 **Listen live**. Click the spectrum to fill in a nearby frequency. Analog
 tuning plays continuously, even below the scanner's trigger level. WFM uses
-the app's mono live-audio stream.
+the app's mono live-audio stream. The station information card shows the
+RDS service name, programme ID and RadioText when decoded. Use the star
+to save the tuned FM frequency. Saved FM stations appear under **Favourites**.
 
 Set the gain mode and level on the Manual page for analog or DAB, then
 press **Tune** to apply them. The Scan page keeps its own configured gain.
 With the native Airspy driver, the slider shows the 0–21 sensitivity index.
 
 For digital broadcast radio on the Linux receiver, run the headless installer
-with `--server --with-dab`. FalconSDR's Python receiver feeds IQ from the
+with `--server --with-dab`. AliSDR's Python receiver feeds IQ from the
 selected SDR to the [dab-cmdline](https://github.com/JvanKatwijk/dab-cmdline)
-shared library and sends decoded audio through FalconSDR's live audio stream.
+shared library and sends decoded audio through AliSDR's live audio stream.
 
 In **Manual tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
-**Tune**. Wait for the ensemble's stations to appear, select one, and press
-**Play station**.
+**Tune**. Press a station in the list to play it, or use its star to
+add or remove it. **Favourites** is the first entry in the DAB channel
+selector. Play or remove saved stations there without tuning an ensemble
+first. The station information card displays the ensemble, codec and
+broadcast text where available.
 
 The SDR must capture the Band III ensemble with about 2 MHz of bandwidth.
 If reception fails, the receiver reports whether it synchronized or found
-audio stations. Browser audio is mono, like the analog live stream.
-The DAB signal meter shows channel power. On a headless receiver, a timeout
+audio stations. The browser receives stereo audio at 48 kHz. The spectrum,
+waterfall and signal meter are available during DAB reception. On a headless receiver, a timeout
 also logs the capture rate, gain and any reported IQ loss to
 `journalctl -u falconsdr-receiver`.
 
-**Tune** pauses scanning across all receivers. **Start** on the Scan tab
-ends manual tuning before scanning. **Stop tuning** restores the previous
-scan when one was active.
+**Tune** stops scanning across all receivers. **Start** on the Scan tab
+ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.
 
 ## Tips for good recordings
 

@@ -31,7 +31,7 @@ async function boot() {
   try {
     await loadLanguage();
   } catch {
-    mount(app, h('div.center-page', h('div.card.login', h('h2', 'FalconSDR'), h('p.muted', 'Server unreachable - retrying…'))));
+    mount(app, h('div.center-page', h('div.card.login', h('h2', 'AliSDR'), h('p.muted', 'Server unreachable - retrying…'))));
     setTimeout(boot, 3000);
     return;
   }
@@ -61,7 +61,7 @@ function loginPage() {
   };
   mount(app, h('div.center-page', h('form.card.login', { onsubmit: submit },
     h('img', { src: 'icon.svg', alt: '' }),
-    h('h2', 'FalconSDR'),
+    h('h2', 'AliSDR'),
     h('p.muted', t('Enter the password of this receiver.')),
     input,
     h('button.primary.big', { type: 'submit' }, t('Log in')),
@@ -74,7 +74,7 @@ async function clientPage() {
   const body = h('div.col');
   const card = h('div.card.login', { style: { width: 'min(560px, 100%)', textAlign: 'left' } },
     h('div.row', h('img', { src: 'icon.svg', alt: '', style: { width: '44px', height: '44px', margin: 0 } }),
-      h('div', h('h2', 'FalconSDR'), h('span.muted', t('This computer works for a FalconSDR server')))),
+      h('div', h('h2', 'AliSDR'), h('span.muted', t('This computer works for a AliSDR server')))),
     body);
   mount(app, h('div.center-page', card));
   const refresh = async () => {
@@ -112,7 +112,7 @@ function shell() {
   const content = h('main');
   mount(app, h('div.shell',
     h('header.topbar',
-      h('a.brand', { href: '#/listen' }, h('img', { src: 'icon.svg', alt: '' }), 'FalconSDR', h('small', S.settings.mode === 'server' ? t('server') : '')),
+      h('a.brand', { href: '#/listen' }, h('img', { src: 'icon.svg', alt: '' }), 'AliSDR', h('small', S.settings.mode === 'server' ? t('server') : '')),
       nav, status),
     content));
   const markActive = () => {
@@ -146,7 +146,10 @@ function shell() {
         onclick: () => liveAudio.toggle().catch(errorToast),
       }, icon(liveAudio.playing ? 'headphones' : 'mute')));
   };
-  on('live', updateStatus);
+  on('live', (live) => {
+    liveAudio.useDab(Boolean(live.manual_dab));
+    updateStatus();
+  });
   // Notifications: a notice in the app whenever a rule fires (the first poll only sets the starting point).
   let notifySeq = null;
   on('live', async (live) => {

@@ -213,7 +213,7 @@ export function settingsView(root, hash, scope = 'settings') {
       h('details',
         h('summary.small.muted', { style: { cursor: 'pointer' } }, t('Add another computer (e.g. your PC with a GPU)')),
         h('div.col', { style: { marginTop: '10px' } },
-          h('p.small.muted', { style: { margin: 0 } }, t('On that computer start FalconSDR, open Settings → Connect to a server and enter:')),
+          h('p.small.muted', { style: { margin: 0 } }, t('On that computer start AliSDR, open Settings → Connect to a server and enter:')),
           h('code.cmd', location.origin),
           S.settings.password_set ? h('p.small.muted', { style: { margin: 0 } }, t('…and this server\'s password.')) : null,
           h('p.small.muted', { style: { margin: 0 } }, t('It then shows up here. Turn on transcription or local copies for it, and if it already has recordings of its own, send them here with one click.')))));
@@ -264,7 +264,7 @@ export function settingsView(root, hash, scope = 'settings') {
     const progress = wt && !BUSY.includes(info.status)
       ? h('div.small', { style: { color: Date.now() - wt.since > 40000 ? 'var(--warn)' : 'var(--secondary)' } },
         Date.now() - wt.since > 40000
-          ? t('{name} hasn\'t answered yet ({s}) - is FalconSDR running there and connected?', { name: w.name, s: fmtDuration((Date.now() - wt.since) / 1000) })
+          ? t('{name} hasn\'t answered yet ({s}) - is AliSDR running there and connected?', { name: w.name, s: fmtDuration((Date.now() - wt.since) / 1000) })
           : t('Sent to {name} - waiting for it to pick the command up (a few seconds)…', { name: w.name }))
       : (info.status === 'downloading' && info.download
         ? h('div.small', { style: { color: 'var(--secondary)' } }, t('Downloading the model {model}: {size} so far - the first transcription waits for it. This can take several minutes.', { model: info.download.model, size: fmtBytes(info.download.bytes) }))
@@ -291,7 +291,7 @@ export function settingsView(root, hash, scope = 'settings') {
         !w.online && !info.embedded ? h('button.ghost.small', { onclick: () => api.post('/api/workers/forget', { name: w.name }).then(loadWorkers) }, t('Forget')) : null),
       info.last_seen && !w.online ? h('span.faint.small', t('Last seen {ago}', { ago: fmtAgo(new Date(info.last_seen * 1000).toISOString()) })) : null,
       progress,
-      setting(t('Transcribe here'), info.removal_pending ? h('span', { style: { color: 'var(--warn)' } }, t('Transcription is uninstalled - restart FalconSDR on this computer to remove its files.'))
+      setting(t('Transcribe here'), info.removal_pending ? h('span', { style: { color: 'var(--warn)' } }, t('Transcription is uninstalled - restart AliSDR on this computer to remove its files.'))
         : info.installed === false ?t('Whisper isn\'t installed on this computer yet.')
         : s.transcribe && !cfg().transcription.enabled ? h('span', { style: { color: 'var(--warn)' } }, t('Automatic transcription is off above - this computer only gets recordings you queue by hand.'))
           : (s.transcribe && pending ? t('{n} recordings waiting', { n: pending.toLocaleString() }) : ''),
@@ -332,9 +332,9 @@ export function settingsView(root, hash, scope = 'settings') {
     const install = async () => {
       // Shown once, here, at the moment of choosing it - not as a banner elsewhere.
       const ok = await modal(t('Install digital voice'), h('div.col', { style: { gap: '10px' } },
-        h('p', h('span.chip.warn', t('Experimental')), ' ', t('Digital voice is new in FalconSDR and hasn\'t been tested with every system and receiver yet.')),
+        h('p', h('span.chip.warn', t('Experimental')), ' ', t('Digital voice is new in AliSDR and hasn\'t been tested with every system and receiver yet.')),
         h('p', t('If something doesn\'t work, please report it - it helps a lot:'), ' ',
-          h('a', { href: 'https://github.com/rafafunt/FalconSDR/issues', target: '_blank', rel: 'noopener' }, 'github.com/rafafunt/FalconSDR/issues')),
+          h('a', { href: 'https://github.com/PW00X/AliSDR/issues', target: '_blank', rel: 'noopener' }, 'github.com/PW00X/AliSDR/issues')),
         h('p.small.muted', windows ? t('Downloads the dsd-fme decoder (about 40 MB) from its authors.')
           : t('Downloads the dsd-fme decoder from its authors and compiles it on this machine - a few minutes.'))),
       [[t('Cancel'), false, 'ghost'], [t('Install'), true, 'primary']]);
@@ -354,7 +354,7 @@ export function settingsView(root, hash, scope = 'settings') {
       if (st.installed) toast(t('Digital voice installed - pick DMR or C4FM as a band\'s or channel\'s modulation.'), 'good');
     }
     mount(body('digital'),
-      h('p.muted', { style: { margin: 0 } }, t('Optional add-on: listens to DMR and Yaesu System Fusion (C4FM) voice using dsd-fme, an independent open-source decoder that FalconSDR downloads from its authors. It runs on the machine that scans. Encrypted calls stay muted - nothing is ever decrypted.')),
+      h('p.muted', { style: { margin: 0 } }, t('Optional add-on: listens to DMR and Yaesu System Fusion (C4FM) voice using dsd-fme, an independent open-source decoder that AliSDR downloads from its authors. It runs on the machine that scans. Encrypted calls stay muted - nothing is ever decrypted.')),
       setting(t('Decoder'),
         st.installed ? t('Installed. Choose DMR or C4FM as the modulation of a band or a Memory List channel.')
           : st.running ? t('Installing…') : t('Not installed.'),
@@ -385,7 +385,7 @@ export function settingsView(root, hash, scope = 'settings') {
       },
     }, icon('link'), t('Connect'));
     mount(body('connect'),
-      h('p.muted', { style: { margin: 0 } }, t('Have a FalconSDR server elsewhere (e.g. an always-on receiver)? Connect this computer to it: it stops scanning on its own and instead transcribes and/or keeps copies of the server\'s recordings. You can come back to local mode any time.')),
+      h('p.muted', { style: { margin: 0 } }, t('Have a AliSDR server elsewhere (e.g. an always-on receiver)? Connect this computer to it: it stops scanning on its own and instead transcribes and/or keeps copies of the server\'s recordings. You can come back to local mode any time.')),
       h('div.row.wrap', url, pass, btn));
   }
 
@@ -503,7 +503,7 @@ export function settingsView(root, hash, scope = 'settings') {
     mount(body('advanced'),
       setting(t('Debug mode'), t('Adds a “Simulation (no hardware)” device for testing without a receiver.'),
         toggle('', cfg().debug_mode, async (v) => { patchConfig({ debug_mode: v }); setTimeout(loadSettings, 700); })),
-      setting(t('Continuous RTL-SDR reading'), t('While the scanner stays on a frequency, an RTL-SDR read through librtlsdr (Windows, macOS and the receiver) is read as a continuous stream, which removes the buzz caused by lost samples. If it crashes the driver on your receiver, FalconSDR switches it off by itself and says so in the Activity list; the buzz may come back. Takes effect the next time scanning starts.'),
+      setting(t('Continuous RTL-SDR reading'), t('While the scanner stays on a frequency, an RTL-SDR read through librtlsdr (Windows, macOS and the receiver) is read as a continuous stream, which removes the buzz caused by lost samples. If it crashes the driver on your receiver, AliSDR switches it off by itself and says so in the Activity list; the buzz may come back. Takes effect the next time scanning starts.'),
         toggle('', cfg().device.async_read, (v) => patchConfig({ device: { async_read: v } }))),
       setting(t('Reset to defaults'), t('Settings, Memory List, blacklist and custom presets back to a fresh install. Recordings, the password and connected computers are kept.'),
         h('button.danger', {
@@ -515,22 +515,22 @@ export function settingsView(root, hash, scope = 'settings') {
             renderAll();
           },
         }, t('Reset…'))),
-      S.settings.mode === 'local' && S.settings.capabilities.autostart !== null ? setting(t('Start with the system'), t('Starts FalconSDR in the background when you log in to this computer, without opening the browser.'),
+      S.settings.mode === 'local' && S.settings.capabilities.autostart !== null ? setting(t('Start with the system'), t('Starts AliSDR in the background when you log in to this computer, without opening the browser.'),
         toggle('', S.settings.capabilities.autostart, async (v, e) => {
           try {
             S.settings.capabilities.autostart = (await api.post('/api/autostart', { enabled: v })).enabled;
           } catch (err) { errorToast(err); }
           e.target.checked = S.settings.capabilities.autostart;
         })) : null,
-      S.settings.mode === 'local' ? setting(t('Quit FalconSDR'), t('Stops the scanner and closes the program running in the background. Start it again from the menu or with the same command.'),
+      S.settings.mode === 'local' ? setting(t('Quit AliSDR'), t('Stops the scanner and closes the program running in the background. Start it again from the menu or with the same command.'),
         h('button', {
           onclick: async () => {
-            if (!(await confirmDialog(t('Quit FalconSDR'), t('Stop scanning and close the program?'), t('Quit'), true))) return;
+            if (!(await confirmDialog(t('Quit AliSDR'), t('Stop scanning and close the program?'), t('Quit'), true))) return;
             await api.post('/api/quit');
-            document.body.replaceChildren(h('div.center-page', h('div.card.login', h('h2', 'FalconSDR'), h('p.muted', t('Closed. You can close this tab.')))));
+            document.body.replaceChildren(h('div.center-page', h('div.card.login', h('h2', 'AliSDR'), h('p.muted', t('Closed. You can close this tab.')))));
           },
         }, icon('logout'), t('Quit'))) : null,
-      h('p.faint.small', { style: { margin: 0 } }, `FalconSDR ${S.settings.version} · ${S.settings.mode} · ${lang}`));
+      h('p.faint.small', { style: { margin: 0 } }, `AliSDR ${S.settings.version} · ${S.settings.mode} · ${lang}`));
   }
 
   let stopDecoders = null;

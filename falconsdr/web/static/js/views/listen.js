@@ -354,7 +354,7 @@ export function listenView(root) {
     const name = missing.map((f) => FAMILY_NAMES[f] || f).join(', ');
     return h('span.small', { style: { color: '#ff9f0a' } }, caps.soapy
       ? t('{name} is plugged in but not listed. Install its SoapySDR module (e.g. soapysdr-module-hackrf), allow USB access (udev rules or the plugdev group), then reload this page.', { name })
-      : t('{name} is plugged in, but SoapySDR is not available to FalconSDR (the Python module python3-soapysdr is not visible to it). Install python3-soapysdr and soapysdr-module-<your receiver>, then reinstall with install.sh --from-source, or install libhackrf0 / libairspy0 for the experimental native access.', { name }));
+      : t('{name} is plugged in, but SoapySDR is not available to AliSDR (the Python module python3-soapysdr is not visible to it). Install python3-soapysdr and soapysdr-module-<your receiver>, then reinstall with install.sh --from-source, or install libhackrf0 / libairspy0 for the experimental native access.', { name }));
   }
 
   let deviceInputs = [];
@@ -458,7 +458,7 @@ export function listenView(root) {
         addr ? h('label.field', t('rtl_tcp address'), addr) : null,
         h('label.field', t('Capture width (MHz)'), bw)),
       addr ? h('span.faint.small', t('The RTL-SDR on another computer, through its rtl_tcp server (host or host:port, default port 1234). It serves one program at a time, the stream is not encrypted - use it on a trusted network. Retuning takes longer than with a local dongle, so scanning many windows is slower.')) : null,
-      methods ? h('span.faint.small', t('How FalconSDR talks to this receiver. The first choice is the default; the other one is the fallback when it will not open, and a way to compare.')) : null,
+      methods ? h('span.faint.small', t('How AliSDR talks to this receiver. The first choice is the default; the other one is the fallback when it will not open, and a way to compare.')) : null,
       missingReceiverNotice(devices),
       bias,
       rangeFields(c.device.range_start_hz || 0, c.device.range_stop_hz || 0, (p) => { patchConfig({ device: p }); renderDevice(); }),
@@ -498,7 +498,7 @@ export function listenView(root) {
     return (await modal(t('Turn on Bias-T?'), h('div.col', { style: { gap: '10px' } },
       h('p', t('Bias-T sends about 4.5 V DC up the antenna cable to power an LNA or an active antenna.')),
       h('p', t('Turn it on only when such a device is connected and your dongle supports it (e.g. RTL-SDR Blog V3/V4). A DC-shorted antenna, a splitter or other equipment on the cable can be damaged - and so can the dongle.')),
-      h('p.small.muted', t('FalconSDR switches it off whenever scanning stops.'))),
+      h('p.small.muted', t('AliSDR switches it off whenever scanning stops.'))),
     // The safe choice is the prominent one, and last - the button a dialog focuses (Enter):
     // people click the highlighted button, and here that must not be the risky one.
     [[t('Turn on'), true, 'ghost'], [t('Cancel'), false, 'primary']])) === true;

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs or updates the FalconSDR receiver from this checkout (run as root
+# Installs or updates the AliSDR receiver from this checkout (run as root
 # on the receiver):  sudo packaging/remote-server/install.sh
 # Safe to re-run: code is synced to /opt/falconsdr, settings and recordings
 # are kept, and a running service is restarted.

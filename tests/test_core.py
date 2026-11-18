@@ -2600,7 +2600,7 @@ class ControllerStartTest(unittest.TestCase):
 
 
 class ManualTuningTest(unittest.TestCase):
-    def test_analog_retunes_in_place_and_restores_scan(self) -> None:
+    def test_analog_retunes_in_place_and_stays_idle(self) -> None:
         from falconsdr.controller import Controller
 
         cfg = AppConfig()
@@ -2637,7 +2637,7 @@ class ManualTuningTest(unittest.TestCase):
         self.assertEqual(cfg.device.gain_db, saved_gain)
         ctl.stop_manual()
         self.assertIsNone(ctl.manual_status()["tuning"])
-        self.assertTrue(ctl.running)
+        self.assertFalse(ctl.running)
 
     def test_scan_and_manual_are_exclusive_across_receivers(self) -> None:
         from falconsdr.controller import Controller
@@ -2679,13 +2679,18 @@ class ManualTuningTest(unittest.TestCase):
                 station(0xabcd, b"Radio Plus", 63)
                 return 1
 
+            def falcon_dab_set_metadata(self, _handle, callback):
+                self.metadata = callback
+
             def falcon_dab_select(self, _handle, sid):
                 self.sid = sid
 
             def falcon_dab_push(self, _handle, _pointer, count):
+                self.metadata(0, b"Test Ensemble")
                 if self.sid:
+                    self.metadata(self.sid, b"Now playing")
                     from ctypes import c_int16
-                    self.audio((c_int16 * 960)(*[10000] * 960), 960, 48000)
+                    self.audio((c_int16 * 960)(*([10000, -3000] * 480)), 960, 48000)
                 return count
 
             def falcon_dab_close(self, _handle):
@@ -2718,6 +2723,76 @@ class ManualTuningTest(unittest.TestCase):
             self.assertEqual(json.load(response)["station"], 0xabcd)
         with urlopen(Request(url + "/audio", headers=headers), timeout=5) as response:
             self.assertTrue(np.any(np.frombuffer(response.read(120), dtype="<i2")))
+
+        with urlopen(Request(url + "/audio?dab=1", headers=headers), timeout=5) as response:
+            self.assertEqual(response.headers["X-Sample-Rate"], "48000")
+            self.assertEqual(response.headers["X-Audio-Channels"], "2")
+            stereo = np.frombuffer(response.read(120), dtype="<i2").reshape(-1, 2)
+            np.testing.assert_array_equal(stereo, np.tile([10000, -3000], (30, 1)))
+        self.assertEqual(ctl.manual_status()["station_info"],
+                         {"ensemble": "Test Ensemble", "text": "Now playing"})
+        self.assertIsNotNone(ctl.manual_status()["spectrum"])
+        favourite = {"mode": "DAB", "channel": "12A", "sid": 0xabcd, "enabled": True}
+        with patch.object(AppConfig, "save") as save:
+            with urlopen(Request(url + "/manual/favourite", json.dumps(favourite).encode(), headers),
+                         timeout=5) as response:
+                self.assertEqual(json.load(response)["favourites"], [
+                    {"mode": "DAB", "channel": "12A", "id": 0xabcd, "name": "Radio Plus", "codec": "DAB+"}
+                ])
+            ctl.stop_manual()
+            ctl.change_manual_favourite({**favourite, "enabled": False})
+            self.assertEqual(ctl.manual_status()["favourites"], [])
+            self.assertEqual(save.call_count, 2)
+
+    def test_fm_favourite_and_rds_group_decoding(self) -> None:
+        from unittest.mock import patch
+
+        import numpy as np
+
+        from falconsdr.controller import Controller
+        from falconsdr.rds import RDSDecoder
+
+        def encode_block(payload, offset):
+            word = payload << 10
+            remainder = word
+            for bit in range(25, 9, -1):
+                if remainder & (1 << bit):
+                    remainder ^= 0x5B9 << (bit - 10)
+            encoded = word | (remainder ^ offset)
+            return [(encoded >> bit) & 1 for bit in range(25, -1, -1)]
+
+        pi = 0xCAFE
+        groups = [(pi, i, 0, int.from_bytes(label, "big"))
+                  for i, label in enumerate((b"FA", b"LC", b"ON", b"FM"))]
+        groups.append((pi, 2 << 12, int.from_bytes(b"Hi", "big"), int.from_bytes(b"\r ", "big")))
+        bits = [0] + [bit for group in groups for payload, offset in zip(group, (0xFC, 0x198, 0x168, 0x1B4))
+                      for bit in encode_block(payload, offset)]
+        symbols = 1 - 2 * (np.cumsum(bits * 5) % 2)
+        biphase = np.kron(symbols, np.r_[np.ones(8), -np.ones(8)])
+        from scipy.signal import resample_poly
+        multiplex = resample_poly(biphase, 200, 19)
+        clock = np.arange(multiplex.size) / 200000
+        multiplex *= np.cos(2 * np.pi * 57000 * clock + 0.7)
+        decoder = RDSDecoder()
+        for chunk in np.array_split(multiplex, 67):
+            decoder.feed(chunk, 200000)
+        self.assertEqual(decoder.info, {"pi": "CAFE", "name": "FALCONFM", "text": "Hi"})
+
+        cfg = AppConfig()
+        cfg.device.driver = "simulated"
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        ctl = Controller(cfg)
+        self.addCleanup(ctl.shutdown)
+        hz = 99_500_000
+        ctl.tune_manual({"mode": "WFM", "frequency_hz": hz})
+        entry = {"mode": "WFM", "frequency_hz": hz, "enabled": True}
+        with patch.object(AppConfig, "save") as save:
+            ctl.change_manual_favourite(entry)
+            self.assertEqual(ctl.manual_status()["favourites"][0]["frequency_hz"], hz)
+            ctl.stop_manual()
+            ctl.change_manual_favourite({**entry, "enabled": False})
+            self.assertEqual(ctl.manual_status()["favourites"], [])
+            self.assertEqual(save.call_count, 2)
 
     def test_empty_dab_channel_times_out_and_releases_receiver(self) -> None:
         from unittest.mock import Mock, patch

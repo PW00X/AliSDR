@@ -1,4 +1,4 @@
-// Live audio: one long fetch() of raw mono PCM16 (X-Sample-Rate header) from
+// Live audio: one long fetch() of raw PCM16 (X-Sample-Rate header) from
 // /api/audio, each chunk scheduled back to back as an AudioBufferSourceNode.
 // Works over plain http:// to an IP (no AudioWorklet, which needs HTTPS).
 // Keeps ~0.4 s of latency and resyncs after gaps (no transmission = no data). 0.25 s was
@@ -39,6 +39,7 @@ export const liveAudio = {
   boostDb: boostDb(),
   ctrl: null,
   playing: false,
+  dab: false,
   volume: parseFloat(localStorage.getItem('volume') ?? '0.9'),
   onchange: () => {},
   t: 0,
@@ -62,7 +63,7 @@ export const liveAudio = {
     if (this.el) this.el.play().catch(() => {});
     await this.ctx.resume();
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: 'FalconSDR', artist: 'Live' });
+      navigator.mediaSession.metadata = new MediaMetadata({ title: 'AliSDR', artist: 'Live' });
       navigator.mediaSession.setActionHandler('play', () => this.start());
       navigator.mediaSession.setActionHandler('pause', () => this.stop());
     }
@@ -76,6 +77,13 @@ export const liveAudio = {
     if (this.ctrl) { this.ctrl.abort(); this.ctrl = null; }
     if (this.el) this.el.pause();
     this.onchange();
+  },
+
+  useDab(enabled) {
+    if (this.dab === enabled) return;
+    this.dab = enabled;
+    if (this.ctrl) { this.ctrl.abort(); this.ctrl = null; }
+    if (this.playing) this._stream();
   },
 
   toggle() { return this.playing ? this.stop() : this.start(); },
@@ -98,25 +106,30 @@ export const liveAudio = {
     this.t = 0;
     let rest = null;
     try {
-      const r = await fetch('/api/audio', { signal: ctrl.signal, cache: 'no-store' });
+      const r = await fetch(this.dab ? '/api/audio?dab=1' : '/api/audio', { signal: ctrl.signal, cache: 'no-store' });
       if (!r.ok) throw new Error(String(r.status));
       const rate = +(r.headers.get('X-Sample-Rate') || 12500);
+      const channels = r.headers.get('X-Audio-Channels') === '2' ? 2 : 1;
+      const frameBytes = channels * 2;
       const reader = r.body.getReader();
       for (;;) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done || ctrl.signal.aborted) break;
         let u = value;
         if (rest) { const m = new Uint8Array(rest.length + u.length); m.set(rest); m.set(u, rest.length); u = m; rest = null; }
-        if (u.length % 2) { rest = u.slice(-1); u = u.slice(0, -1); }
-        if (!u.length) continue;
-        const i16 = new Int16Array(u.buffer, u.byteOffset, u.length / 2);
-        const f = new Float32Array(i16.length);
-        for (let i = 0; i < f.length; i++) f[i] = i16[i] / 32768;
-        const buf = this.ctx.createBuffer(1, f.length, rate);
-        buf.copyToChannel(f, 0);
+        const length = u.length - u.length % frameBytes;
+        if (length < u.length) rest = u.slice(length);
+        if (!length) continue;
+        const pcm = new DataView(u.buffer, u.byteOffset, length);
+        const frames = length / frameBytes;
+        const buf = this.ctx.createBuffer(channels, frames, rate);
+        for (let channel = 0; channel < channels; channel++) {
+          const out = buf.getChannelData(channel);
+          for (let i = 0; i < frames; i++) out[i] = pcm.getInt16(i * frameBytes + channel * 2, true) / 32768;
+        }
         const src = this.ctx.createBufferSource();
         src.buffer = buf;
-        src.connect(this.chain.input);
+        src.connect(channels === 2 ? this.gain : this.chain.input);
         const now = this.ctx.currentTime;
         // Really ran dry (or a new transmission after silence) / far too far ahead: start over.
         if (this.t <= now || this.t > now + MAX_AHEAD_S) this.t = now + LATENCY_S;

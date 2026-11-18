@@ -197,14 +197,14 @@ export function decodersCard(box) {
         parts.push(h('div.row.wrap',
           st.running ? h('span.chip.accent.live', h('span.dot'), t('Installing…'))
             : h('button.primary', { onclick: () => act('/api/addons/install', { id: a.id }) }, icon('download'), t('Install')),
-          h('span.faint.small', t('It is downloaded or built from the author\'s own release; FalconSDR does not ship it.'))));
+          h('span.faint.small', t('It is downloaded or built from the author\'s own release; AliSDR does not ship it.'))));
         if (st.log && st.log.length) parts.push(h('pre.msg-detail', st.log.join('\n')));
         if (st.error) parts.push(h('span', { style: { color: 'var(--red)' } }, t('Installation failed: {error}', { error: st.error })));
         if (st.hint) parts.push(h('div.col', { style: { gap: '4px' } },
-          h('span.small', t('Install what the build needs first (this needs administrator rights, so FalconSDR does not run it):')), h('code', st.hint)));
+          h('span.small', t('Install what the build needs first (this needs administrator rights, so AliSDR does not run it):')), h('code', st.hint)));
       }
       const input = h('input', { placeholder: t('Path of the program'), value: a.path, style: { width: '320px' } });
-      parts.push(setting(t('Program'), t('Where it is installed, if FalconSDR does not find it by itself.'),
+      parts.push(setting(t('Program'), t('Where it is installed, if AliSDR does not find it by itself.'),
         h('div.row.wrap', input, h('button', { onclick: () => act('/api/addons/configure', { id: a.id, path: input.value }) }, t('Save')))));
       if (a.homepage) parts.push(h('a', { href: a.homepage, target: '_blank', rel: 'noopener' }, t('Project page')));
     } else {
@@ -238,7 +238,7 @@ export function decodersCard(box) {
   function render() {
     const listen = cfg().addons.listen_to_data;
     box.replaceChildren(
-      h('p.muted', { style: { margin: 0 } }, t('Optional decoders. The built-in ones read the channels your scanner stops on; the separate programs are installed by you and use the receiver on their own - FalconSDR only starts and stops them and shows what they decode in Messages.')),
+      h('p.muted', { style: { margin: 0 } }, t('Optional decoders. The built-in ones read the channels your scanner stops on; the separate programs are installed by you and use the receiver on their own - AliSDR only starts and stops them and shows what they decode in Messages.')),
       ...rows.filter((a) => a.kind === 'builtin').map(card),
       h('section.addon-card',
         h('div.row.wrap.addon-head', h('b.addon-name', t('Hear and record data channels too')), h('span.spacer'),

@@ -88,7 +88,7 @@ function schedule(ms) { clearTimeout(timer); timer = setTimeout(poll, ms); }
 export function startPolling() { poll(); }
 
 // ---------------------------------------------------------------- legal notices
-const LAUNCH_TEXT = () => t('FalconSDR can tune to a wide range of radio frequencies, some of which may be restricted or illegal to listen to or record where you live.\n\nUsing this software does not authorize you to listen to or record any transmission. Radio monitoring and recording laws vary significantly between countries - some places allow listening to most frequencies but restrict recording or sharing what you hear; others restrict listening to non-public or certain public-safety/aviation communications entirely.\n\nYou are solely responsible for knowing and following the laws that apply to you. If you\'re unsure, check your local telecommunications regulations before using the scanning or recording features.');
+const LAUNCH_TEXT = () => t('AliSDR can tune to a wide range of radio frequencies, some of which may be restricted or illegal to listen to or record where you live.\n\nUsing this software does not authorize you to listen to or record any transmission. Radio monitoring and recording laws vary significantly between countries - some places allow listening to most frequencies but restrict recording or sharing what you hear; others restrict listening to non-public or certain public-safety/aviation communications entirely.\n\nYou are solely responsible for knowing and following the laws that apply to you. If you\'re unsure, check your local telecommunications regulations before using the scanning or recording features.');
 
 export async function maybeShowLaunchNotice() {
   const seen = cfg().legal_disclaimer.launch_seen_languages;
