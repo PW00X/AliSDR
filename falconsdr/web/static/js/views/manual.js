@@ -1,4 +1,4 @@
-import { api, errorToast, fmtMHz, h, icon, mount, t } from '../core.js';
+import { api, errorToast, fmtMHz, h, icon, mount, seg, slider, t } from '../core.js';
 import { liveAudio } from '../live-audio.js';
 import { cfg, on } from '../state.js';
 import { spectrumPainter } from './listen.js';
@@ -14,23 +14,29 @@ export function manualView(root) {
     value: '99.5', required: true,
   });
   const channel = h('select');
-  const gainMode = h('select', {},
-    h('option', { value: 'manual' }, t('Manual')),
-    h('option', { value: 'auto' }, t('Auto (hardware)')),
-    h('option', { value: 'sw_auto' }, t('Auto (software)')));
-  const gainDb = h('input', { type: 'number', min: -100, max: 100, step: 'any', required: true });
-  const gainLabel = h('span');
-  const gainField = h('label.field', gainLabel, gainDb);
-  const setGain = (mode, db) => {
-    gainMode.value = mode;
-    gainDb.value = db;
-    updateGain();
+  let gainMode = cfg().device.gain_mode;
+  let gainDb = cfg().device.gain_db;
+  let receivers = [];
+  const gainField = h('div.col');
+  const updateGain = () => {
+    const device = receivers.find(({ id }) => id === Number(receiver.value));
+    const [min, max] = device?.gain_range || [0, 50];
+    gainDb = Math.max(min, Math.min(max, gainDb));
+    const name = device?.gain_index ? t('Sensitivity index')
+      : gainMode === 'sw_auto' ? t('Starting gain') : t('Gain');
+    const level = gainMode === 'auto' ? null : slider({
+      name, min, max, step: device?.gain_index ? 1 : 0.1, value: gainDb,
+      unit: device?.gain_index ? '' : 'dB', oninput: (value) => { gainDb = value; },
+    });
+    if (level) {
+      gainDb = Number(level.input.value);
+      level.set(gainDb);
+      level.input.setAttribute('aria-label', name);
+    }
+    mount(gainField, h('span.small.muted', t('Gain')),
+      seg([['manual', t('Manual')], ['auto', t('Auto (hardware)')], ['sw_auto', t('Auto (software)')]],
+        gainMode, (value) => { gainMode = value; updateGain(); }), level);
   };
-  function updateGain() {
-    gainField.hidden = gainDb.disabled = gainMode.value === 'auto';
-    gainLabel.textContent = gainMode.value === 'sw_auto' ? t('Starting gain (dB)') : t('Gain (dB)');
-  }
-  setGain(cfg().device.gain_mode, cfg().device.gain_db);
   const frequencyField = h('label.field', t('Frequency (MHz)'), frequency);
   const channelField = h('label.field', t('DAB channel'), channel);
   const tune = h('button.primary.big', { type: 'submit', disabled: true }, icon('play'), t('Tune'));
@@ -87,10 +93,12 @@ export function manualView(root) {
     ready = true;
     active = data.tuning;
     playingStation = data.station || 0;
+    const previousReceiverKey = receiverKey;
     const nextReceiverKey = JSON.stringify(data.receivers);
     if (receiverKey !== nextReceiverKey) {
       const selected = receiver.value;
       receiverKey = nextReceiverKey;
+      receivers = data.receivers;
       mount(receiver, ...data.receivers.map(({ id, driver }) => h('option', { value: id },
         t('Receiver {n}', { n: id + 1 }) + (driver ? ` · ${driver}` : ''))));
       if (data.receivers.some(({ id }) => String(id) === selected)) receiver.value = selected;
@@ -102,10 +110,14 @@ export function manualView(root) {
         mode.value = active.mode;
         if (active.channel) channel.value = active.channel;
         if (active.frequency_hz) frequency.value = active.frequency_hz / 1e6;
-        if (data.gain) setGain(data.gain.mode, data.gain.db);
+        if (data.gain) {
+          gainMode = data.gain.mode;
+          gainDb = data.gain.db;
+        }
       }
       updateMode();
     }
+    if (initial || receiverKey !== previousReceiverKey) updateGain();
     const nextStationKey = JSON.stringify(data.stations);
     if (nextStationKey !== stationKey) {
       const selected = stationList.value;
@@ -120,7 +132,7 @@ export function manualView(root) {
     readout.textContent = active?.mode === 'DAB' ? active.channel
       : active ? `${fmtMHz(active.frequency_hz, 3)} MHz` : '—';
     detail.textContent = active?.mode === 'DAB' ? 'DAB/DAB+' : active?.mode === 'WFM' ? t('FM broadcast') : active?.mode || '';
-    meter.hidden = data.level == null || !active || active.mode === 'DAB';
+    meter.hidden = data.level == null || !active;
     if (!meter.hidden) {
       meterFill.style.width = `${Math.max(0, Math.min(100, 100 + data.level))}%`;
       rfLevel.textContent = `${data.level.toFixed(1)} dBFS`;
@@ -176,7 +188,7 @@ export function manualView(root) {
     }
   };
   mode.addEventListener('change', updateMode);
-  gainMode.addEventListener('change', updateGain);
+  receiver.addEventListener('change', updateGain);
   canvas.addEventListener('click', (event) => {
     if (!frame) return;
     mode.value = mode.value === 'DAB' ? 'WFM' : mode.value;
@@ -213,16 +225,15 @@ export function manualView(root) {
         change('/api/manual/tune', {
           receiver: Number(receiver.value), mode: mode.value,
           frequency_hz: Math.round(Number(frequency.value) * 1e6), channel: channel.value,
-          gain_mode: gainMode.value, gain_db: Number(gainDb.value),
+          gain_mode: gainMode, gain_db: gainDb,
         });
       } },
       h('div.row.wrap', h('label.field', t('Modulation'), mode),
         frequencyField, channelField),
-      h('div.row.wrap', h('label.field', t('Gain mode'), gainMode), gainField),
       h('div.controls', tune, stop, analogAudio))),
     spectrumCard),
     h('div.col',
-      h('section.card.col', h('div.card-head', h('h2', t('SDR device'))), h('label.field', t('Receiver'), receiver)),
+      h('section.card.col', h('div.card-head', h('h2', t('SDR device'))), h('label.field', t('Receiver'), receiver), gainField),
       stations))));
   updateMode();
   const offAudio = on('audio', updateListen);

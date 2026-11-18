@@ -133,8 +133,20 @@ class SoapyBackend(SdrBackend):
         self.device = SoapySDR.Device(args_str)
         self.bias_tee = False  # on only once the device is fully set up (end of __init__)
         self._apply_bias_tee()
-        self.sample_rate = sample_rate
+        if args["driver"] == "airspy":
+            # Airspy hardware has discrete clocks. Select an advertised rate
+            # and let the DAB input resample to its required 2.048 MS/s.
+            rates = self.device.listSampleRates(SOAPY_SDR_RX, 0)
+            if len(rates):
+                sample_rate = min(rates, key=lambda rate: abs(rate - sample_rate))
         self.device.setSampleRate(SOAPY_SDR_RX, 0, sample_rate)
+        self.sample_rate = sample_rate
+        try:
+            actual = float(self.device.getSampleRate(SOAPY_SDR_RX, 0))
+            if np.isfinite(actual) and actual > 0:
+                self.sample_rate = actual
+        except (AttributeError, TypeError, ValueError, RuntimeError):
+            pass
         self._gain_steps: tuple[float, ...] | None = None
         try:
             rng = self.device.getGainRange(SOAPY_SDR_RX, 0)
@@ -145,7 +157,7 @@ class SoapyBackend(SdrBackend):
             pass
         self.set_gain(gain_mode, gain_db)
         try:
-            self.stream = self.device.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32, [0], _soapy_stream_args(sample_rate))
+            self.stream = self.device.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32, [0], _soapy_stream_args(self.sample_rate))
         except Exception:
             # A driver that rejects the args still opens - they only shape latency and slack.
             self.stream = self.device.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32)

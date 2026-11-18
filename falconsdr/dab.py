@@ -6,6 +6,9 @@ from pathlib import Path
 from queue import Empty, Full, Queue
 
 import numpy as np
+from scipy.signal import ellip, sosfilt
+
+from .dsp import StreamResampler
 
 from .i18n import tr
 
@@ -22,6 +25,27 @@ _STATION = C.CFUNCTYPE(None, C.c_uint32, C.c_char_p, C.c_int)
 _AUDIO = C.CFUNCTYPE(None, C.POINTER(C.c_int16), C.c_int, C.c_int)
 _RECEPTION = C.CFUNCTYPE(None, C.c_bool, C.c_int16, C.c_int32)
 _LIBRARY = Path(__file__).resolve().parent.parent / ".venv" / "lib" / "libfalconsdr_dab.so"
+
+
+class ChannelInput:
+    """Condition a continuous stream before the decoder looks for the OFDM null."""
+
+    def __init__(self, rate: float):
+        self._resample = StreamResampler(rate, SAMPLE_RATE) if rate != SAMPLE_RATE else None
+        # Keep the occupied ±768 kHz and some tuner-error margin. Noise and
+        # adjacent emissions outside the ensemble can obscure its quiet null.
+        self._filter = ellip(7, 0.2, 50, 810_000, fs=SAMPLE_RATE, output="sos").astype(np.float32)
+        self._state = np.zeros((len(self._filter), 2), dtype=np.complex64)
+
+    def process(self, iq: np.ndarray) -> np.ndarray:
+        # There is no DAB carrier at DC. USB capture can have a centre spike
+        # large enough to hide the null even when the wanted ensemble is strong.
+        iq = iq - iq.mean(dtype=np.complex64)
+        if self._resample is not None:
+            iq = self._resample.process(iq)
+        if iq.size:
+            iq, self._state = sosfilt(self._filter, iq, zi=self._state)
+        return iq
 
 
 def load_decoder():

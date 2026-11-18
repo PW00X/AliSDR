@@ -1549,6 +1549,15 @@ class BiasTeeTest(unittest.TestCase):
             def __init__(self, _args):
                 pass
 
+            def listSampleRates(self, *_):
+                return [2_500_000, 10_000_000]
+
+            def setSampleRate(self, _, channel, rate):
+                self.requested_rate = rate
+
+            def getSampleRate(self, *_):
+                return self.requested_rate
+
             def writeSetting(self, k, v):
                 writes.append((k, v))
 
@@ -1580,6 +1589,10 @@ class BiasTeeTest(unittest.TestCase):
             b.set_frequency(121_500_000)
             self.assertEqual(writes, [("biastee", "true"), ("bias_tee", "true")])
             b.close()
+            airspy = sdr_backend.SoapyBackend("airspy", "", 2_048_000, "manual", 12.0)
+            self.assertEqual(airspy.device.requested_rate, 2_500_000)
+            self.assertEqual(airspy.sample_rate, 2_500_000)
+            airspy.close()
             self.assertEqual(writes[-3:], [("biastee", "false"), ("bias_tee", "false"), ("offset_tuning", "false")])
 
 
@@ -2690,7 +2703,7 @@ class ManualTuningTest(unittest.TestCase):
         cleanup.callback(web.shutdown)
         url = f"http://127.0.0.1:{web.server_port}/api"
         headers = {"Authorization": "Bearer secret", "X-FalconSDR": "1", "Content-Type": "application/json"}
-        ctl.tune_manual({"mode": "DAB", "channel": "12A"})
+        ctl.tune_manual({"mode": "DAB", "channel": "12A", "gain_mode": "manual"})
         deadline = time.monotonic() + 5
         while not ctl.manual_status()["stations"] and time.monotonic() < deadline:
             time.sleep(0.01)
@@ -2722,7 +2735,7 @@ class ManualTuningTest(unittest.TestCase):
         with patch("falconsdr.controller.load_decoder"), patch.object(manual_tuning, "Decoder", return_value=decoder), \
                 patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2_048_000)), \
                 patch.object(manual_tuning, "DAB_DISCOVERY_TIMEOUT", 0.1):
-            ctl.tune_manual({"mode": "DAB", "channel": "12A"})
+            ctl.tune_manual({"mode": "DAB", "channel": "12A", "gain_mode": "manual"})
             deadline = time.monotonic() + 5
             while ctl.manual_session is not None and time.monotonic() < deadline:
                 time.sleep(0.01)
@@ -2730,6 +2743,22 @@ class ManualTuningTest(unittest.TestCase):
         self.assertNotIn(0, ctl._held)
         self.assertIn("No DAB signal could be synchronized on channel 12A", ctl.manual_status()["error"])
         decoder.close.assert_called_once()
+
+    def test_dab_input_rejects_dc_and_preserves_the_ensemble_at_airspy_rate(self) -> None:
+        import numpy as np
+        from falconsdr.dab import ChannelInput, SAMPLE_RATE
+
+        rate = 2_500_000
+        n = np.arange(150_000)
+        tone = lambda frequency: np.exp(2j * np.pi * frequency * n / rate).astype(np.complex64)
+        iq = 0.35 + 0.2j + 0.02 * tone(760_000) + 0.05 * tone(980_000)
+        frontend = ChannelInput(rate)
+        output = np.concatenate([frontend.process(block) for block in np.array_split(iq, 3)])[1000:]
+        n = np.arange(output.size)
+        gain_at = lambda f: abs(np.mean(output * np.exp(-2j * np.pi * f * n / SAMPLE_RATE)))
+        self.assertAlmostEqual(gain_at(760_000), 0.02, delta=0.002)
+        self.assertLess(gain_at(980_000), 0.001)
+        self.assertLess(gain_at(0), 0.001)
 
 
 @unittest.skipUnless(hasattr(time, "tzset"), "needs time.tzset (not Windows)")

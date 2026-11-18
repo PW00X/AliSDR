@@ -369,9 +369,16 @@ class Controller:
     def manual_status(self) -> dict:
         session = self.manual_session
         devices = self._devices()
+        receivers = []
+        for k, dev in enumerate(devices):
+            driver = (dev or {}).get("driver", self.config.device.driver)
+            native_airspy = driver == "airspy_native" or (driver == "airspy" and not HAVE_SOAPY)
+            gain_range = sdr_native._AIRSPY_GAIN_RANGE_DB if native_airspy else (0, 50)
+            if session and session.tuning.receiver == k and session.gain_range is not None:
+                gain_range = session.gain_range
+            receivers.append({"id": k, "driver": driver, "gain_range": gain_range, "gain_index": native_airspy})
         result = {
-            "receivers": [{"id": k, "driver": (dev or {}).get("driver", self.config.device.driver)}
-                          for k, dev in enumerate(devices)],
+            "receivers": receivers,
             "channels": DAB_CHANNELS,
             "error": self._manual_error,
             "tuning": asdict(session.tuning) if session else None,
@@ -379,7 +386,7 @@ class Controller:
             "state": session.state if session else "idle",
             "stations": [],
             "spectrum": session.spectrum if session and session.state == "listening" else None,
-            "level": session.level if session and session.spectrum is not None else None,
+            "level": session.level if session else None,
         }
         if session and session.tuning.mode == "DAB":
             result["stations"] = sorted(session.stations.copy().values(), key=lambda station: (station["name"].casefold(), station["id"]))

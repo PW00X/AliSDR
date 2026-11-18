@@ -434,6 +434,7 @@ the app's mono live-audio stream.
 
 Set the gain mode and level on the Manual page for analog or DAB, then
 press **Tune** to apply them. The Scan page keeps its own configured gain.
+With the native Airspy driver, the slider shows the 0–21 sensitivity index.
 
 For digital broadcast radio on the Linux receiver, run the headless installer
 with `--server --with-dab`. FalconSDR's Python receiver feeds IQ from the
@@ -447,6 +448,9 @@ In **Manual tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
 The SDR must capture the Band III ensemble with about 2 MHz of bandwidth.
 If reception fails, the receiver reports whether it synchronized or found
 audio stations. Browser audio is mono, like the analog live stream.
+The DAB signal meter shows channel power. On a headless receiver, a timeout
+also logs the capture rate, gain and any reported IQ loss to
+`journalctl -u falconsdr-receiver`.
 
 **Tune** pauses scanning across all receivers. **Start** on the Scan tab
 ends manual tuning before scanning. **Stop tuning** restores the previous

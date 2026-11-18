@@ -1,6 +1,7 @@
 """Continuous analog listening and native DAB/DAB+ listening."""
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -8,7 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .agc import SoftwareAgc
-from .dab import CHANNELS, SAMPLE_RATE, Decoder
+from .dab import CHANNELS, SAMPLE_RATE, ChannelInput, Decoder
 from .dsp import Demodulator, StreamResampler, WFM_DISCRIMINATOR_RATE, level_dbfs
 from .i18n import tr
 from .models import Modulation, resolve_ssb_sideband
@@ -17,7 +18,9 @@ from .sdr_backend import AcquisitionThread, create_backend, open_real_backend
 
 DAB_CHANNELS = tuple(CHANNELS)
 DAB_DISCOVERY_TIMEOUT = 20
+DAB_GAIN_SETTLE_S = 5
 ANALOG_MODES = ("AM", "NFM", "WFM", "SSB", "USB", "LSB")
+_log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,7 @@ class ManualSession(threading.Thread):
         self.state = "starting"
         self.spectrum = None
         self.level = None
+        self.gain_range = None
 
     def _update_spectrum(self, freqs, db, _trigger, _custom):
         self.spectrum = {"f0": float(freqs[0]), "f1": float(freqs[-1]), "db": np.round(db, 1).tolist()}
@@ -95,6 +99,7 @@ class ManualSession(threading.Thread):
             rate = float(getattr(raw, "sample_rate", 0) or dev["sample_rate_hz"])
             chunk = max(4096, round(rate * 0.03 / 4096) * 4096)
             acquisition = AcquisitionThread(raw, chunk, max_queued=8, debug=self.debug)
+            self.gain_range = acquisition.gain_range_db
             current = None
             next_frame = 0
             while not self.stop_requested.is_set():
@@ -146,10 +151,10 @@ class ManualSession(threading.Thread):
     def _dab(self):
         dev = self.device
         gain = dev["gain_db"]
-        agc = SoftwareAgc(gain) if dev["gain_mode"] == "sw_auto" else None
+        software_gain = dev["gain_mode"] == "sw_auto"
         raw = open_real_backend(
             dev["driver"], dev.get("device_args", ""), SAMPLE_RATE,
-            "manual" if agc else dev["gain_mode"], gain,
+            "manual" if software_gain else dev["gain_mode"], gain,
             bias_tee=bool(dev.get("bias_tee")), async_read=dev["async_read"],
         )
         acquisition = decoder = None
@@ -158,27 +163,56 @@ class ManualSession(threading.Thread):
             if rate < 1_536_000:
                 raise RuntimeError(tr("The receiver capture bandwidth is too narrow for DAB/DAB+."))
             chunk = max(4096, round(rate * .03 / 4096) * 4096)
-            resample = StreamResampler(rate, SAMPLE_RATE) if rate != SAMPLE_RATE else None
             acquisition = AcquisitionThread(raw, chunk, max_queued=12, debug=self.debug)
-            acquisition.set_frequency(CHANNELS[self.tuning.channel])
+            self.gain_range = acquisition.gain_range_db
+            frequency = CHANNELS[self.tuning.channel]
+            acquisition.set_frequency(frequency)
             acquisition.read(chunk)
+            if dev["gain_mode"] != "auto":
+                lo, hi = acquisition.gain_range_db
+                gain = max(lo, min(hi, gain))
+            if software_gain:
+                # Gain steps flush the Airspy's IQ queues. Let software AGC
+                # settle first, then give the decoder an uninterrupted stream.
+                agc = SoftwareAgc(gain)
+                deadline = time.monotonic() + DAB_GAIN_SETTLE_S
+                while not self.stop_requested.is_set() and time.monotonic() < deadline:
+                    iq = acquisition.read(chunk)
+                    new_gain = agc.step(float(np.max(np.abs(iq))), acquisition.gain_range_db)
+                    if new_gain is not None:
+                        acquisition.set_gain("manual", new_gain)
+                        gain = new_gain
+            if self.stop_requested.is_set():
+                return
+            channel = ChannelInput(rate)
+            stream_stats = getattr(raw, "stream_stats", None)
+            lost_before = stream_stats()[0] if stream_stats else 0.0
+            dropped_before = acquisition.chunks_dropped
             decoder = Decoder(self.dab_library, self._dab_station, self._dab_reception)
             self.state = "discovering"
             started = time.monotonic()
+            next_meter = started
             previous_sid = previous_rate = 0
             last_audio = started
             audio_resampler = None
             while not self.stop_requested.is_set():
                 iq = acquisition.read(chunk)
                 now = time.monotonic()
-                if agc:
-                    new_gain = agc.step(float(np.max(np.abs(iq))), acquisition.gain_range_db)
-                    if new_gain is not None:
-                        acquisition.set_gain("manual", new_gain)
-                decoder.push(resample.process(iq) if resample else iq)
+                conditioned = channel.process(iq)
+                if now >= next_meter:
+                    self.level = level_dbfs(conditioned)
+                    next_meter = now + 0.35
+                decoder.push(conditioned)
                 if self.stations:
                     self.state = "listening"
                 elif now - started >= DAB_DISCOVERY_TIMEOUT:
+                    lost = stream_stats()[0] - lost_before if stream_stats else 0.0
+                    _log.warning(
+                        "DAB %s %d Hz via %s: %.3f MS/s, gain %s (configured %.1f, last %.1f), "
+                        "%.1f dBFS channel level, %d dropped acquisition blocks, %.3f s native IQ lost",
+                        self.tuning.channel, frequency, raw.label, rate / 1e6, dev["gain_mode"],
+                        dev["gain_db"], gain, self.level, acquisition.chunks_dropped - dropped_before, lost,
+                    )
                     message = ("DAB channel {channel} synchronized, but no audio stations were decoded."
                                if self.synced else "No DAB signal could be synchronized on channel {channel}.")
                     raise RuntimeError(tr(message).format(channel=self.tuning.channel))
