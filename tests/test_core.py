@@ -2383,7 +2383,10 @@ class WorkerReceptionTest(unittest.TestCase):
                 self.assertIsNone(process_at_dab_open[-1])
                 self.wait_for(lambda: worker._status == "paused_decoders")
                 self.assertIsNone(ctl.library.get(rel).transcript)
-                self.assertIsNone(remote.post("/api/worker/claim", {"name": "remote"})["job"])
+                self.assertIsNone(remote.post("/api/worker/claim", {"name": "receiver"})["job"])
+                job = remote.post("/api/worker/claim", {"name": "remote"})["job"]
+                self.assertEqual(job["id"], rel)
+                remote.post("/api/worker/release", {"id": rel})
                 recording.with_suffix(".resume").touch()
                 cfg.transcription.only_when_decoders_idle = False
                 self.wait_for(lambda: ctl.library.get(rel).transcript is not None)
@@ -2394,7 +2397,7 @@ class WorkerReceptionTest(unittest.TestCase):
                 worker.stop()
                 worker.join(2)
 
-    def test_idle_only_waits_for_an_active_decoder_even_on_a_remote_worker(self) -> None:
+    def test_idle_only_blocks_server_claims_and_allows_remote_transcription(self) -> None:
         from unittest.mock import patch
 
         from alisdr.controller import Controller
@@ -2418,32 +2421,25 @@ class WorkerReceptionTest(unittest.TestCase):
 
         # A held receiver is busy even while its add-on is starting.
         ctl._addon_dongles["vdl2"] = 0
-        job = api.post("/api/worker/claim", {"name": "probe"})["job"]
-        self.assertEqual(job["id"], rel)  # Existing configurations allow this.
-        api.post("/api/worker/release", {"id": rel})
         ctl.config.transcription.only_when_decoders_idle = True
-        self.assertIsNone(api.post("/api/worker/claim", {"name": "probe"})["job"])
-        ctl._addon_dongles.clear()
+        embedded = api.post("/api/worker/heartbeat", {"name": "receiver", "info": {"embedded": True}})
+        self.assertTrue(embedded["paused_for_decoders"])
+        self.assertIsNone(api.post("/api/worker/claim", {"name": "receiver"})["job"])
+        remote = api.post("/api/worker/heartbeat", {"name": "remote", "info": {"embedded": False}})
+        self.assertFalse(remote["paused_for_decoders"])
+        self.assertFalse(remote["transcription"]["only_when_decoders_idle"])
+        recording.with_suffix(".resume").touch()
 
         with patch("alisdr.playback.transcription_process._serve", _test_transcription_process), \
                 patch("alisdr.worker.is_transcription_installed", return_value=True), \
                 patch("alisdr.worker.model_cached", return_value=True), \
-                patch("alisdr.worker._HEARTBEAT_S", .1), \
-                patch("alisdr.worker._MIN_HEARTBEAT_GAP_S", .1), \
                 patch("alisdr.worker._IDLE_S", .05):
             worker = Worker(base, "", name="remote", local_root=root)
             worker.start()
             try:
-                self.wait_for(recording.with_suffix(".started").is_file)
-                ctl._addon_dongles["vdl2"] = 0
-                self.wait_for(lambda: worker._status == "paused_decoders")
-                self.assertIsNone(worker._transcription._process)
-                self.assertIsNone(ctl.library.get(rel).transcript)
-                self.assertIsNone(api.post("/api/worker/claim", {"name": "probe"})["job"])
-                recording.with_suffix(".resume").touch()
-                ctl._addon_dongles.clear()
                 self.wait_for(lambda: ctl.library.get(rel).transcript is not None)
                 self.assertEqual(ctl.library.get(rel).transcript.text, "receiver test")
+                self.assertTrue(ctl.transcription_paused())
             finally:
                 worker.stop()
                 worker.join(2)

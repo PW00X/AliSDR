@@ -65,11 +65,10 @@ Use `--ask-password` if the receiver requires a password, or set
 Manage transcription, copies and library imports in the receiver's web app
 under **Add-ons → Transcription & computers**.
 
-Enable **Transcribe only when decoders are idle** to pause all workers
-while the receiver decodes, including while tuning or playing DAB/DAB+.
-Interrupted jobs return to the queue. With the switch off, workers can
-transcribe during reception. Update remote workers to apply these rules
-to jobs already running.
+Enable **Transcribe only when decoders are idle** to pause transcription on
+the receiver while it decodes, including while tuning or playing DAB/DAB+.
+Interrupted jobs return to the queue, where remote workers can pick them up
+during reception.
 
 ## USB passthrough
 

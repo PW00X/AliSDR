@@ -201,7 +201,7 @@ export function settingsView(root, hash, scope = 'settings') {
     mount(body('transcription'),
       setting(t('Transcribe new recordings automatically'), t('Transcription runs on whichever computers below have it switched on - the server itself, or your PC with a GPU.'),
         toggle('', tc.enabled, (v) => patchConfig({ transcription: { enabled: v } }))),
-      setting(idleLabel, t('Pause transcription while DAB, FM RDS, digital voice or a decoder add-on is active.'), idleToggle),
+      setting(idleLabel, t('Pause transcription on this server while DAB, FM RDS, digital voice or a decoder add-on is active.'), idleToggle),
       setting(t('Main model'), t('Transcribes every recording and detects its language - English too, unless an English model is set below. A bigger model is more accurate and slower; the first use downloads it.'),
         modelPicker(mainModels(), tc.generic_model, (v) => { if (v) patchConfig({ transcription: { generic_model: v } }); })),
       setting(t('English model (optional)'), t('Only for English, e.g. tuned for air traffic control. None: the main model does English too - one download, less memory.'),

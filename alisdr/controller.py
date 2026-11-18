@@ -1178,15 +1178,22 @@ class Controller:
         with self._lock:
             self.workers[name] = info
             commands = self.worker_commands.pop(name, [])
+        embedded = info.get("embedded") is True
+        transcription = asdict(self.config.transcription)
+        if not embedded:
+            # Older remote workers also read this setting from the heartbeat.
+            transcription["only_when_decoders_idle"] = False
         return {
             "settings": self.worker_settings(name),
-            "transcription": asdict(self.config.transcription),
-            "paused_for_decoders": self.transcription_paused(),
+            "transcription": transcription,
+            "paused_for_decoders": embedded and self.transcription_paused(),
             "commands": commands,
         }
 
     def claim_transcription(self, name: str) -> Optional[dict]:
-        if self.transcription_paused():
+        with self._lock:
+            embedded = self.workers.get(name, {}).get("embedded") is True
+        if embedded and self.transcription_paused():
             return None
         return self.library.claim_job(name)
 

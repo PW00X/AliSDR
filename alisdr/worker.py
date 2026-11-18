@@ -113,8 +113,7 @@ class Worker(threading.Thread):
         self.on_restart = on_restart
         self._stop_event = threading.Event()
         self._wake = threading.Event()  # a command arrived - don't sit out the idle pause
-        self._server_paused = False
-        self._decoders_paused = decoders_paused or (lambda: self._server_paused)
+        self._decoders_paused = decoders_paused if embedded and decoders_paused else lambda: False
         self._transcription = TranscriptionProcess(
             lambda: self._stop_event.is_set() or self._decoders_paused())
         self._log: deque[str] = deque(maxlen=40)
@@ -175,10 +174,8 @@ class Worker(threading.Thread):
                     self._settings = reply["settings"]
                     self._tconfig = _from_dict(TranscriptionConfig, reply["transcription"])
                     self._commands += reply.get("commands", [])
-                    paused = bool(reply.get("paused_for_decoders"))
-                    if self._commands or paused != self._server_paused:
+                    if self._commands:
                         self._wake.set()
-                    self._server_paused = paused
                 if not self._connected:
                     self._connected = True
                     self.say("connected")
@@ -186,9 +183,7 @@ class Worker(threading.Thread):
                 if self._connected:
                     self.say(f"server unreachable: {exc}")
                 self._connected = False
-            monitor_decoders = (self._tconfig.only_when_decoders_idle
-                                and self._status in ("transcribing", "paused_decoders"))
-            self._hb_wake.wait(_MIN_HEARTBEAT_GAP_S if monitor_decoders else _HEARTBEAT_S)
+            self._hb_wake.wait(_HEARTBEAT_S)
             self._hb_wake.clear()
             self._stop_event.wait(max(0.0, _MIN_HEARTBEAT_GAP_S - (time.monotonic() - sent)))
 

@@ -1876,8 +1876,8 @@ msgstr "Oczekiwanie na zakończenie pracy dekoderów"
 msgid "Transcribe only when decoders are idle"
 msgstr "Transkrybuj tylko wtedy, gdy dekodery są bezczynne"
 
-msgid "Pause transcription while DAB, FM RDS, digital voice or a decoder add-on is active."
-msgstr "Wstrzymaj transkrypcję podczas pracy dekodera DAB, FM RDS, głosu cyfrowego lub dekodera z dodatku."
+msgid "Pause transcription on this server while DAB, FM RDS, digital voice or a decoder add-on is active."
+msgstr "Wstrzymaj transkrypcję na tym serwerze podczas pracy dekodera DAB, FM RDS, głosu cyfrowego lub dekodera z dodatku."
 
 msgid "copying recordings"
 msgstr "kopiuje nagrania"
