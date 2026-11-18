@@ -26,6 +26,7 @@ _STATION = C.CFUNCTYPE(None, C.c_uint32, C.c_char_p, C.c_int)
 _AUDIO = C.CFUNCTYPE(None, C.POINTER(C.c_int16), C.c_int, C.c_int)
 _RECEPTION = C.CFUNCTYPE(None, C.c_bool, C.c_int16, C.c_int32)
 _METADATA = C.CFUNCTYPE(None, C.c_uint32, C.c_char_p)
+_IMAGE = C.CFUNCTYPE(None, C.c_uint32, C.POINTER(C.c_uint8), C.c_int)
 _LIBRARY = Path(__file__).resolve().parent.parent / ".venv" / "lib" / "libfalconsdr_dab.so"
 
 
@@ -64,6 +65,9 @@ def load_decoder():
         if hasattr(library, "falcon_dab_set_metadata"):
             library.falcon_dab_set_metadata.argtypes = [C.c_void_p, _METADATA]
             library.falcon_dab_set_metadata.restype = None
+        if hasattr(library, "falcon_dab_set_image"):
+            library.falcon_dab_set_image.argtypes = [C.c_void_p, _IMAGE]
+            library.falcon_dab_set_image.restype = None
         return library
     except (OSError, AttributeError) as exc:
         raise RuntimeError(tr("DAB decoder unavailable. Run the receiver installer with --server --with-dab.")
@@ -71,7 +75,7 @@ def load_decoder():
 
 
 class Decoder:
-    def __init__(self, library, on_station, on_reception, on_metadata=None):
+    def __init__(self, library, on_station, on_reception, on_metadata=None, on_image=None):
         self.library = library
         self.audio: Queue = Queue(maxsize=12)
         self.callbacks = (_STATION(on_station), _AUDIO(self._audio), _RECEPTION(on_reception))
@@ -81,6 +85,14 @@ class Decoder:
         if on_metadata is not None and hasattr(library, "falcon_dab_set_metadata"):
             self.metadata_callback = _METADATA(on_metadata)
             library.falcon_dab_set_metadata(self.handle, self.metadata_callback)
+
+        if on_image is not None and hasattr(library, "falcon_dab_set_image"):
+            def image(sid, pointer, size):
+                if pointer and 0 < size <= 512 * 1024:
+                    on_image(sid, C.string_at(pointer, size))
+
+            self.image_callback = _IMAGE(image)
+            library.falcon_dab_set_image(self.handle, self.image_callback)
 
     def _audio(self, pointer, count, rate):
         if count <= 0 or count % 2 or not 8_000 <= rate <= 96_000:

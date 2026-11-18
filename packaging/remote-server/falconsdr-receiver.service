@@ -9,7 +9,7 @@ Type=simple
 User=falconsdr
 SupplementaryGroups=plugdev
 WorkingDirectory=/opt/falconsdr
-ExecStart=/opt/falconsdr/.venv/bin/python /opt/falconsdr/main.py --server --start
+ExecStart=/opt/falconsdr/.venv/bin/python /opt/falconsdr/main.py --server
 # SIGTERM closes every open recording cleanly (sdr-mode switches stop this unit).
 TimeoutStopSec=15
 Restart=always

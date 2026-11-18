@@ -127,7 +127,7 @@ class Controller:
         self._log_id = 0
         self._audio_lock = threading.Lock()
         self._audio_subscribers: list[queue.Queue] = []
-        self._dab_audio_subscribers: list[queue.Queue] = []
+        self._broadcast_audio_subscribers: list[queue.Queue] = []
         self.workers: dict[str, dict] = {}   # name -> last heartbeat (in memory only)
         self.worker_commands: dict[str, list[str]] = {}
         self.library = Library(self.config, self.open_recording_paths, self.freq_names)
@@ -329,7 +329,7 @@ class Controller:
             self._manual_error = ""
             session = ManualSession(tuning, device, self.config.debug_mode, self._publish_audio, self._manual_ended, library)
             session.pending_station = wanted
-            session.on_dab_audio = self._publish_dab_audio
+            session.on_broadcast_audio = self._publish_broadcast_audio
             self.manual_session = session
             try:
                 session.start()
@@ -351,47 +351,6 @@ class Controller:
             if session is None or session.tuning.mode != "DAB":
                 raise RuntimeError(i18n.tr("Tune a DAB channel first."))
             session.select_station(sid)
-
-    def change_manual_favourite(self, body: dict) -> None:
-        mode, enabled = body.get("mode"), body.get("enabled")
-        if mode == "DAB":
-            channel, sid = body.get("channel"), body.get("sid")
-            if channel not in DAB_CHANNELS or type(sid) is not int or not 0 < sid <= 0xffffffff:
-                raise ValueError("Invalid DAB favourite")
-            key = {"mode": mode, "channel": channel, "id": sid}
-        elif mode == "WFM":
-            hz = body.get("frequency_hz")
-            if type(hz) is not int or not 1 <= hz <= 6_000_000_000:
-                raise ValueError("Invalid FM favourite")
-            key = {"mode": mode, "frequency_hz": hz}
-        else:
-            raise ValueError("Invalid favourite mode")
-        if type(enabled) is not bool:
-            raise ValueError("Invalid favourite action")
-        with self._start_lock:
-            previous = self.config.manual_favourites
-            favourites = [entry for entry in self._manual_favourites()
-                          if not all(entry.get(k) == v for k, v in key.items())]
-            if enabled:
-                session = self.manual_session
-                if not session or session.tuning.mode != mode:
-                    raise ValueError(i18n.tr("Tune to the station first."))
-                if mode == "DAB":
-                    station = session.stations.get(sid) if session.tuning.channel == channel else None
-                    if station is None:
-                        raise ValueError(i18n.tr("DAB station is unavailable."))
-                    favourite = {**station, **key}
-                else:
-                    if session.tuning.frequency_hz != hz:
-                        raise ValueError(i18n.tr("Tune to the station first."))
-                    favourite = {**key, "name": session.station_info.get("name", "")}
-                favourites.append(favourite)
-            self.config.manual_favourites = favourites
-            try:
-                self.config.save()
-            except Exception:
-                self.config.manual_favourites = previous
-                raise
 
     def _manual_favourites(self) -> list[dict]:
         return [entry for entry in self.config.manual_favourites if isinstance(entry, dict)
@@ -421,6 +380,13 @@ class Controller:
                     self._held.discard(session.tuning.receiver)
         threading.Thread(target=release, daemon=True, name="manual-release").start()
 
+    def manual_image(self, version: str):
+        session = self.manual_session
+        image = session.station_image if session else None
+        if image and image[0] == session.station and image[1] == version:
+            return image[2], image[3]
+        return None
+
     def manual_status(self) -> dict:
         session = self.manual_session
         devices = self._devices()
@@ -448,6 +414,9 @@ class Controller:
         if session and session.tuning.mode == "DAB":
             result["stations"] = sorted(session.stations.copy().values(), key=lambda station: (station["name"].casefold(), station["id"]))
             result["station"] = session.station
+            image = session.station_image
+            if image and image[0] == result["station"]:
+                result["station_info"]["image"] = image[1]
             result["error"] = session.dab_error
         return result
 
@@ -738,8 +707,8 @@ class Controller:
         pcm16 = (np.clip(np.asarray(mono, dtype=np.float32), -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
         self._publish_pcm(pcm16, self._audio_subscribers)
 
-    def _publish_dab_audio(self, pcm16: bytes) -> None:
-        self._publish_pcm(pcm16, self._dab_audio_subscribers)
+    def _publish_broadcast_audio(self, pcm16: bytes) -> None:
+        self._publish_pcm(pcm16, self._broadcast_audio_subscribers)
 
     def _publish_pcm(self, pcm16: bytes, subscribers: list[queue.Queue]) -> None:
         with self._audio_lock:
@@ -753,22 +722,22 @@ class Controller:
                     except (queue.Empty, queue.Full):
                         pass
 
-    def subscribe_audio(self, dab: bool = False) -> queue.Queue:
+    def subscribe_audio(self, broadcast: bool = False) -> queue.Queue:
         q: queue.Queue = queue.Queue(maxsize=_AUDIO_QUEUE_SIZE)
         with self._audio_lock:
-            (self._dab_audio_subscribers if dab else self._audio_subscribers).append(q)
+            (self._broadcast_audio_subscribers if broadcast else self._audio_subscribers).append(q)
         return q
 
-    def unsubscribe_audio(self, q: queue.Queue, dab: bool = False) -> None:
+    def unsubscribe_audio(self, q: queue.Queue, broadcast: bool = False) -> None:
         with self._audio_lock:
-            subscribers = self._dab_audio_subscribers if dab else self._audio_subscribers
+            subscribers = self._broadcast_audio_subscribers if broadcast else self._audio_subscribers
             if q in subscribers:
                 subscribers.remove(q)
 
     @property
     def listeners(self) -> int:
         with self._audio_lock:
-            return len(self._audio_subscribers) + len(self._dab_audio_subscribers)
+            return len(self._audio_subscribers) + len(self._broadcast_audio_subscribers)
 
     # -- snapshots --------------------------------------------------------------
     def _merged_live_locked(self) -> dict[str, Any]:
@@ -790,13 +759,15 @@ class Controller:
         }
 
     def live(self, since_log: int = 0) -> dict:
+        session = self.manual_session
         with self._lock:
             return {
                 **self._merged_live_locked(),
                 "running": bool(self._engines),
                 "stopping": any(e._stop_evt.is_set() for k, e in enumerate(self._engines) if k not in self._held),
-                "manual_tuning": self.manual_session is not None,
-                "manual_dab": bool(self.manual_session and self.manual_session.tuning.mode == "DAB"),
+                "manual_tuning": session is not None,
+                "manual_broadcast": bool(session and session.tuning.mode in ("DAB", "WFM")),
+                "manual_dab": bool(session and session.tuning.mode == "DAB"),
                 "solo_band": self._solo_band,
                 "uncovered": self._uncovered(),
                 "schedule_active": schedule.active_indices(self.config),
@@ -922,7 +893,7 @@ class Controller:
     def patch_config(self, patch: dict) -> None:
         old_language = self.config.language
         old_root = self.config.recording.output_dir
-        for locked in ("access_token", "workers", "notify"):     # these have their own endpoints
+        for locked in ("access_token", "workers", "notify", "manual_favourites"):
             patch.pop(locked, None)
         if isinstance(patch.get("addons"), dict):
             for locked in ("paths", "extra_args"):               # a command line: only /api/addons/configure, which checks who asks

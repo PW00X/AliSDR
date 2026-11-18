@@ -1,6 +1,6 @@
 # Headless receiver (server mode)
 
-The receiver runs FalconSDR as a service and serves its web UI on port
+The receiver runs AliSDR as a service and serves its web UI on port
 8765 to every device on the network: open `http://<receiver-ip>:8765/` in any
 browser (PC, phone). There is no password by default; set one in
 Settings → Access if other people share your network.
@@ -16,7 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/insta
 
 It installs this fork's `master` branch and keeps its checkout in
 `/opt/falconsdr-src`. Set `FALCONSDR_REF=<tag or branch>` before `bash` to
-choose a different ref. The optional `--with-dab` flag builds FalconSDR's
+choose a different ref. The optional `--with-dab` flag builds AliSDR's
 in-process DAB/DAB+ decoder on the receiver. Or, from a checkout of
 this repository:
 
@@ -35,13 +35,13 @@ rule and DVB-T driver blacklist, and the systemd unit. Re-run it after
 `git pull` to update; settings and recordings stay. An older install that ran
 as root has its settings moved over automatically the first time.
 
-`falconsdr-receiver.service` starts scanning right away (`--start`) and
-closes open recordings cleanly when stopped - so a mode switcher that stops
-and starts the unit (like `sdr-mode`) keeps working unchanged.
+The web client opens on **Manual**. Scanning begins when you press
+**Start** on **Scan**. Stopping `falconsdr-receiver.service` closes open
+recordings cleanly.
 
 ## Transcription and copies on your PC
 
-A small receiver usually can't run Whisper. Start FalconSDR on your PC,
+A small receiver usually can't run Whisper. Start AliSDR on your PC,
 open Settings → Connect to a server, and enter the receiver's address. The PC
 then appears under Settings → Transcription & computers on the receiver,
 where you switch on transcription (uses its GPU) and/or keeping a copy of

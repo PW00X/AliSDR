@@ -1,9 +1,36 @@
 import { api, errorToast, fmtMHz, h, icon, mount, seg, slider, t } from '../core.js';
 import { liveAudio } from '../live-audio.js';
-import { cfg, on } from '../state.js';
-import { spectrumPainter } from './listen.js';
+import { S, cfg, on, syncConfig } from '../state.js';
+import { receiverPanel, spectrumPainter } from './listen.js';
 
 const analogModes = ['AM', 'NFM', 'WFM', 'SSB', 'USB', 'LSB'];
+
+const FAVOURITE_COOKIE = 'alisdr_favourites';
+
+function readFavourites() {
+  const cookie = document.cookie.split('; ').find((item) => item.startsWith(FAVOURITE_COOKIE + '='));
+  if (!cookie) return null;
+  try {
+    const bytes = Uint8Array.from(atob(cookie.slice(FAVOURITE_COOKIE.length + 1)), (c) => c.charCodeAt(0));
+    const result = JSON.parse(new TextDecoder().decode(bytes));
+    return Array.isArray(result) ? result.filter((entry) => entry && typeof entry.name === 'string' && (
+      entry.mode === 'DAB' && typeof entry.channel === 'string' && Number.isInteger(entry.id)
+      || entry.mode === 'WFM' && Number.isInteger(entry.frequency_hz))) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeFavourites(entries) {
+  const bytes = new TextEncoder().encode(JSON.stringify(entries));
+  if (bytes.length > 2850) throw new Error(t('The favourites cookie is full.'));
+  const value = btoa(String.fromCharCode(...bytes));
+  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${FAVOURITE_COOKIE}=${value}; Path=/; Max-Age=34560000; SameSite=Lax${secure}`;
+  if (!document.cookie.split('; ').includes(`${FAVOURITE_COOKIE}=${value}`)) {
+    throw new Error(t('The browser could not save favourites in a cookie.'));
+  }
+}
 
 export function manualView(root) {
   const receiver = h('select', { required: true });
@@ -18,6 +45,10 @@ export function manualView(root) {
   let gainDb = cfg().device.gain_db;
   let receivers = [];
   const gainField = h('div.col');
+  const receiverField = h('label.field', t('Receiver'), receiver);
+  const deviceCard = h('section.card.col');
+  const devicePanel = receiverPanel(deviceCard, h('div.col', receiverField, gainField),
+    'Stop scanning or tuning to change the device or capture width.');
   const updateGain = () => {
     const device = receivers.find(({ id }) => id === Number(receiver.value));
     const [min, max] = device?.gain_range || [0, 50];
@@ -44,7 +75,9 @@ export function manualView(root) {
   const listen = h('button.big', { type: 'button', hidden: true, onclick: () => liveAudio.toggle().catch(errorToast) });
   const status = h('span.chip.state', { role: 'status' }, t('Loading…'));
   const readout = h('div.freq', '—');
+  const frequencyDisplay = h('div', readout);
   const detail = h('div.freq-name');
+  frequencyDisplay.append(detail);
   const rfLevel = h('span.mono');
   const meterFill = h('div.fill');
   const meter = h('div.col', { hidden: true }, h('div.meter', meterFill),
@@ -53,13 +86,14 @@ export function manualView(root) {
     title: t('Volume'), oninput: (event) => liveAudio.setVolume(+event.target.value) });
   const audio = h('div.row', { hidden: true }, listen, h('div.volume', icon('volume'), volume));
   const stationRows = h('ul.manual-stations');
-  const stationTitle = h('h2');
+  const favouriteRows = h('ul.manual-stations');
   const stationEmpty = h('p.muted', t('No favourites saved.'));
+  const favouritesCard = h('section.card.col', { hidden: true },
+    h('div.card-head', h('h2', t('Favourites'))), favouriteRows, stationEmpty);
   const stations = h('section.card.col', { hidden: true },
-    h('div.card-head', stationTitle), stationRows, stationEmpty);
+    h('div.card-head', h('h2', t('DAB/DAB+ stations'))), stationRows);
   const stationInfo = h('div.col');
-  const info = h('section.card.col', { hidden: true },
-    h('div.card-head', h('h2', t('Station information'))), stationInfo);
+  const info = h('section.col', { hidden: true }, h('h2', t('Station information')), stationInfo);
   const canvas = h('canvas', { height: 260, role: 'img', 'aria-label': t('Live spectrum and waterfall around the tuned frequency.') });
   const axis = h('div.spectrum-axis');
   const spectrumHint = h('span.faint.small', t('Click the spectrum to select a frequency'));
@@ -77,6 +111,7 @@ export function manualView(root) {
   let stationKey = '';
   let infoKey = '';
   let latest;
+  let favourites = [];
   let receiverKey = '';
   let revision = 0;
   let timer;
@@ -93,13 +128,21 @@ export function manualView(root) {
   const formatFM = (hz) => `${fmtMHz(hz, 3)} MHz`;
   const matches = (a, b) => a.mode === b.mode && (a.mode === 'DAB'
     ? a.channel === b.channel && a.id === b.id : a.frequency_hz === b.frequency_hz);
-  const isFavourite = (entry) => (latest.favourites || []).some((fav) => matches(entry, fav));
+  const isFavourite = (entry) => favourites.some((fav) => matches(entry, fav));
   const favouriteButton = (entry) => {
     const saved = isFavourite(entry);
     const label = saved ? t('Remove from favourites') : t('Add to favourites');
     return h('button.manual-star', {
       type: 'button', title: label, 'aria-label': label, 'aria-pressed': String(saved),
-      onclick: () => change('/api/manual/favourite', { ...entry, sid: entry.id, enabled: !saved }),
+      onclick: () => {
+        const entries = (readFavourites() ?? favourites).filter((fav) => !matches(entry, fav));
+        if (!saved) entries.push(entry);
+        try {
+          writeFavourites(entries);
+          favourites = entries;
+          updateStationCards();
+        } catch (e) { errorToast(e); }
+      },
     }, saved ? '★' : '☆');
   };
   const playEntry = async (entry, current) => {
@@ -109,7 +152,7 @@ export function manualView(root) {
       return;
     }
     const dab = entry.mode === 'DAB';
-    liveAudio.useDab(dab);
+    liveAudio.useBroadcast(true);
     const wasPlaying = liveAudio.playing;
     const action = dab && active?.mode === 'DAB' && active.channel === entry.channel
         && latest.stations.some(({ id }) => id === entry.id)
@@ -125,51 +168,60 @@ export function manualView(root) {
   };
   const updateStationCards = () => {
     if (!latest) return;
-    const showingDabFavs = mode.value === 'DAB' && channel.value === 'favourites';
+    const showingDab = mode.value === 'DAB';
     const showingFM = mode.value === 'WFM';
-    const tunedDab = mode.value === 'DAB' && active?.mode === 'DAB' && channel.value === active.channel;
-    const rows = showingDabFavs || showingFM
-      ? (latest.favourites || []).filter((entry) => entry.mode === mode.value)
-      : tunedDab ? latest.stations.map((entry) => ({ ...entry, mode: 'DAB', channel: active.channel })) : [];
-    stations.hidden = !showingDabFavs && !showingFM && rows.length === 0;
-    stationTitle.textContent = showingDabFavs || showingFM ? t('Favourites') : t('DAB/DAB+ stations');
-    stationEmpty.hidden = rows.length > 0;
-    const nextStationKey = JSON.stringify([rows, latest.favourites, active, playingStation, liveAudio.playing]);
+    const tunedDab = showingDab && active?.mode === 'DAB' && channel.value === active.channel;
+    const found = tunedDab ? latest.stations.map((entry) => ({ ...entry, mode: 'DAB', channel: active.channel })) : [];
+    const saved = favourites.filter((entry) => entry.mode === mode.value);
+    favouritesCard.hidden = !showingDab && !showingFM;
+    stations.hidden = !found.length;
+    stationEmpty.hidden = saved.length > 0;
+    const nextStationKey = JSON.stringify([found, saved, active, playingStation, liveAudio.playing]);
     if (nextStationKey !== stationKey) {
       stationKey = nextStationKey;
-      mount(stationRows, ...rows.map((entry) => {
+      const row = (entry) => {
         const dab = entry.mode === 'DAB';
         const current = active?.mode === entry.mode && (dab
           ? active.channel === entry.channel && playingStation === entry.id
           : active.frequency_hz === entry.frequency_hz);
-        const label = entry.name || formatFM(entry.frequency_hz);
-        const sub = dab ? `${entry.channel} · ${entry.codec}` : entry.name && formatFM(entry.frequency_hz);
+        const label = entry.name || (dab ? String(entry.id) : formatFM(entry.frequency_hz));
+        const sub = dab ? [entry.channel, entry.codec].filter(Boolean).join(' · ')
+          : entry.name && formatFM(entry.frequency_hz);
         const playing = current && liveAudio.playing;
         return h('li.manual-station', h('button.manual-station-play', {
           type: 'button', 'aria-label': `${playing ? t('Stop listening') : t('Play station')}: ${label}`,
           onclick: () => playEntry(entry, current),
         }, icon(playing ? 'stop' : 'play'), h('span.col', h('strong', label),
           sub ? h('small.muted', sub) : null)), favouriteButton(entry));
-      }));
+      };
+      mount(favouriteRows, ...saved.map(row));
+      mount(stationRows, ...found.map(row));
     }
     const dab = active?.mode === 'DAB';
     const fm = active?.mode === 'WFM';
     info.hidden = !dab && !fm;
+    frequencyDisplay.hidden = !info.hidden;
     const meta = latest.station_info || {};
     const service = dab && latest.stations.find(({ id }) => id === playingStation);
-    const fmEntry = fm && { mode: 'WFM', frequency_hz: active.frequency_hz };
-    const nextInfoKey = JSON.stringify([meta, service, fmEntry, fm && isFavourite(fmEntry)]);
+    const fmEntry = fm && { mode: 'WFM', frequency_hz: active.frequency_hz, name: meta.name || '' };
+    const nextInfoKey = JSON.stringify([meta, service, active, fm && isFavourite(fmEntry)]);
     if (nextInfoKey !== infoKey) {
       infoKey = nextInfoKey;
-      const title = dab ? service?.name : (meta.name || (fm && formatFM(active.frequency_hz)));
-      mount(stationInfo,
-        title || fm ? h('div.row', h('strong', title), h('span.spacer'), fm && favouriteButton(fmEntry)) : null,
-        meta.ensemble ? h('span.muted', `${t('Ensemble')}: ${meta.ensemble}`) : null,
-        service?.codec ? h('span.muted', service.codec) : null,
-        meta.pi ? h('span.muted', `RDS PI: ${meta.pi}`) : null,
-        meta.text ? h('span', meta.text) : null);
+      const title = dab ? (service?.name || meta.ensemble || 'DAB/DAB+') : (meta.name || (fm && formatFM(active.frequency_hz)));
+      const fallback = h('span.manual-station-art', { 'aria-hidden': 'true' }, icon('listen'));
+      const stationImage = meta.image && /^[a-f0-9]{64}$/.test(meta.image)
+        ? h('img.manual-station-art', { src: `/api/manual/image?v=${meta.image}`,
+          alt: t('Station artwork'), onerror: (event) => event.target.replaceWith(fallback) })
+        : fallback;
+      mount(stationInfo, dab || fm ? h('div.row.manual-station-summary', stationImage,
+        h('div.col', h('strong', title),
+          h('span.muted', dab ? [active.channel, service?.codec].filter(Boolean).join(' · ')
+            : [t('FM broadcast'), formatFM(active.frequency_hz)].join(' · ')),
+          meta.ensemble && meta.ensemble !== title ? h('span.muted', `${t('Ensemble')}: ${meta.ensemble}`) : null,
+          meta.pi ? h('span.muted', `RDS PI: ${meta.pi}`) : null),
+        h('span.spacer'), fm && favouriteButton(fmEntry)) : null,
+      meta.text ? h('span', meta.text) : null);
     }
-    info.hidden ||= !stationInfo.childElementCount;
   };
   const updateMode = () => {
     const dab = mode.value === 'DAB';
@@ -187,6 +239,7 @@ export function manualView(root) {
   };
   const render = (data) => {
     latest = data;
+    favourites = readFavourites() ?? data.favourites ?? [];
     const initial = !ready;
     ready = true;
     active = data.tuning;
@@ -200,15 +253,16 @@ export function manualView(root) {
       mount(receiver, ...data.receivers.map(({ id, driver }) => h('option', { value: id },
         t('Receiver {n}', { n: id + 1 }) + (driver ? ` · ${driver}` : ''))));
       if (data.receivers.some(({ id }) => String(id) === selected)) receiver.value = selected;
+      receiverField.hidden = data.receivers.length < 2;
     }
     if (initial) {
       mount(channel, h('option', { value: 'favourites' }, t('Favourites')),
         ...data.channels.map((value) => h('option', { value }, value)));
-      if (data.channels.length) channel.value = data.channels[0];
+      channel.value = 'favourites';
       if (active) {
         receiver.value = active.receiver;
         mode.value = active.mode;
-        if (active.channel) channel.value = active.channel;
+
         if (active.mode !== 'DAB' && active.frequency_hz) frequency.value = active.frequency_hz / 1e6;
         if (data.gain) {
           gainMode = data.gain.mode;
@@ -218,6 +272,7 @@ export function manualView(root) {
       updateMode();
     }
     if (initial || receiverKey !== previousReceiverKey) updateGain();
+    devicePanel.lockDevice(active || S.live?.running);
     spectrumHint.hidden = active?.mode === 'DAB';
     readout.textContent = active?.mode === 'DAB' ? active.channel
       : active ? `${fmtMHz(active.frequency_hz, 3)} MHz` : '—';
@@ -263,7 +318,9 @@ export function manualView(root) {
     revision++;
     busy = tune.disabled = stop.disabled = true;
     try {
+      if (path === '/api/manual/tune') await syncConfig();
       const data = await api.post(path, body);
+      if (data.tuning) liveAudio.useBroadcast(['DAB', 'WFM'].includes(data.tuning.mode));
       if (destroyed) return;
       busy = false;
       render(data);
@@ -289,14 +346,14 @@ export function manualView(root) {
   stop.addEventListener('click', async () => {
     if (await change('/api/manual/stop', {})) {
       liveAudio.stop();
-      liveAudio.useDab(false);
+      liveAudio.useBroadcast(false);
     }
   });
   mount(root, h('div.page.manual-tuning',
     h('div.page-head', h('h1', t('Manual tuning'))),
     h('div.grid.listen',
     h('div.col',
-    h('section.card.hero', h('div.row', status), h('div', readout, detail), meter,
+    h('section.card.hero', h('div.row', status), frequencyDisplay, info, meter,
       h('form.col', { onsubmit: (event) => {
         event.preventDefault();
         if (!tune.disabled) change('/api/manual/tune', tuneValues());
@@ -305,11 +362,12 @@ export function manualView(root) {
         frequencyField, channelField),
       h('div.controls', tune, stop, audio))),
     spectrumCard),
-    h('div.col',
-      h('section.card.col', h('div.card-head', h('h2', t('SDR device'))), h('label.field', t('Receiver'), receiver), gainField),
-      stations, info))));
+    h('div.col', favouritesCard, stations, deviceCard))));
   updateMode();
+  devicePanel.renderDevice();
   const offAudio = on('audio', updateListen);
+  const offSettings = on('settings', devicePanel.renderDevice);
+  const offLive = on('live', (live) => devicePanel.lockDevice(active || live.running));
   refresh();
-  return { destroy() { destroyed = true; clearTimeout(timer); offAudio(); spectrum.destroy(); } };
+  return { destroy() { destroyed = true; clearTimeout(timer); offAudio(); offSettings(); offLive(); spectrum.destroy(); } };
 }

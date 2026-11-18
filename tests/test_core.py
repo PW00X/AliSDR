@@ -2682,6 +2682,9 @@ class ManualTuningTest(unittest.TestCase):
             def falcon_dab_set_metadata(self, _handle, callback):
                 self.metadata = callback
 
+            def falcon_dab_set_image(self, _handle, callback):
+                self.image = callback
+
             def falcon_dab_select(self, _handle, sid):
                 self.sid = sid
 
@@ -2689,7 +2692,9 @@ class ManualTuningTest(unittest.TestCase):
                 self.metadata(0, b"Test Ensemble")
                 if self.sid:
                     self.metadata(self.sid, b"Now playing")
-                    from ctypes import c_int16
+                    from ctypes import c_int16, c_uint8
+                    png = b"\x89PNG\r\n\x1a\n" + b"artwork"
+                    self.image(self.sid, (c_uint8 * len(png)).from_buffer_copy(png), len(png))
                     self.audio((c_int16 * 960)(*([10000, -3000] * 480)), 960, 48000)
                 return count
 
@@ -2729,27 +2734,56 @@ class ManualTuningTest(unittest.TestCase):
             self.assertEqual(response.headers["X-Audio-Channels"], "2")
             stereo = np.frombuffer(response.read(120), dtype="<i2").reshape(-1, 2)
             np.testing.assert_array_equal(stereo, np.tile([10000, -3000], (30, 1)))
-        self.assertEqual(ctl.manual_status()["station_info"],
-                         {"ensemble": "Test Ensemble", "text": "Now playing"})
+        meta = ctl.manual_status()["station_info"]
+        self.assertEqual(meta["ensemble"], "Test Ensemble")
+        self.assertEqual(meta["text"], "Now playing")
         self.assertIsNotNone(ctl.manual_status()["spectrum"])
-        favourite = {"mode": "DAB", "channel": "12A", "sid": 0xabcd, "enabled": True}
-        with patch.object(AppConfig, "save") as save:
-            with urlopen(Request(url + "/manual/favourite", json.dumps(favourite).encode(), headers),
-                         timeout=5) as response:
-                self.assertEqual(json.load(response)["favourites"], [
-                    {"mode": "DAB", "channel": "12A", "id": 0xabcd, "name": "Radio Plus", "codec": "DAB+"}
-                ])
-            ctl.stop_manual()
-            ctl.change_manual_favourite({**favourite, "enabled": False})
-            self.assertEqual(ctl.manual_status()["favourites"], [])
-            self.assertEqual(save.call_count, 2)
+        artwork = url + "/manual/image?v=" + meta["image"]
+        with self.assertRaises(HTTPError) as exc:
+            urlopen(artwork, timeout=5)
+        self.assertEqual(exc.exception.code, 401)
+        with urlopen(Request(artwork, headers=headers), timeout=5) as response:
+            self.assertEqual(response.headers["Content-Type"], "image/png")
+            self.assertEqual(response.read(), b"\x89PNG\r\n\x1a\nartwork")
+        ctl.stop_manual()
+        with self.assertRaises(HTTPError) as exc:
+            urlopen(Request(artwork, headers=headers), timeout=5)
+        self.assertEqual(exc.exception.code, 404)
 
-    def test_fm_favourite_and_rds_group_decoding(self) -> None:
-        from unittest.mock import patch
-
+    def test_broadcast_fm_stereo_separation_and_mono_fallback(self) -> None:
         import numpy as np
 
-        from falconsdr.controller import Controller
+        from falconsdr.broadcast_fm import AUDIO_RATE, BroadcastFM
+        from falconsdr.dsp import Demodulator
+
+        rate = 250_000
+        t = np.arange(rate) / rate
+        pilot_phase = 2 * np.pi * 19_000 * t + 0.6
+        left = 0.4 * np.sin(2 * np.pi * 1200 * t)
+        right = 0.35 * np.sin(2 * np.pi * 8400 * t)
+        stereo = (left + right) / 2 + (left - right) / 2 * np.sin(2 * pilot_phase)
+        stereo += 0.09 * np.sin(pilot_phase)
+        multiplex = np.r_[stereo, (left + right) / 2]
+        iq = np.exp(2j * np.pi * 75_000 * np.cumsum(multiplex) / rate).astype(np.complex64)
+        demod = Demodulator(rate)
+        fm = BroadcastFM(200_000)
+        audio = np.concatenate([fm.process(demod.fm_composite(block)[0]) for block in np.array_split(iq, 73)])
+        tuned = audio[AUDIO_RATE * 3 // 4:AUDIO_RATE]
+        after_pilot = audio[-AUDIO_RATE // 8:]
+        t = np.arange(tuned.shape[0]) / AUDIO_RATE
+
+        def amplitude(ch, frequency):
+            return abs(np.mean(tuned[:, ch] * np.exp(-2j * np.pi * frequency * t)))
+
+        self.assertGreater(amplitude(0, 1200), 0.14)
+        self.assertGreater(amplitude(1, 8400), 0.035)
+        self.assertLess(amplitude(1, 1200), amplitude(0, 1200) / 12)
+        self.assertLess(amplitude(0, 8400), amplitude(1, 8400) / 12)
+        self.assertLess(float(np.max(np.abs(after_pilot[:, 0] - after_pilot[:, 1]))), 0.005)
+
+    def test_fm_rds_group_decoding(self) -> None:
+        import numpy as np
+
         from falconsdr.rds import RDSDecoder
 
         def encode_block(payload, offset):
@@ -2777,22 +2811,6 @@ class ManualTuningTest(unittest.TestCase):
         for chunk in np.array_split(multiplex, 67):
             decoder.feed(chunk, 200000)
         self.assertEqual(decoder.info, {"pi": "CAFE", "name": "FALCONFM", "text": "Hi"})
-
-        cfg = AppConfig()
-        cfg.device.driver = "simulated"
-        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
-        ctl = Controller(cfg)
-        self.addCleanup(ctl.shutdown)
-        hz = 99_500_000
-        ctl.tune_manual({"mode": "WFM", "frequency_hz": hz})
-        entry = {"mode": "WFM", "frequency_hz": hz, "enabled": True}
-        with patch.object(AppConfig, "save") as save:
-            ctl.change_manual_favourite(entry)
-            self.assertEqual(ctl.manual_status()["favourites"][0]["frequency_hz"], hz)
-            ctl.stop_manual()
-            ctl.change_manual_favourite({**entry, "enabled": False})
-            self.assertEqual(ctl.manual_status()["favourites"], [])
-            self.assertEqual(save.call_count, 2)
 
     def test_empty_dab_channel_times_out_and_releases_receiver(self) -> None:
         from unittest.mock import Mock, patch

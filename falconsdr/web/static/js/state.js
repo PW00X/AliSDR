@@ -32,12 +32,18 @@ function mergeLocal(target, patch) {
 }
 
 let pending = {};
-const flush = debounce(async () => {
+let configWrite = Promise.resolve();
+export function syncConfig() {
+  if (!Object.keys(pending).length) return configWrite;
   const patch = pending;
   pending = {};
-  try { await api.post('/api/config', patch); } catch (e) { errorToast(e); }
-}, 350);
-
+  const write = configWrite.catch(() => {}).then(() => api.post('/api/config', patch));
+  configWrite = write;
+  const settled = () => { if (configWrite === write) configWrite = Promise.resolve(); };
+  write.then(settled, settled);
+  return configWrite;
+}
+const flush = debounce(() => syncConfig().catch(errorToast), 350);
 export function patchConfig(patch) {
   mergeLocal(S.settings.config, patch);
   mergeLocal(pending, JSON.parse(JSON.stringify(patch)));

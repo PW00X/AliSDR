@@ -228,7 +228,7 @@ def make_handler(app: App):
                 return self._json({
                     "authenticated": self._token_ok(), "mode": app.mode,
                     "remote": cfg.remote_receiver.url if app.mode == "client" else "",
-                    "navigation": "scan-manual",
+                    "navigation": "manual-scan" if app.mode == "server" else "scan-manual",
                     "dab_backend": "in-process",
                     "revision": _INSTALLED_REVISION,
                 })
@@ -255,24 +255,24 @@ def make_handler(app: App):
             self._json(ctl.live(int(_qs(query, "since_log", 0) or 0)))
 
         def audio(self, _query: dict) -> None:
-            dab = _qs(_query, "dab", "") == "1"
-            if dab:
-                from ..dab import AUDIO_RATE as DAB_AUDIO_RATE
+            broadcast = _qs(_query, "broadcast", "") == "1" or _qs(_query, "dab", "") == "1"
+            if broadcast:
+                from ..broadcast_fm import AUDIO_RATE as BROADCAST_AUDIO_RATE
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Cache-Control", "no-store")
-            self.send_header("X-Sample-Rate", str(DAB_AUDIO_RATE if dab else ctl.live()["audio_rate"]))
-            self.send_header("X-Audio-Channels", "2" if dab else "1")
+            self.send_header("X-Sample-Rate", str(BROADCAST_AUDIO_RATE if broadcast else ctl.live()["audio_rate"]))
+            self.send_header("X-Audio-Channels", "2" if broadcast else "1")
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
-            q = ctl.subscribe_audio(dab=True) if dab else ctl.subscribe_audio()
+            q = ctl.subscribe_audio(broadcast=True) if broadcast else ctl.subscribe_audio()
             try:
                 while True:
                     try:
                         chunks = [q.get(timeout=_KEEPALIVE_S)]
                     except queue.Empty:
-                        chunks = [bytes(1920) if dab else _KEEPALIVE]
+                        chunks = [bytes(1920) if broadcast else _KEEPALIVE]
                     while True:
                         try:
                             chunks.append(q.get_nowait())
@@ -283,8 +283,8 @@ def make_handler(app: App):
             except OSError:
                 pass
             finally:
-                if dab:
-                    ctl.unsubscribe_audio(q, dab=True)
+                if broadcast:
+                    ctl.unsubscribe_audio(q, broadcast=True)
                 else:
                     ctl.unsubscribe_audio(q)
 
@@ -305,12 +305,18 @@ def make_handler(app: App):
                 ctl.tune_manual(self._body())
             elif path == "/api/manual/dab-station":
                 ctl.select_dab_station(self._body().get("sid"))
-            elif path == "/api/manual/favourite":
-                ctl.change_manual_favourite(self._body())
             elif path == "/api/manual/stop":
                 self._body()
                 ctl.stop_manual()
             self._json(ctl.manual_status())
+
+        def manual_image(self, query: dict) -> None:
+            image = ctl.manual_image(_qs(query, "v", ""))
+            if image is None:
+                self._error(404, i18n.tr("Station artwork is unavailable."))
+                return
+            media_type, data = image
+            self._send(200, data, media_type, {"X-Content-Type-Options": "nosniff"})
 
         def settings(self, _query: dict) -> None:
             data = ctl.settings()
@@ -720,7 +726,7 @@ def make_handler(app: App):
         ("POST", "/api/manual/tune"): Handler.manual,
         ("POST", "/api/manual/stop"): Handler.manual,
         ("POST", "/api/manual/dab-station"): Handler.manual,
-        ("POST", "/api/manual/favourite"): Handler.manual,
+        ("GET", "/api/manual/image"): Handler.manual_image,
         ("POST", "/api/scanner/start"): Handler.scanner,
         ("POST", "/api/scanner/stop"): Handler.scanner,
         ("POST", "/api/scanner/skip"): Handler.scanner,

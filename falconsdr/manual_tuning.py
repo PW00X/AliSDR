@@ -1,6 +1,7 @@
 """Continuous analog listening and native DAB/DAB+ listening."""
 from __future__ import annotations
 
+import hashlib
 import logging
 import threading
 import time
@@ -9,6 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .agc import SoftwareAgc
+from .broadcast_fm import AUDIO_RATE as FM_AUDIO_RATE, BroadcastFM
 from .dab import AUDIO_RATE as DAB_AUDIO_RATE, CHANNELS, SAMPLE_RATE, ChannelInput, Decoder
 from .dsp import Demodulator, StreamResampler, WFM_DISCRIMINATOR_RATE, level_dbfs
 from .i18n import tr
@@ -64,7 +66,8 @@ class ManualSession(threading.Thread):
         self.station = 0
         self.pending_station = 0
         self.station_info = {}
-        self.on_dab_audio = lambda _pcm: None
+        self.station_image = None
+        self.on_broadcast_audio = lambda _pcm: None
         self.dab_error = ""
         self.synced = False
         self.state = "starting"
@@ -120,9 +123,11 @@ class ManualSession(threading.Thread):
                     mode = resolve_ssb_sideband(Modulation(tuning.mode), freq)
                     demod = Demodulator(rate, AUDIO_RATE)
                     self.station_info = {}
+                    fm_audio = None
                     if mode == Modulation.WFM:
                         rds = RDSDecoder()
-                        demod.on_fm_composite = rds.feed
+                        fm_audio = BroadcastFM(min(WFM_DISCRIMINATOR_RATE, int(round(rate))))
+                        fm_mono = StreamResampler(FM_AUDIO_RATE, AUDIO_RATE)
                         self.station_info = rds.info
                     acquisition.read(chunk)  # discard the first block while the tuner settles
                 iq = acquisition.read(chunk)
@@ -135,7 +140,16 @@ class ManualSession(threading.Thread):
                 if self.tuning != current or self.stop_requested.is_set():
                     continue
                 self.state = "listening"
-                self.on_audio(demod.demod(iq, mode, offset))
+                if fm_audio is not None and iq.size:
+                    composite, fm_rate = demod.fm_composite(iq, offset)
+                    if fm_rate > 120_000:
+                        rds.feed(composite, fm_rate)
+                    stereo = fm_audio.process(composite)
+                    if stereo.size:
+                        self.on_broadcast_audio((np.clip(stereo, -1.0, 1.0) * 32767).astype("<i2").tobytes())
+                        self.on_audio(fm_mono.process(stereo.mean(axis=1)).real)
+                else:
+                    self.on_audio(demod.demod(iq, mode, offset))
                 now = time.monotonic()
                 if now >= next_frame:
                     next_frame = now + 0.35
@@ -148,9 +162,11 @@ class ManualSession(threading.Thread):
     def select_station(self, sid):
         if sid not in self.stations or self.stop_requested.is_set():
             raise ValueError(tr("DAB station is unavailable."))
-        self.station = sid
         self.pending_station = 0
-        self.station_info.pop("text", None)
+        if self.station != sid:
+            self.station = sid
+            self.station_info.pop("text", None)
+            self.station_image = None
 
     def _dab_station(self, sid, name, codec):
         label = name.decode("utf-8", errors="replace").strip()
@@ -162,6 +178,16 @@ class ManualSession(threading.Thread):
     def _dab_metadata(self, sid, label):
         if label and (sid == 0 or sid == self.station):
             self.station_info["ensemble" if sid == 0 else "text"] = label.decode("utf-8", errors="replace").strip()
+
+    def _dab_image(self, sid, data):
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            media_type = "image/png"
+        elif data.startswith(b"\xff\xd8\xff"):
+            media_type = "image/jpeg"
+        else:
+            return
+        if sid == self.station:
+            self.station_image = (sid, hashlib.sha256(data).hexdigest(), media_type, data)
 
     def _dab(self):
         dev = self.device
@@ -204,7 +230,8 @@ class ManualSession(threading.Thread):
             stream_stats = getattr(raw, "stream_stats", None)
             lost_before = stream_stats()[0] if stream_stats else 0.0
             dropped_before = acquisition.chunks_dropped
-            decoder = Decoder(self.dab_library, self._dab_station, self._dab_reception, self._dab_metadata)
+            decoder = Decoder(self.dab_library, self._dab_station, self._dab_reception,
+                              self._dab_metadata, self._dab_image)
             self.state = "discovering"
             started = time.monotonic()
             next_meter = started
@@ -258,7 +285,7 @@ class ManualSession(threading.Thread):
                         stereo_out = np.clip(np.column_stack(channels), -32768, 32767).astype("<i2")
                     else:
                         stereo_out = stereo.astype("<i2", copy=False)
-                    self.on_dab_audio(stereo_out.tobytes())
+                    self.on_broadcast_audio(stereo_out.tobytes())
                     mono = stereo.mean(axis=1, dtype=np.float32) / 32768.0
                     self.on_audio(audio_resampler.process(mono).real)
                     last_audio = now

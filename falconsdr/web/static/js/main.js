@@ -107,23 +107,27 @@ async function clientPage() {
 let current = null;
 
 function shell() {
+  const defaultRoute = S.settings.mode === 'server' ? 'manual' : 'listen';
+  const routeOrder = Object.keys(ROUTES);
+  if (defaultRoute === 'manual') routeOrder.splice(0, 2, 'manual', 'listen');
+  const routeKey = () => (location.hash.match(/^#\/(\w+)/) || [])[1] || defaultRoute;
   const nav = h('nav.nav');
   const status = h('div.status');
   const content = h('main');
   mount(app, h('div.shell',
     h('header.topbar',
-      h('a.brand', { href: '#/listen' }, h('img', { src: 'icon.svg', alt: '' }), 'AliSDR', h('small', S.settings.mode === 'server' ? t('server') : '')),
+      h('a.brand', { href: '#/' + defaultRoute }, h('img', { src: 'icon.svg', alt: '' }), 'AliSDR', h('small', S.settings.mode === 'server' ? t('server') : '')),
       nav, status),
     content));
   const markActive = () => {
-    const key = (location.hash.match(/^#\/(\w+)/) || [])[1] || 'listen';
+    const key = routeKey();
     nav.querySelectorAll('a').forEach((a) => {
       a.classList.toggle('active', a.dataset.route === key);
       if (a.dataset.route === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
   };
   const renderNav = () => {
-    nav.replaceChildren(...Object.entries(ROUTES).filter(([, r]) => !r.show || r.show())
+    nav.replaceChildren(...routeOrder.map((key) => [key, ROUTES[key]]).filter(([, r]) => !r.show || r.show())
       .map(([key, r]) => h('a', { href: `#/${key}`, 'data-route': key }, icon(r.icon), h('span', r.label()))));
     markActive();
   };
@@ -147,7 +151,7 @@ function shell() {
       }, icon(liveAudio.playing ? 'headphones' : 'mute')));
   };
   on('live', (live) => {
-    liveAudio.useDab(Boolean(live.manual_dab));
+    liveAudio.useBroadcast(Boolean(live.manual_broadcast ?? live.manual_dab));
     updateStatus();
   });
   // Notifications: a notice in the app whenever a rule fires (the first poll only sets the starting point).
@@ -164,8 +168,8 @@ function shell() {
   updateStatus();
 
   const route = () => {
-    const key = (location.hash.match(/^#\/(\w+)/) || [])[1] || 'listen';
-    const r = ROUTES[key] || ROUTES.listen;
+    const key = routeKey();
+    const r = ROUTES[key] || ROUTES[defaultRoute];
     markActive();
     if (current && current.destroy) current.destroy();
     content.scrollTop = 0;

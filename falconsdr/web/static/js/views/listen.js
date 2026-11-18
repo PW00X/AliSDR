@@ -31,6 +31,177 @@ export function driverHelp() {
     h('p.small', t('The driver is tied to the USB port - plugging the dongle into a different port may need the same steps again.'))));
 }
 
+export function receiverPanel(device, extraControls = null, lockText = 'Stop the scanner to change the device or capture width.') {
+  // ---------------------------------------------------------- device
+  // A receiver that is plugged in (USB ids, Linux) but that nothing here can drive: say why instead of an empty list.
+  function missingReceiverNotice(devices) {
+    const caps = S.settings.capabilities;
+    const listed = new Set(devices.filter((d) => !d.missing).map((d) => d.family));
+    const missing = (caps.usb_seen || []).filter((f) => !listed.has(f));
+    if (!missing.length) return null;
+    const name = missing.map((f) => FAMILY_NAMES[f] || f).join(', ');
+    return h('span.small', { style: { color: '#ff9f0a' } }, caps.soapy
+      ? t('{name} is plugged in but not listed. Install its SoapySDR module (e.g. soapysdr-module-hackrf), allow USB access (udev rules or the plugdev group), then reload this page.', { name })
+      : t('{name} is plugged in, but SoapySDR is not available to AliSDR (the Python module python3-soapysdr is not visible to it). Install python3-soapysdr and soapysdr-module-<your receiver>, then reinstall with install.sh --from-source, or install libhackrf0 / libairspy0 for the experimental native access.', { name }));
+  }
+
+  let deviceInputs = [];
+  function renderDevice() {
+    const c = cfg();
+    const devices = S.settings.devices;
+    const current = devices.findIndex((d) => d.driver === c.device.driver && d.args === c.device.device_args);
+    const here = devices[current >= 0 ? current : 0];
+    // One entry per physical receiver, and - when there is more than one way to open it - a second choice.
+    const groups = groupDevices(devices);
+    const myGroup = groups.find((g) => g.group === groupOf(here));
+    const patchDevice = (d) => {
+      // Another dongle may sit on another antenna - its Bias-T starts off again.
+      const patch = { driver: d.driver, device_args: d.args, bias_tee: false };
+      if (d.default_rate_hz && ![2.5e6, 3e6, 6e6, 10e6].includes(c.device.sample_rate_hz)) patch.sample_rate_hz = d.default_rate_hz;
+      patchConfig({ device: patch });
+      renderDevice();
+    };
+    const sel = select(groups.map((g, i) => [i, stripMethod(g.entries[0].label)]), groups.indexOf(myGroup), (v) => {
+      if (takenByExtra(groups[+v], c.device.extra_devices || [])) { toast(t('An extra dongle already uses this receiver.'), 'bad'); renderDevice(); return; }
+      patchDevice(groups[+v].entries[0]);
+    });
+    const methods = myGroup.entries.length > 1
+      ? select(myGroup.entries.map((d, i) => [i, methodLabel(d.method)]), myGroup.entries.indexOf(here), (v) => patchDevice(myGroup.entries[+v]))
+      : null;
+    const bias = biasTeeToggle(c.device.bias_tee, (v) => { patchConfig({ device: { bias_tee: v } }); renderDevice(); });
+    // An RTL-SDR on another computer (rtl_tcp): nothing to detect, so its address is typed here. "host" or "host:port";
+    // kept in device_args as host=...,port=... - and in the list entry, or the next render would not find the device.
+    const netEntry = devices.find((d) => d.driver === 'rtl_tcp');
+    const netArgsOf = (args) => Object.fromEntries((args || '').split(',').filter((kv) => kv.includes('=')).map((kv) => kv.split(/=(.*)/s).slice(0, 2)));
+    const showAddr = (args) => {
+      const a = netArgsOf(args);
+      return a.host ? `${a.host.includes(':') ? `[${a.host}]` : a.host}${a.port && a.port !== '1234' ? ':' + a.port : ''}` : '';
+    };
+    // host, host:port, [ipv6]:port or a bare IPv6 address (more than one colon: all of it is the host) -> "host=...,port=..."
+    const parseAddr = (text) => {
+      const raw = text.trim().replace(/^tcp:\/\//, '');
+      const m = raw.match(/^\[(.+)\](?::(\d+))?$/) || (raw.split(':').length > 2 ? [raw, raw] : raw.match(/^(.*?)(?::(\d+))?$/));
+      return m && m[1] ? `host=${m[1]},port=${m[2] || 1234}` : '';
+    };
+    const addrInput = (args, onset) => h('input', { type: 'text', placeholder: '192.168.1.20:1234', spellcheck: false, autocapitalize: 'off', value: showAddr(args),
+      onchange: (e) => onset(parseAddr(e.target.value)) });
+    const addr = c.device.driver === 'rtl_tcp' ? addrInput(c.device.device_args, (args) => { if (netEntry) netEntry.args = args; patchConfig({ device: { device_args: args } }); }) : null;
+    const bw = h('input', { type: 'number', min: 0.25, max: 61.44, step: 0.01, value: (c.device.sample_rate_hz / 1e6).toFixed(2), onchange: (e) => patchConfig({ device: { sample_rate_hz: +e.target.value * 1e6 } }) });
+    // Experimental: more dongles scanning together - each takes its share of the capture windows.
+    const extra = c.device.extra_devices || [];
+    // An extra dongle must be a specific one - and never a simulation next to real hardware (fake
+    // transmissions in the library, part of the band no longer really listened to).
+    const sim = c.device.driver === 'simulated';
+    const usable = usableFor(sim);
+    const extraGroups = groups.filter((g) => g.entries.some(usable));
+    const setExtra = (list) => { patchConfig({ device: { extra_devices: list } }); renderDevice(); };
+    const extraInputs = [];
+    const extraRows = extra.map((x, i) => {
+      const mine = groupOfExtra(extraGroups, x);
+      const taken = heldGroups(extraGroups, myGroup.group, extra, i);
+      const options = extraGroups.filter((g) => g === mine || !taken.has(g.group));
+      const setMine = (patch) => setExtra(extra.map((e, j) => (j === i ? { ...e, ...patch } : e)));
+      const pickGroup = (g) => {
+        const d = g.entries.find(usable);
+        setMine({ driver: d.driver, device_args: d.driver === NETWORK ? '' : d.args, bias_tee: false });
+      };
+      const s = select([...(mine ? [] : [[-1, t('(not connected)')]]), ...options.map((g) => [extraGroups.indexOf(g), stripMethod(g.entries[0].label)])],
+        mine ? extraGroups.indexOf(mine) : -1, (v) => pickGroup(extraGroups[+v]));
+      const entries = mine ? mine.entries.filter(usable) : [];
+      const xMethod = entries.length > 1
+        ? select(entries.map((d, k) => [k, methodLabel(d.method)]), Math.max(0, entries.findIndex((d) => d.driver === x.driver)), (v) => setMine({ driver: entries[+v].driver, device_args: entries[+v].args }))
+        : null;
+      const xAddr = x.driver === 'rtl_tcp' ? addrInput(x.device_args, (args) => setMine({ device_args: args })) : null;
+      const del = h('button.icon.ghost', { title: t('Remove'), onclick: () => setExtra(extra.filter((_, j) => j !== i)) }, icon('x'));
+      const xBias = biasTeeToggle(!!x.bias_tee, (v) => setMine({ bias_tee: v }));
+      extraInputs.push(s, ...(xMethod ? [xMethod] : []), ...(xAddr ? [xAddr] : []), del, xBias.querySelector('input'));
+      const xRange = rangeFields(x.range_start_hz || 0, x.range_stop_hz || 0, (p) => setMine(p));
+      // Receivers differ: a HackRF can capture 10 MHz where an RTL-SDR takes 2.4. Empty = the same as the first one.
+      const xWidth = h('input', {
+        type: 'number', min: 0.25, max: 61.44, step: 0.01, placeholder: t('same as the first'), value: x.sample_rate_hz ? (x.sample_rate_hz / 1e6).toFixed(2) : '',
+        onchange: (e) => setMine({ sample_rate_hz: e.target.value ? Math.round(+e.target.value * 1e6) : 0 }),
+      });
+      extraInputs.push(xWidth);
+      const twice = isTwice(c.device, extra, i);
+      return h('div.col', { style: { gap: '6px' } }, h('label.field', t('Dongle {n}', { n: i + 2 }), h('div.row', s, del)),
+        xMethod ? h('label.field', t('Access method'), xMethod) : null,
+        xAddr ? h('label.field', t('rtl_tcp address'), xAddr) : null,
+        twice ? h('span.small', { style: { color: '#ff9f0a' } }, t('This receiver is already used above - it can only be opened once.')) : null,
+        h('label.field', t('Capture width (MHz)'), xWidth), xBias, xRange);
+    });
+    const add = h('button.ghost.small', {
+      onclick: () => {
+        const g = nextGroup(extraGroups, myGroup.group, c.device, extra);
+        if (!g) { toast(t('No other SDR device found - plug it in, then reload this page.'), 'bad'); return; }
+        const d = g.entries.find(usable);
+        setExtra([...extra, { driver: d.driver, device_args: d.driver === NETWORK ? '' : d.args }]);
+      },
+    }, icon('plus'), t('Scan with another dongle (experimental)'));
+    deviceInputs = [sel, ...(methods ? [methods] : []), ...(addr ? [addr] : []), bw, bias.querySelector('input'), add, ...extraInputs];
+    mount(device,
+      h('div.card-head', h('h2', t('SDR device'))),
+      h('div.fields',
+        h('label.field', t('Device'), sel),
+        methods ? h('label.field', t('Access method'), methods) : null,
+        addr ? h('label.field', t('rtl_tcp address'), addr) : null,
+        h('label.field', t('Capture width (MHz)'), bw)),
+      addr ? h('span.faint.small', t('The RTL-SDR on another computer, through its rtl_tcp server (host or host:port, default port 1234). It serves one program at a time, the stream is not encrypted - use it on a trusted network. Retuning takes longer than with a local dongle, so scanning many windows is slower.')) : null,
+      methods ? h('span.faint.small', t('How AliSDR talks to this receiver. The first choice is the default; the other one is the fallback when it will not open, and a way to compare.')) : null,
+      missingReceiverNotice(devices),
+      bias,
+      rangeFields(c.device.range_start_hz || 0, c.device.range_stop_hz || 0, (p) => { patchConfig({ device: p }); renderDevice(); }),
+      ...extraRows,
+      extra.length ? h('span.faint.small', t('The scan plan is split between all dongles - each scans its own share of the windows, so a full cycle is that much shorter. You hear one dongle at a time; the others keep recording.')) : null,
+      extra.some((x) => x.sample_rate_hz && x.sample_rate_hz !== c.device.sample_rate_hz)
+        ? h('span.faint.small', t('Receivers with different capture widths split the scan in proportion to their width, and a wide one joins neighbouring windows into one. The processor must keep up: a 30 ms block of a 10 MHz capture takes about 20 ms to analyse.')) : null,
+      add,
+      extraControls,
+      h('span.faint.small.lockhint', t(lockText)),
+      // Picked by USB order (no serial of its own) - that order can change when dongles are replugged.
+      devices.some((d) => /(^|,)index=/.test(d.args)) ? h('span.faint.small', t('Some dongles share a serial number (often 00000001) and are told apart only by USB order, which can change after replugging. To keep your choice for good, give each one its own serial with rtl_eeprom -s.')) : null,
+      isWindows() ? h('button.ghost.small', { onclick: () => driverHelp() }, t('Dongle not detected? Driver (Zadig) instructions')) : null);
+    lockDevice(S.live && (S.live.running || S.live.manual_tuning));
+  }
+  // Antenna range: optional and per dongle; 0 in the config = no limit on that side. Applies live
+  // (the scan plan is rebuilt), so unlike the device itself it stays editable while scanning.
+  function rangeFields(startHz, stopHz, set) {
+    const mhz = (hz) => (hz ? String(+(hz / 1e6).toFixed(6)) : '');
+    const field = (hz, label, key) => h('input', {
+      type: 'number', min: 0, step: 0.001, placeholder: t('no limit'), 'aria-label': `${t('Antenna range (MHz)')}: ${label}`, value: mhz(hz),
+      onchange: (e) => set({ [key]: Math.max(0, Math.round((+e.target.value || 0) * 1e6)) }),
+    });
+    return h('div.col', { style: { gap: '4px' } },
+      h('label.field', t('Antenna range (MHz)'), h('div.row', field(startHz, t('From'), 'range_start_hz'), h('span.faint', '–'), field(stopHz, t('To'), 'range_stop_hz'))),
+      h('span.faint.small', t('Optional. This dongle scans only inside this range - for one on an antenna made for a single band, e.g. 144 to 146 for 2 m. Empty = no limit.')));
+  }
+
+  // Off by default: DC on the antenna cable can damage what's on it.
+  function biasTeeToggle(on, set) {
+    return toggle(t('Bias-T (antenna power)'), on, async (v, e) => {
+      if (v && !(await confirmBiasTee())) { e.target.checked = false; return; }
+      set(v);
+    }, { hint: on ? t('On while scanning - powers an LNA or active antenna') : null });
+  }
+
+  async function confirmBiasTee() {
+    return (await modal(t('Turn on Bias-T?'), h('div.col', { style: { gap: '10px' } },
+      h('p', t('Bias-T sends about 4.5 V DC up the antenna cable to power an LNA or an active antenna.')),
+      h('p', t('Turn it on only when such a device is connected and your dongle supports it (e.g. RTL-SDR Blog V3/V4). A DC-shorted antenna, a splitter or other equipment on the cable can be damaged - and so can the dongle.')),
+      h('p.small.muted', t('AliSDR switches it off whenever scanning stops.'))),
+    // The safe choice is the prominent one, and last - the button a dialog focuses (Enter):
+    // people click the highlighted button, and here that must not be the risky one.
+    [[t('Turn on'), true, 'ghost'], [t('Cancel'), false, 'primary']])) === true;
+  }
+
+  function lockDevice(running) {
+    deviceInputs.forEach((el) => { el.disabled = !!running; });
+    const hint = device.querySelector('.lockhint');
+    if (hint) hint.classList.toggle('hidden', !running);
+  }
+
+  return { renderDevice, lockDevice };
+}
+
 export function stateLabel(state) {
   return {
     IDLE: t('Stopped'), CALCULATE_NEXT_FREQ: t('Scanning'), TUNING: t('Scanning'), SCANNING: t('Scanning'),
@@ -344,172 +515,7 @@ export function listenView(root) {
       duration, interval);
   }
 
-  // ---------------------------------------------------------- device
-  // A receiver that is plugged in (USB ids, Linux) but that nothing here can drive: say why instead of an empty list.
-  function missingReceiverNotice(devices) {
-    const caps = S.settings.capabilities;
-    const listed = new Set(devices.filter((d) => !d.missing).map((d) => d.family));
-    const missing = (caps.usb_seen || []).filter((f) => !listed.has(f));
-    if (!missing.length) return null;
-    const name = missing.map((f) => FAMILY_NAMES[f] || f).join(', ');
-    return h('span.small', { style: { color: '#ff9f0a' } }, caps.soapy
-      ? t('{name} is plugged in but not listed. Install its SoapySDR module (e.g. soapysdr-module-hackrf), allow USB access (udev rules or the plugdev group), then reload this page.', { name })
-      : t('{name} is plugged in, but SoapySDR is not available to AliSDR (the Python module python3-soapysdr is not visible to it). Install python3-soapysdr and soapysdr-module-<your receiver>, then reinstall with install.sh --from-source, or install libhackrf0 / libairspy0 for the experimental native access.', { name }));
-  }
-
-  let deviceInputs = [];
-  function renderDevice() {
-    const c = cfg();
-    const devices = S.settings.devices;
-    const current = devices.findIndex((d) => d.driver === c.device.driver && d.args === c.device.device_args);
-    const here = devices[current >= 0 ? current : 0];
-    // One entry per physical receiver, and - when there is more than one way to open it - a second choice.
-    const groups = groupDevices(devices);
-    const myGroup = groups.find((g) => g.group === groupOf(here));
-    const patchDevice = (d) => {
-      // Another dongle may sit on another antenna - its Bias-T starts off again.
-      const patch = { driver: d.driver, device_args: d.args, bias_tee: false };
-      if (d.default_rate_hz && ![2.5e6, 3e6, 6e6, 10e6].includes(c.device.sample_rate_hz)) patch.sample_rate_hz = d.default_rate_hz;
-      patchConfig({ device: patch });
-      renderDevice();
-    };
-    const sel = select(groups.map((g, i) => [i, stripMethod(g.entries[0].label)]), groups.indexOf(myGroup), (v) => {
-      if (takenByExtra(groups[+v], c.device.extra_devices || [])) { toast(t('An extra dongle already uses this receiver.'), 'bad'); renderDevice(); return; }
-      patchDevice(groups[+v].entries[0]);
-    });
-    const methods = myGroup.entries.length > 1
-      ? select(myGroup.entries.map((d, i) => [i, methodLabel(d.method)]), myGroup.entries.indexOf(here), (v) => patchDevice(myGroup.entries[+v]))
-      : null;
-    const bias = biasTeeToggle(c.device.bias_tee, (v) => { patchConfig({ device: { bias_tee: v } }); renderDevice(); });
-    // An RTL-SDR on another computer (rtl_tcp): nothing to detect, so its address is typed here. "host" or "host:port";
-    // kept in device_args as host=...,port=... - and in the list entry, or the next render would not find the device.
-    const netEntry = devices.find((d) => d.driver === 'rtl_tcp');
-    const netArgsOf = (args) => Object.fromEntries((args || '').split(',').filter((kv) => kv.includes('=')).map((kv) => kv.split(/=(.*)/s).slice(0, 2)));
-    const showAddr = (args) => {
-      const a = netArgsOf(args);
-      return a.host ? `${a.host.includes(':') ? `[${a.host}]` : a.host}${a.port && a.port !== '1234' ? ':' + a.port : ''}` : '';
-    };
-    // host, host:port, [ipv6]:port or a bare IPv6 address (more than one colon: all of it is the host) -> "host=...,port=..."
-    const parseAddr = (text) => {
-      const raw = text.trim().replace(/^tcp:\/\//, '');
-      const m = raw.match(/^\[(.+)\](?::(\d+))?$/) || (raw.split(':').length > 2 ? [raw, raw] : raw.match(/^(.*?)(?::(\d+))?$/));
-      return m && m[1] ? `host=${m[1]},port=${m[2] || 1234}` : '';
-    };
-    const addrInput = (args, onset) => h('input', { type: 'text', placeholder: '192.168.1.20:1234', spellcheck: false, autocapitalize: 'off', value: showAddr(args),
-      onchange: (e) => onset(parseAddr(e.target.value)) });
-    const addr = c.device.driver === 'rtl_tcp' ? addrInput(c.device.device_args, (args) => { if (netEntry) netEntry.args = args; patchConfig({ device: { device_args: args } }); }) : null;
-    const bw = h('input', { type: 'number', min: 0.25, max: 61.44, step: 0.01, value: (c.device.sample_rate_hz / 1e6).toFixed(2), onchange: (e) => patchConfig({ device: { sample_rate_hz: +e.target.value * 1e6 } }) });
-    // Experimental: more dongles scanning together - each takes its share of the capture windows.
-    const extra = c.device.extra_devices || [];
-    // An extra dongle must be a specific one - and never a simulation next to real hardware (fake
-    // transmissions in the library, part of the band no longer really listened to).
-    const sim = c.device.driver === 'simulated';
-    const usable = usableFor(sim);
-    const extraGroups = groups.filter((g) => g.entries.some(usable));
-    const setExtra = (list) => { patchConfig({ device: { extra_devices: list } }); renderDevice(); };
-    const extraInputs = [];
-    const extraRows = extra.map((x, i) => {
-      const mine = groupOfExtra(extraGroups, x);
-      const taken = heldGroups(extraGroups, myGroup.group, extra, i);
-      const options = extraGroups.filter((g) => g === mine || !taken.has(g.group));
-      const setMine = (patch) => setExtra(extra.map((e, j) => (j === i ? { ...e, ...patch } : e)));
-      const pickGroup = (g) => {
-        const d = g.entries.find(usable);
-        setMine({ driver: d.driver, device_args: d.driver === NETWORK ? '' : d.args, bias_tee: false });
-      };
-      const s = select([...(mine ? [] : [[-1, t('(not connected)')]]), ...options.map((g) => [extraGroups.indexOf(g), stripMethod(g.entries[0].label)])],
-        mine ? extraGroups.indexOf(mine) : -1, (v) => pickGroup(extraGroups[+v]));
-      const entries = mine ? mine.entries.filter(usable) : [];
-      const xMethod = entries.length > 1
-        ? select(entries.map((d, k) => [k, methodLabel(d.method)]), Math.max(0, entries.findIndex((d) => d.driver === x.driver)), (v) => setMine({ driver: entries[+v].driver, device_args: entries[+v].args }))
-        : null;
-      const xAddr = x.driver === 'rtl_tcp' ? addrInput(x.device_args, (args) => setMine({ device_args: args })) : null;
-      const del = h('button.icon.ghost', { title: t('Remove'), onclick: () => setExtra(extra.filter((_, j) => j !== i)) }, icon('x'));
-      const xBias = biasTeeToggle(!!x.bias_tee, (v) => setMine({ bias_tee: v }));
-      extraInputs.push(s, ...(xMethod ? [xMethod] : []), ...(xAddr ? [xAddr] : []), del, xBias.querySelector('input'));
-      const xRange = rangeFields(x.range_start_hz || 0, x.range_stop_hz || 0, (p) => setMine(p));
-      // Receivers differ: a HackRF can capture 10 MHz where an RTL-SDR takes 2.4. Empty = the same as the first one.
-      const xWidth = h('input', {
-        type: 'number', min: 0.25, max: 61.44, step: 0.01, placeholder: t('same as the first'), value: x.sample_rate_hz ? (x.sample_rate_hz / 1e6).toFixed(2) : '',
-        onchange: (e) => setMine({ sample_rate_hz: e.target.value ? Math.round(+e.target.value * 1e6) : 0 }),
-      });
-      extraInputs.push(xWidth);
-      const twice = isTwice(c.device, extra, i);
-      return h('div.col', { style: { gap: '6px' } }, h('label.field', t('Dongle {n}', { n: i + 2 }), h('div.row', s, del)),
-        xMethod ? h('label.field', t('Access method'), xMethod) : null,
-        xAddr ? h('label.field', t('rtl_tcp address'), xAddr) : null,
-        twice ? h('span.small', { style: { color: '#ff9f0a' } }, t('This receiver is already used above - it can only be opened once.')) : null,
-        h('label.field', t('Capture width (MHz)'), xWidth), xBias, xRange);
-    });
-    const add = h('button.ghost.small', {
-      onclick: () => {
-        const g = nextGroup(extraGroups, myGroup.group, c.device, extra);
-        if (!g) { toast(t('No other SDR device found - plug it in, then reload this page.'), 'bad'); return; }
-        const d = g.entries.find(usable);
-        setExtra([...extra, { driver: d.driver, device_args: d.driver === NETWORK ? '' : d.args }]);
-      },
-    }, icon('plus'), t('Scan with another dongle (experimental)'));
-    deviceInputs = [sel, ...(methods ? [methods] : []), ...(addr ? [addr] : []), bw, bias.querySelector('input'), add, ...extraInputs];
-    mount(device,
-      h('div.card-head', h('h2', t('SDR device'))),
-      h('div.fields',
-        h('label.field', t('Device'), sel),
-        methods ? h('label.field', t('Access method'), methods) : null,
-        addr ? h('label.field', t('rtl_tcp address'), addr) : null,
-        h('label.field', t('Capture width (MHz)'), bw)),
-      addr ? h('span.faint.small', t('The RTL-SDR on another computer, through its rtl_tcp server (host or host:port, default port 1234). It serves one program at a time, the stream is not encrypted - use it on a trusted network. Retuning takes longer than with a local dongle, so scanning many windows is slower.')) : null,
-      methods ? h('span.faint.small', t('How AliSDR talks to this receiver. The first choice is the default; the other one is the fallback when it will not open, and a way to compare.')) : null,
-      missingReceiverNotice(devices),
-      bias,
-      rangeFields(c.device.range_start_hz || 0, c.device.range_stop_hz || 0, (p) => { patchConfig({ device: p }); renderDevice(); }),
-      ...extraRows,
-      extra.length ? h('span.faint.small', t('The scan plan is split between all dongles - each scans its own share of the windows, so a full cycle is that much shorter. You hear one dongle at a time; the others keep recording.')) : null,
-      extra.some((x) => x.sample_rate_hz && x.sample_rate_hz !== c.device.sample_rate_hz)
-        ? h('span.faint.small', t('Receivers with different capture widths split the scan in proportion to their width, and a wide one joins neighbouring windows into one. The processor must keep up: a 30 ms block of a 10 MHz capture takes about 20 ms to analyse.')) : null,
-      add,
-      h('span.faint.small.lockhint', t('Stop the scanner to change the device or capture width.')),
-      // Picked by USB order (no serial of its own) - that order can change when dongles are replugged.
-      devices.some((d) => /(^|,)index=/.test(d.args)) ? h('span.faint.small', t('Some dongles share a serial number (often 00000001) and are told apart only by USB order, which can change after replugging. To keep your choice for good, give each one its own serial with rtl_eeprom -s.')) : null,
-      isWindows() ? h('button.ghost.small', { onclick: () => driverHelp() }, t('Dongle not detected? Driver (Zadig) instructions')) : null);
-    lockDevice(S.live && (S.live.running || S.live.manual_tuning));
-  }
-  // Antenna range: optional and per dongle; 0 in the config = no limit on that side. Applies live
-  // (the scan plan is rebuilt), so unlike the device itself it stays editable while scanning.
-  function rangeFields(startHz, stopHz, set) {
-    const mhz = (hz) => (hz ? String(+(hz / 1e6).toFixed(6)) : '');
-    const field = (hz, label, key) => h('input', {
-      type: 'number', min: 0, step: 0.001, placeholder: t('no limit'), 'aria-label': `${t('Antenna range (MHz)')}: ${label}`, value: mhz(hz),
-      onchange: (e) => set({ [key]: Math.max(0, Math.round((+e.target.value || 0) * 1e6)) }),
-    });
-    return h('div.col', { style: { gap: '4px' } },
-      h('label.field', t('Antenna range (MHz)'), h('div.row', field(startHz, t('From'), 'range_start_hz'), h('span.faint', '–'), field(stopHz, t('To'), 'range_stop_hz'))),
-      h('span.faint.small', t('Optional. This dongle scans only inside this range - for one on an antenna made for a single band, e.g. 144 to 146 for 2 m. Empty = no limit.')));
-  }
-
-  // Off by default: DC on the antenna cable can damage what's on it.
-  function biasTeeToggle(on, set) {
-    return toggle(t('Bias-T (antenna power)'), on, async (v, e) => {
-      if (v && !(await confirmBiasTee())) { e.target.checked = false; return; }
-      set(v);
-    }, { hint: on ? t('On while scanning - powers an LNA or active antenna') : null });
-  }
-
-  async function confirmBiasTee() {
-    return (await modal(t('Turn on Bias-T?'), h('div.col', { style: { gap: '10px' } },
-      h('p', t('Bias-T sends about 4.5 V DC up the antenna cable to power an LNA or an active antenna.')),
-      h('p', t('Turn it on only when such a device is connected and your dongle supports it (e.g. RTL-SDR Blog V3/V4). A DC-shorted antenna, a splitter or other equipment on the cable can be damaged - and so can the dongle.')),
-      h('p.small.muted', t('AliSDR switches it off whenever scanning stops.'))),
-    // The safe choice is the prominent one, and last - the button a dialog focuses (Enter):
-    // people click the highlighted button, and here that must not be the risky one.
-    [[t('Turn on'), true, 'ghost'], [t('Cancel'), false, 'primary']])) === true;
-  }
-
-  function lockDevice(running) {
-    deviceInputs.forEach((el) => { el.disabled = !!running; });
-    const hint = device.querySelector('.lockhint');
-    if (hint) hint.classList.toggle('hidden', !running);
-  }
-
+  const { renderDevice, lockDevice } = receiverPanel(device);
   // ---------------------------------------------------------- bands
   function bandsSection() {
     const c = cfg();

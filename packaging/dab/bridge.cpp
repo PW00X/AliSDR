@@ -8,6 +8,7 @@ using Station = void (*)(uint32_t, const char *, int);
 using Audio = void (*)(const int16_t *, int, int);
 using Reception = void (*)(bool, int16_t, int32_t);
 using Metadata = void (*)(uint32_t, const char *);
+using Image = void (*)(uint32_t, const uint8_t *, int);
 
 struct Receiver final : deviceHandler {
     RingBuffer<std::complex<float>> iq{1 << 20};
@@ -18,6 +19,7 @@ struct Receiver final : deviceHandler {
     std::atomic<uint32_t> requested{0};
     std::atomic<uint32_t> selected{0};
     std::atomic<Metadata> metadata{nullptr};
+    std::atomic<Image> image{nullptr};
     std::string ensemble;
     Station station;
     Audio audio;
@@ -44,6 +46,13 @@ struct Receiver final : deviceHandler {
             const auto sid = self.selected.load();
             if (auto callback = self.metadata.load())
                 if (sid && sid == self.requested.load()) callback(sid, label);
+        };
+        api.motdata_Handler = [](uint8_t *data, int size, const char *, int, void *context) {
+            auto &self = *static_cast<Receiver *>(context);
+            const auto sid = self.selected.load();
+            auto callback = self.image.load();
+            if (callback && sid && sid == self.requested.load())
+                callback(sid, data, size);
         };
         api.audioOut_Handler = [](int16_t *samples, int count, int rate, bool, void *context) {
             auto &self = *static_cast<Receiver *>(context);
@@ -109,5 +118,9 @@ DAB_API void falcon_dab_select(void *handle, uint32_t sid) {
 
 DAB_API void falcon_dab_set_metadata(void *handle, Metadata callback) {
     static_cast<Receiver *>(handle)->metadata.store(callback);
+}
+
+DAB_API void falcon_dab_set_image(void *handle, Image callback) {
+    static_cast<Receiver *>(handle)->image.store(callback);
 }
 }

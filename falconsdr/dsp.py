@@ -142,7 +142,6 @@ class Demodulator:
     def __init__(self, sample_rate: float, audio_rate: int = 12500):
         self.sample_rate = sample_rate
         self.audio_rate = audio_rate
-        self.on_fm_composite = None
         self._dc_zi = np.zeros(1)  # lfilter state for the AM DC-blocker, see demod()
         self._prev_phase = 0.0
         self._mix_index = 0
@@ -236,19 +235,21 @@ class Demodulator:
         alpha = dt / (WFM_DEEMPHASIS_TAU_S + dt)
         return lfilter([alpha], [1.0, -(1.0 - alpha)], audio, zi=zi)
 
-    def _demod_wfm(self, iq: np.ndarray) -> np.ndarray:
-        # Discriminate at a wide rate (full +/-75 kHz swing), de-emphasize,
-        # then narrow the audio down to audio_rate.
+    def fm_composite(self, iq: np.ndarray, offset_hz: float = 0.0) -> tuple[np.ndarray, int]:
+        """FM multiplex at a rate wide enough for stereo and RDS."""
         intermediate_rate = min(WFM_DISCRIMINATOR_RATE, int(round(self.sample_rate)))
+        if offset_hz:
+            iq = self._mix(iq, offset_hz)
         baseband = self._stream_decimate(iq, intermediate_rate)
         phase = np.angle(baseband)
         phase = np.unwrap(np.concatenate(([self._prev_phase], phase)))
         self._prev_phase = phase[-1]
         composite = np.clip(np.diff(phase), -3.0, 3.0)
 
-        if self.on_fm_composite is not None and intermediate_rate > 120000:
-            self.on_fm_composite(composite, intermediate_rate)
+        return composite, intermediate_rate
 
+    def _demod_wfm(self, iq: np.ndarray) -> np.ndarray:
+        composite, intermediate_rate = self.fm_composite(iq)
         audio, self._deemph_zi = self._deemphasize(composite, intermediate_rate, self._deemph_zi)
         if intermediate_rate != self.audio_rate:
             if self._audio_resampler is None:

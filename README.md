@@ -376,7 +376,8 @@ curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/insta
 It installs this fork's `master` branch as a service that starts on boot and ends
 with the address to open from any device on your network
 (`http://<receiver-ip>:8765`). Run the same line again to update - settings
-and recordings are kept. Details, other versions and helper computers for
+and recordings are kept. The web client opens on **Manual**. Use **Start**
+on **Scan** to begin scanning. Details, other versions and helper computers for
 transcription: [packaging/remote-server/README.md](packaging/remote-server/README.md).
 It also installs `libhackrf0` and `libairspy0` (small), so a HackRF or Airspy
 works through the built-in access without extra steps. The service sees the system's SoapySDR: `sudo apt install python3-soapysdr
@@ -385,7 +386,7 @@ falconsdr-receiver`), then pick the access method under *SDR device*.
 
 ### Network receiver (rtl_tcp)
 
-New in 1.5.0. An RTL-SDR plugged into another computer (a Raspberry Pi at the antenna, a
+An RTL-SDR plugged into another computer (a Raspberry Pi at the antenna, a
 box in the attic, a phone running an `rtl_tcp` app) can be the receiver of
 the scanner: on that computer run `rtl_tcp -a 0.0.0.0` (package `rtl-sdr`),
 then on the Scan page choose *SDR device → Network receiver (rtl_tcp)* and
@@ -422,17 +423,17 @@ Good to know:
 
 ### Manual tuning and DAB/DAB+
 
-Open **Manual** between **Scan** and **Recordings**. For a headless receiver,
+Open **Manual** from the top navigation. For a headless receiver,
 run the [headless installer](#headless-receiver) on the receiver host. It
 restarts the service and verifies that the installed revision is serving the UI.
 
 Select a receiver and enter a frequency in MHz. Use WFM for broadcast FM,
 or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
 **Listen live**. Click the spectrum to fill in a nearby frequency. Analog
-tuning plays continuously, even below the scanner's trigger level. WFM uses
-the app's mono live-audio stream. The station information card shows the
-RDS service name, programme ID and RadioText when decoded. Use the star
-to save the tuned FM frequency. Saved FM stations appear under **Favourites**.
+tuning plays continuously, even below the scanner's trigger level. WFM
+streams 48 kHz audio and blends towards mono when the stereo pilot is weak.
+Station information shows the RDS service name, programme ID and RadioText
+when decoded. Use the star to save the tuned FM frequency.
 
 Set the gain mode and level on the Manual page for analog or DAB, then
 press **Tune** to apply them. The Scan page keeps its own configured gain.
@@ -445,10 +446,11 @@ shared library and sends decoded audio through AliSDR's live audio stream.
 
 In **Manual tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
 **Tune**. Press a station in the list to play it, or use its star to
-add or remove it. **Favourites** is the first entry in the DAB channel
-selector. Play or remove saved stations there without tuning an ensemble
-first. The station information card displays the ensemble, codec and
-broadcast text where available.
+add or remove it. **Favourites** is selected first in the DAB channel menu each
+time Manual opens. Play or remove saved stations without tuning an ensemble
+first. The browser stores FM and DAB favourites in a cookie so each browser
+profile can keep its own list. The central station information displays the
+ensemble, codec, broadcast text and DAB slideshow artwork when available.
 
 The SDR must capture the Band III ensemble with about 2 MHz of bandwidth.
 If reception fails, the receiver reports whether it synchronized or found

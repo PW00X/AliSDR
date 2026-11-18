@@ -39,7 +39,7 @@ export const liveAudio = {
   boostDb: boostDb(),
   ctrl: null,
   playing: false,
-  dab: false,
+  broadcast: false,
   volume: parseFloat(localStorage.getItem('volume') ?? '0.9'),
   onchange: () => {},
   t: 0,
@@ -79,9 +79,9 @@ export const liveAudio = {
     this.onchange();
   },
 
-  useDab(enabled) {
-    if (this.dab === enabled) return;
-    this.dab = enabled;
+  useBroadcast(enabled) {
+    if (this.broadcast === enabled) return;
+    this.broadcast = enabled;
     if (this.ctrl) { this.ctrl.abort(); this.ctrl = null; }
     if (this.playing) this._stream();
   },
@@ -106,7 +106,7 @@ export const liveAudio = {
     this.t = 0;
     let rest = null;
     try {
-      const r = await fetch(this.dab ? '/api/audio?dab=1' : '/api/audio', { signal: ctrl.signal, cache: 'no-store' });
+      const r = await fetch(this.broadcast ? '/api/audio?broadcast=1' : '/api/audio', { signal: ctrl.signal, cache: 'no-store' });
       if (!r.ok) throw new Error(String(r.status));
       const rate = +(r.headers.get('X-Sample-Rate') || 12500);
       const channels = r.headers.get('X-Audio-Channels') === '2' ? 2 : 1;

@@ -4006,3 +4006,18 @@ msgstr "Multipleks"
 
 msgid "Tune to the station first."
 msgstr "Najpierw dostrój się do stacji."
+
+msgid "The favourites cookie is full."
+msgstr "Plik cookie z ulubionymi jest pełny."
+
+msgid "The browser could not save favourites in a cookie."
+msgstr "Przeglądarka nie mogła zapisać ulubionych w pliku cookie."
+
+msgid "Stop scanning or tuning to change the device or capture width."
+msgstr "Zatrzymaj skanowanie lub strojenie, aby zmienić urządzenie lub szerokość przechwytywania."
+
+msgid "Station artwork"
+msgstr "Grafika stacji"
+
+msgid "Station artwork is unavailable."
+msgstr "Grafika stacji jest niedostępna."
