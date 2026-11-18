@@ -420,6 +420,7 @@ def airspy_library() -> ctypes.CDLL | None:
                 "airspy_stop_rx": ([c.c_void_p], c.c_int),
                 "airspy_set_freq": ([c.c_void_p, c.c_uint32], c.c_int),
                 "airspy_set_sensitivity_gain": ([c.c_void_p, c.c_uint8], c.c_int),
+                "airspy_set_vga_gain": ([c.c_void_p, c.c_uint8], c.c_int),
                 "airspy_set_lna_agc": ([c.c_void_p, c.c_uint8], c.c_int),
                 "airspy_set_mixer_agc": ([c.c_void_p, c.c_uint8], c.c_int),
                 "airspy_set_rf_bias": ([c.c_void_p, c.c_uint8], c.c_int),
@@ -516,6 +517,9 @@ class AirspyBackend(_NativeStreamBackend):
     def set_gain(self, gain_mode: str, gain_db: float) -> None:
         lib, dev = self._lib, self._dev
         if gain_mode == "auto":     # the receiver's own AGC (LNA + mixer)
+            # VGA is separate from both AGCs. Use airspy_rx's default IF gain
+            # so a previous manual setting or USB power-up state can't set it.
+            self._check(lib.airspy_set_vga_gain(dev, 5), "set_vga_gain")
             self._check(lib.airspy_set_lna_agc(dev, 1), "set_lna_agc")
             self._check(lib.airspy_set_mixer_agc(dev, 1), "set_mixer_agc")
         else:                       # sets all three stages from the library's sensitivity table, AGC off

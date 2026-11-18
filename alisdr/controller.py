@@ -63,6 +63,7 @@ def _coerce(current: Any, value: Any) -> Any:
 _LIST_TYPES = {"bands": VfoRangeConfig, "entries": ScheduleEntry}
 # Settings the engine reads from the config on every tick: changing them needs no new scan plan.
 _READ_LIVE_KEYS = {"trigger_level_dbfs", "squelch_enabled", "squelch_offset_db"}
+_READ_LIVE_DEVICE_KEYS = {"gain_mode", "gain_db"}
 _ACTIVE = ("SIGNAL_DETECTED", "LINGER")
 # With several dongles the status shown is the most telling of their states.
 _STATE_RANK = ["SIGNAL_DETECTED", "LINGER", "RECONNECTING", "SCANNING", "TUNING", "CALCULATE_NEXT_FREQ", "IDLE"]
@@ -399,7 +400,7 @@ class Controller:
             session.on_broadcast_audio = self._publish_broadcast_audio
             self.manual_session = session
             try:
-                if tuning.mode == "DAB" and self.before_dab is not None:
+                if tuning.mode == "DAB" and self.transcription_paused() and self.before_dab is not None:
                     self.before_dab()
                 session.start()
             except Exception:
@@ -411,10 +412,6 @@ class Controller:
         with self._start_lock:
             self._stop_manual_locked()
             self._manual_error = ""
-
-    def dab_active(self) -> bool:
-        session = self.manual_session
-        return session is not None and session.tuning.mode == "DAB"
 
     def transcription_paused(self) -> bool:
         if not self.config.transcription.only_when_decoders_idle:
@@ -1118,7 +1115,11 @@ class Controller:
             i18n.set_language(self.config.language)
         if self.config.recording.output_dir != old_root:
             threading.Thread(target=self.library.rescan, daemon=True).start()
-        if not set(patch) <= _READ_LIVE_KEYS:  # a slider drag must not rebuild the scan plan at every step
+        # Gain changes are read directly by the scanner. Rebuilding on each
+        # adjustment restarts the scan cycle and can starve later windows.
+        if any(key not in _READ_LIVE_KEYS and not (
+            key == "device" and isinstance(value, dict) and value.keys() <= _READ_LIVE_DEVICE_KEYS
+        ) for key, value in patch.items()):
             self._rebuild()
 
     def set_channels(self, channels: list[Channel]) -> None:

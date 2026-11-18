@@ -191,7 +191,7 @@ install AliSDR with DAB/DAB+ from source:
 curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/install.sh | bash
 ```
 
-Open `http://<receiver-ip>:8765` in your browser. The service starts at boot
+Open `http://<receiver-ip>:2424` in your browser. The service starts at boot
 and opens on **Listen → Tune**. Select **Scan** in the tuner to start scanning. Run the same command
 again to update while keeping your settings and recordings. The service is
 `alisdr-server.service`. See the [headless receiver guide](packaging/remote-server/README.md)
@@ -210,7 +210,7 @@ python3 -m venv --system-site-packages .venv
 .venv/bin/python main.py
 ```
 
-Open `http://<receiver-ip>:8765` from another device on the network. To build
+Open `http://<receiver-ip>:2424` from another device on the network. To build
 the DAB decoder from the checkout on Debian-based Linux, run
 `sudo sh packaging/dab/install.sh "$PWD/.venv/lib"`.
 
@@ -271,9 +271,10 @@ By default, the list shows stations whose RDS name was decoded. Use
 **Show stations without RDS names** to see the other frequencies found by the scan.
 
 Tune and Scan share the saved receiver gain and default to **Auto (hardware)**.
+Find **Gain** in **SDR device**, between **Capture width** and **Bias-T**.
 Press **Tune** to apply a gain change to the tuned station. Scan applies
-gain mode and manual gain changes as it runs. A band's own gain settings
-still apply during Scan.
+gain changes as it runs and shows the measured spectrum floor in dBFS.
+A band's own gain settings still apply during Scan.
 With the native Airspy driver, the slider shows the 0–21 sensitivity index.
 
 The Linux installer builds DAB/DAB+ by default. AliSDR's Python receiver feeds IQ from the
@@ -330,7 +331,7 @@ ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.
 Run from the source checkout.
 
 ```
-python3 main.py               serve the web app on the network at port 8765
+python3 main.py               serve the web app on the network at port 2424
 python3 main.py --start       start scanning right away
 python3 main.py --host 10.0.0.5 --port 9000   bind a specific interface and port
 python3 main.py --version     show the version

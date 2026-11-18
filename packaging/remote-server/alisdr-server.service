@@ -1,5 +1,5 @@
 [Unit]
-Description=AliSDR receiver (web UI on port 8765)
+Description=AliSDR receiver (web UI defaults to port 2424)
 After=network-online.target
 Wants=network-online.target
 

@@ -1799,6 +1799,11 @@ class NativeSdrTest(unittest.TestCase):
             got = b.read(10)
             self.assertEqual(got.dtype, np.complex64)
             self.assertEqual(complex(got[0]), 0.5 + 0.25j)
+            calls.clear()
+            b.set_gain("auto", 30.0)
+            self.assertEqual(calls, [
+                ("airspy_set_vga_gain", 5), ("airspy_set_lna_agc", 1), ("airspy_set_mixer_agc", 1),
+            ])
             b.close()
 
     def test_every_way_to_open_a_receiver_is_grouped_and_rtl_defaults_to_librtlsdr(self) -> None:
@@ -2325,7 +2330,7 @@ class WorkerReceptionTest(unittest.TestCase):
             time.sleep(.02)
         self.assertTrue(predicate())
 
-    def test_dab_preempts_receiver_transcription_and_requeues_it(self) -> None:
+    def test_dab_pauses_receiver_transcription_only_when_requested(self) -> None:
         from unittest.mock import patch
 
         from alisdr.controller import Controller
@@ -2361,23 +2366,28 @@ class WorkerReceptionTest(unittest.TestCase):
                 patch("alisdr.worker.is_transcription_installed", return_value=True), \
                 patch("alisdr.worker.model_cached", return_value=True), \
                 patch("alisdr.worker._IDLE_S", .05):
-            worker = Worker(base, "", name="receiver", embedded=True, dab_active=ctl.dab_active)
+            worker = Worker(base, "", name="receiver", embedded=True, decoders_paused=ctl.transcription_paused)
             ctl.before_dab = worker.pause_transcription
             worker.start()
             try:
                 self.wait_for(recording.with_suffix(".started").is_file)
                 ctl.tune_manual({"mode": "DAB", "channel": "12A"})
                 self.assertTrue(dab_started.wait(2))
-                self.assertEqual(process_at_dab_open, [None])
-                self.wait_for(lambda: worker._status == "paused_dab")
-                self.assertIsNone(ctl.library.get(rel).transcript)
+                self.assertIsNotNone(process_at_dab_open[0])
+                self.assertEqual(worker._status, "transcribing")
 
-                job = remote.post("/api/worker/claim", {"name": "remote"})["job"]
-                self.assertEqual((job["id"], job["language"]), (rel, "en"))
-                remote.post("/api/worker/release", {"id": rel})
+                cfg.transcription.only_when_decoders_idle = True
+                dab_started.clear()
+                ctl.tune_manual({"mode": "DAB", "channel": "12A", "rediscover": True})
+                self.assertTrue(dab_started.wait(2))
+                self.assertIsNone(process_at_dab_open[-1])
+                self.wait_for(lambda: worker._status == "paused_decoders")
+                self.assertIsNone(ctl.library.get(rel).transcript)
+                self.assertIsNone(remote.post("/api/worker/claim", {"name": "remote"})["job"])
                 recording.with_suffix(".resume").touch()
-                ctl.stop_manual()
+                cfg.transcription.only_when_decoders_idle = False
                 self.wait_for(lambda: ctl.library.get(rel).transcript is not None)
+                self.assertEqual(ctl.manual_status()["tuning"]["channel"], "12A")
                 result = ctl.library.get(rel).transcript
                 self.assertEqual((result.text, result.language), ("receiver test", "en"))
             finally:
@@ -2728,6 +2738,69 @@ class ControllerStartTest(unittest.TestCase):
 
 
 class ManualTuningTest(unittest.TestCase):
+    def test_scan_gain_change_moves_the_floor_and_detects_a_carrier(self) -> None:
+        from unittest.mock import patch
+        import numpy as np
+
+        from alisdr.config import VfoRangeConfig
+        from alisdr.controller import Controller
+        from alisdr.sdr_backend import SimulatedBackend
+
+        frequency = 145_500_000
+        fail_read = threading.Event()
+        receivers = []
+
+        class Receiver(SimulatedBackend):
+            def read(self, num_samples):
+                if self is receivers[0] and fail_read.is_set():
+                    raise RuntimeError("test receiver disconnected")
+                time.sleep(num_samples / self.sample_rate)
+                noise = self._rng.normal(0, .001, num_samples)
+                carrier = .015 * np.exp(2j * np.pi * 2000 * np.arange(num_samples) / self.sample_rate)
+                return ((noise + carrier) * self._gain_scale).astype(np.complex64)
+
+        def open_receiver(_driver, _args, rate, mode, gain, **_options):
+            receiver = Receiver(rate)
+            receiver.set_gain(mode, gain)
+            receivers.append(receiver)
+            return receiver
+
+        def wait_for(predicate):
+            deadline = time.monotonic() + 6
+            while time.monotonic() < deadline:
+                live = ctl.live()
+                if predicate(live):
+                    return live
+                time.sleep(.025)
+            self.fail("Expected scanner state was not reached")
+
+        cfg = AppConfig()
+        cfg.bands = [VfoRangeConfig(start_hz=frequency, stop_hz=frequency + 1, step_hz=12_500)]
+        cfg.memory_list_enabled = False
+        cfg.device.driver = "simulated"
+        cfg.device.gain_mode, cfg.device.gain_db = "sw_auto", 5
+        cfg.trigger_level_dbfs = -30
+        cfg.recording.enabled = False
+        cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
+        ctl = Controller(cfg)
+        with patch("alisdr.scanner_engine.create_backend", side_effect=open_receiver), \
+                patch("alisdr.agc.SoftwareAgc.MIN_ADJUST_INTERVAL_S", 60):
+            try:
+                ctl.start()
+                before = wait_for(lambda live: live["state"] == "SCANNING" and live["spectrum"])
+                with patch.object(ctl._engines[0], "request_rebuild") as rebuild:
+                    ctl.patch_config({"device": {"gain_db": 40}})
+                    rebuild.assert_not_called()
+                before_floor = np.percentile(before["spectrum"]["db"], 20)
+                after = wait_for(lambda live: live["state"] == "SIGNAL_DETECTED" and live["spectrum"]
+                                 and np.percentile(live["spectrum"]["db"], 20) > before_floor + 20)
+                self.assertGreater(after["level"], before["level"] + 20)
+                fail_read.set()
+                wait_for(lambda live: len(receivers) > 1 and live["state"] == "SIGNAL_DETECTED")
+                self.assertAlmostEqual(receivers[-1].freq_hz, receivers[0].freq_hz)
+            finally:
+                ctl.shutdown()
+
     def test_tune_and_scan_share_saved_gain_with_the_airspy_sensitivity_range(self) -> None:
         from unittest.mock import patch
 

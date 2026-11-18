@@ -42,11 +42,13 @@ export function manualView(root, modes) {
   });
   const channel = h('select');
   let receivers = [];
-  const gainField = h('div.col', { style: { gap: '6px' } });
+  const gainField = h('div.col.receiver-gain');
   const receiverField = h('label.field', t('Receiver'), receiver);
   const deviceCard = h('section.card.col');
-  const devicePanel = receiverPanel(deviceCard, h('div.col', receiverField, gainField),
-    'Stop scanning or tuning to change the device or capture width.');
+  const devicePanel = receiverPanel(deviceCard, {
+    gain: gainField, extraControls: receiverField,
+    lockText: 'Stop scanning or tuning to change the device or capture width.',
+  });
   const updateGain = receiverGainControl(gainField,
     () => receivers.find(({ id }) => id === Number(receiver.value)) || S.settings.receiver_gain);
   const frequencyField = h('label.field', t('Frequency (MHz)'), frequency);

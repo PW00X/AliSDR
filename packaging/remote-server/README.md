@@ -1,7 +1,7 @@
 # Headless receiver
 
 The receiver runs AliSDR as a service and serves its web UI on port
-8765 to every device on the network: open `http://<receiver-ip>:8765/` in any
+2424 to every device on the network: open `http://<receiver-ip>:2424/` in any
 browser (PC, phone). There is no password by default; set one in
 Settings → Access if other people share your network.
 
@@ -47,7 +47,7 @@ Install the Python dependencies from a checkout on the worker host, then
 connect it to the receiver:
 
 ```sh
-python3 -m alisdr.worker http://<receiver-ip>:8765
+python3 -m alisdr.worker http://<receiver-ip>:2424
 ```
 
 Use `--ask-password` if the receiver requires a password, or set
@@ -55,12 +55,11 @@ Use `--ask-password` if the receiver requires a password, or set
 Manage transcription, copies and library imports in the receiver's web app
 under **Add-ons → Transcription & computers**.
 
-While the receiver tunes or plays DAB/DAB+, transcription on the receiver
-pauses. An interrupted recording returns to the queue and can be processed
-by another computer or retried on the receiver after DAB tuning ends.
-To pause all workers during receiver decoding, enable **Transcribe only when
-decoders are idle**. Workers started from an older checkout need the updated
-source to interrupt a job they already started.
+Enable **Transcribe only when decoders are idle** to pause all workers
+while the receiver decodes, including while tuning or playing DAB/DAB+.
+Interrupted jobs return to the queue. With the switch off, workers can
+transcribe during reception. Update remote workers to apply these rules
+to jobs already running.
 
 ## USB passthrough
 

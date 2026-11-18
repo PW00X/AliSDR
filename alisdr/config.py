@@ -319,7 +319,7 @@ class TranscriptionConfig:
 @dataclass
 class RemoteReceiverConfig:
     """Credentials saved by earlier installs, used by the headless worker."""
-    url: str = ""  # e.g. "http://receiver.local:8765"
+    url: str = ""  # e.g. "http://receiver.local:2424"
     token: str = ""
 
 

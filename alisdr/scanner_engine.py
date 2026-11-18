@@ -540,6 +540,7 @@ class ScannerEngine(threading.Thread):
         self._applied_gain_db = None
         # Only while the effective gain mode is "sw_auto" (agc.py).
         self._software_agc: SoftwareAgc | None = None
+        self._software_agc_start_db: float | None = None
         self._plans: list = []
         self.addons = None   # the Controller's AddonManager (decoders for claimed channels); None in tests
         self._had_real_hardware = False
@@ -913,6 +914,9 @@ class ScannerEngine(threading.Thread):
         self._dropped_reported, self._dropped_reported_at = 0, 0.0
         _checkpoint(f"_open_backend: constructed (label={self._backend.label})")
         self._applied_gain_mode, self._applied_gain_db = dev.gain_mode, dev.gain_db
+        self._software_agc = None
+        self._cur_window = None
+        self._last_tuned_center_hz = None
         key = self._calibration_key(dev.gain_mode)
         if key != dev.gain_mode or self._edge_compensation is None:   # its own roll-off history, see _calibration_key()
             self._edge_compensation = EdgeCompensation(key)
@@ -1268,10 +1272,13 @@ class ScannerEngine(threading.Thread):
         entering "sw_auto" starts a SoftwareAgc at the configured gain, which
         _maybe_run_software_agc() then steps every tick."""
         mode, db = self._effective_gain(window)
+        lo, hi = self._backend.gain_range_db
+        db = max(lo, min(hi, db))
         if mode == "sw_auto":
-            if self._applied_gain_mode != "sw_auto" or self._software_agc is None:
-                self._software_agc = SoftwareAgc(db)
+            if self._software_agc is None or db != self._software_agc_start_db:
                 self._backend.set_gain("manual", db)
+                self._software_agc = SoftwareAgc(db)
+                self._software_agc_start_db = db
                 self._applied_gain_mode, self._applied_gain_db = "sw_auto", db
             return
         self._software_agc = None
@@ -1445,7 +1452,8 @@ class ScannerEngine(threading.Thread):
         while not self._stop_evt.is_set():
             if self._shared is not None and self._shared.rates_version != self._seen_rates_version:
                 self._rebuild_windows()   # a receiver turned out to capture another width: the shared plan changes
-            self._maybe_apply_gain(self._cur_window)
+            if state != ScannerState.CALCULATE_NEXT_FREQ:
+                self._maybe_apply_gain(self._cur_window)
             chunk = self._chunk_size()
 
             if state == ScannerState.CALCULATE_NEXT_FREQ:
@@ -1455,6 +1463,7 @@ class ScannerEngine(threading.Thread):
                     time.sleep(0.3)
                     continue
                 self._cur_window = window
+                self._maybe_apply_gain(window)
                 self._emit_freqs()  # no slots active here (guaranteed - see below) -> shows the window placeholder
                 if window.center_hz == self._last_tuned_center_hz:
                     # Already tuned here (narrow or solo band): skip the

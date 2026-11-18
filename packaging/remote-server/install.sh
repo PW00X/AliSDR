@@ -81,4 +81,5 @@ chown -R alisdr:alisdr "$HOME_DIR" "$DEST/.venv" "$REC_DIR"
 systemctl daemon-reload
 systemctl enable --quiet "$UNIT"
 systemctl restart "$UNIT"  # starts it, or restarts it onto the new code
-echo "Web UI: http://$(hostname -I 2>/dev/null | awk '{print $1}'):8765/"
+port="$(sed -n 's/^DEFAULT_PORT = \([0-9][0-9]*\)$/\1/p' "$SRC/main.py")"
+echo "Web UI: http://$(hostname -I 2>/dev/null | awk '{print $1}'):${port:-2424}/"

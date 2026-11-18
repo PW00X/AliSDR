@@ -21,7 +21,7 @@ import threading  # noqa: E402
 from alisdr import __version__  # noqa: E402
 from alisdr.config import CONFIG_DIR, AppConfig, migrate_legacy_home  # noqa: E402
 
-DEFAULT_PORT = 8765
+DEFAULT_PORT = 2424
 
 
 def main() -> int:
@@ -84,7 +84,7 @@ def main() -> int:
     worker_host = f"[{worker_host}]" if ":" in worker_host else worker_host
     worker = Worker(f"http://{worker_host}:{httpd.server_port}", lambda: app.token,
                     name=os.environ.get("ALISDR_WORKER_NAME", ""), embedded=True, on_restart=request_restart,
-                    dab_active=controller.dab_active, decoders_paused=controller.transcription_paused)
+                    decoders_paused=controller.transcription_paused)
     controller.before_dab = worker.pause_transcription
     threading.Thread(target=controller.start_background, daemon=True, name="library-start").start()
     try:

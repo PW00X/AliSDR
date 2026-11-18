@@ -10,7 +10,7 @@ and records audio **only** for transmissions the scanner actually stops on —
 never the retuning noise. `alisdr/scanner_engine.py`'s state machine is
 the authoritative spec.
 
-The app runs headless. `main.py` serves the browser UI and API on port 8765.
+The app runs headless. `main.py` serves the browser UI and API on port 2424.
 Use `alisdr-server.service` for an always-on receiver and
 `python3 -m alisdr.worker <server-url>` for optional remote transcription
 and recording copies. Keep clean SIGTERM shutdown (gotcha 41).
@@ -18,7 +18,7 @@ and recording copies. Keep clean SIGTERM shutdown (gotcha 41).
 ## Running it
 
 ```
-python3 main.py                 # serve the web app on port 8765
+python3 main.py                 # serve the web app on port 2424
 python3 -m unittest tests/test_core.py tests/test_addons.py
 python3 main.py --probe-sdr [driver]   # with the scanner stopped: measures a real receiver (gotcha 55)
 ```

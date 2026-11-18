@@ -57,6 +57,9 @@ install_server() {
     $SUDO git -c advice.detachedHead=false clone -q --depth 1 --branch "$ref" "https://github.com/$REPO.git" "$src"
   fi
   revision="$($SUDO git -C "$src" rev-parse --verify HEAD)"
+  # Older source refs used 8765. Check the port of the checkout being installed.
+  port="$(sed -n 's/^DEFAULT_PORT = \([0-9][0-9]*\)$/\1/p' "$src/main.py")"
+  port="${port:-8765}"
   app=alisdr
   if [ -f "$src/packaging/remote-server/alisdr-server.service" ]; then
     unit=alisdr-server
@@ -75,14 +78,14 @@ install_server() {
   if [ "$REPO" = "$FORK" ] && [ "$ref" = "master" ]; then
     retries=10
     while :; do
-      session="$(curl --noproxy '*' -fsS --max-time 2 http://127.0.0.1:8765/api/session 2>/dev/null || true)"
+      session="$(curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:$port/api/session" 2>/dev/null || true)"
       if printf '%s\n' "$session" | grep -Eq "\"revision\"[[:space:]]*:[[:space:]]*\"$revision\"" &&
          printf '%s\n' "$session" | grep -Eq '"mode"[[:space:]]*:[[:space:]]*"server"'; then
         break
       fi
       retries=$((retries - 1))
       [ "$retries" -gt 0 ] ||
-        die "Port 8765 is not serving headless revision $revision. Check for an older receiver process and run: journalctl -u $unit -n 50 --no-pager"
+        die "Port $port is not serving headless revision $revision. Check for an older receiver process and run: journalctl -u $unit -n 50 --no-pager"
       sleep 2
     done
   else
@@ -92,7 +95,7 @@ install_server() {
     die "${REPO##*/} $version is installed, but the service didn't start - see: journalctl -u $unit"
   say ""
   say "${REPO##*/} $version ($revision) is installed and running (service $unit, starts on boot)."
-  say "Open it from any device on your network:  http://${ip:-<server-ip>}:8765/"
+  say "Open it from any device on your network:  http://${ip:-<server-ip>}:$port/"
   say "To update later, run the same command again."
 }
 

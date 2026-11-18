@@ -102,7 +102,6 @@ class Worker(threading.Thread):
     def __init__(self, base_url: str, token: "str | Callable[[], str]", name: str = "", local_root: Optional[Path] = None,
                  embedded: bool = False, on_detach: Optional[Callable[[], None]] = None,
                  on_restart: Optional[Callable[[], None]] = None,
-                 dab_active: Optional[Callable[[], bool]] = None,
                  decoders_paused: Optional[Callable[[], bool]] = None) -> None:
         super().__init__(daemon=True, name="worker")
         self.api = Api(base_url, token)
@@ -113,11 +112,10 @@ class Worker(threading.Thread):
         self.on_restart = on_restart
         self._stop_event = threading.Event()
         self._wake = threading.Event()  # a command arrived - don't sit out the idle pause
-        self._dab_active = dab_active if embedded and dab_active else lambda: False
         self._server_paused = False
         self._decoders_paused = decoders_paused or (lambda: self._server_paused)
         self._transcription = TranscriptionProcess(
-            lambda: self._stop_event.is_set() or bool(self._pause_reason()))
+            lambda: self._stop_event.is_set() or self._decoders_paused())
         self._log: deque[str] = deque(maxlen=40)
         self._status = "idle"
         self._status_since = time.time()
@@ -203,11 +201,6 @@ class Worker(threading.Thread):
         self._transcription.close()
         self._wake.set()
 
-    def _pause_reason(self) -> str:
-        if self._dab_active():
-            return "paused_dab"
-        return "paused_decoders" if self._decoders_paused() else ""
-
     def run(self) -> None:
         threading.Thread(target=self._heartbeat_loop, daemon=True, name="worker-heartbeat").start()
         imported = False
@@ -224,10 +217,12 @@ class Worker(threading.Thread):
                     self._last_mirror = time.monotonic()
                     self._mirror() if self._settings.get("mirror") else self._count_local_only()
                 can_transcribe = self._settings.get("transcribe") and self._installed
-                if can_transcribe and not self._pause_reason() and not self._stop_event.is_set():
+                if can_transcribe and not self._decoders_paused() and not self._stop_event.is_set():
                     did_work = self._transcribe_one()
-                paused = self._pause_reason() if can_transcribe else ""
-                self._set_status(paused or ("transcribing" if did_work else "idle"))
+                if can_transcribe and self._decoders_paused():
+                    self._set_status("paused_decoders")
+                else:
+                    self._set_status("transcribing" if did_work else "idle")
                 if not did_work:
                     self._wake.wait(_IDLE_S)
                     self._wake.clear()

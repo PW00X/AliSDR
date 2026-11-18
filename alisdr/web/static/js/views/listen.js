@@ -32,7 +32,7 @@ export function driverHelp() {
     h('p.small', t('The driver is tied to the USB port - plugging the dongle into a different port may need the same steps again.'))));
 }
 
-export function receiverPanel(device, extraControls = null, lockText = 'Stop the scanner to change the device or capture width.') {
+export function receiverPanel(device, { gain, extraControls, lockText = 'Stop the scanner to change the device or capture width.' } = {}) {
   // ---------------------------------------------------------- device
   // A receiver that is plugged in (USB ids, Linux) but that nothing here can drive: say why instead of an empty list.
   function missingReceiverNotice(devices) {
@@ -146,10 +146,11 @@ export function receiverPanel(device, extraControls = null, lockText = 'Stop the
         methods ? h('label.field', t('Access method'), methods) : null,
         addr ? h('label.field', t('rtl_tcp address'), addr) : null,
         h('label.field', t('Capture width (MHz)'), bw)),
+      gain,
+      bias,
       addr ? h('span.faint.small', t('The RTL-SDR on another computer, through its rtl_tcp server (host or host:port, default port 1234). It serves one program at a time, the stream is not encrypted - use it on a trusted network. Retuning takes longer than with a local dongle, so scanning many windows is slower.')) : null,
       methods ? h('span.faint.small', t('How AliSDR talks to this receiver. The first choice is the default; the other one is the fallback when it will not open, and a way to compare.')) : null,
       missingReceiverNotice(devices),
-      bias,
       rangeFields(c.device.range_start_hz || 0, c.device.range_stop_hz || 0, (p) => { patchConfig({ device: p }); renderDevice(); }),
       ...extraRows,
       extra.length ? h('span.faint.small', t('The scan plan is split between all dongles - each scans its own share of the windows, so a full cycle is that much shorter. You hear one dongle at a time; the others keep recording.')) : null,
@@ -312,9 +313,6 @@ export function listenView(root, modes) {
   // Bands/channels that no dongle's antenna range reaches (live.uncovered, antenna_range.py).
   const rangeNotice = h('div.notice.hidden', { role: 'status' }, icon('ban'), h('span', { style: { flex: '1 1 260px' } }));
   const tunerHeader = h('div.tuner-header', modes, h('div.tuner-readout', freqEl, nameEl));
-  const gainField = h('div.col.scan-gain');
-  const tunerGain = h('div', gainField);
-  const pausedGain = h('div', { hidden: true });
   const hero = h('section.card.hero',
     h('div.row', stateChip, h('span.spacer'), cycleText),
     tunerHeader,
@@ -326,7 +324,6 @@ export function listenView(root, modes) {
     h('div.col', { style: { gap: '4px' } },
       h('div.meter', meterFill, meterMark),
       h('div.meter-legend', h('span', '-100'), levelText, h('span', '0 dBFS'))),
-    tunerGain,
     h('div.controls', startBtn, h('div.row', listenBtn, h('div.volume', icon('volume'), volume)), skipBtn, blBtn, holdBtn, recBtn, addChannelBtn),
     h('div.row.wrap', autoRec, h('span.spacer'), h('span.faint.small', t('Boost')), boost, iqBtn));
 
@@ -405,9 +402,6 @@ export function listenView(root, modes) {
     addonPanel.classList.toggle('hidden', !id);
     const modeHost = paused ? addonPanel : tunerHeader;
     if (modes.parentNode !== modeHost) modeHost.prepend(modes);
-    const gainHost = paused ? pausedGain : tunerGain;
-    if (gainField.parentNode !== gainHost) gainHost.append(gainField);
-    pausedGain.hidden = !paused;
     if (id && !addonPoll) { addonLastId = 0; addonSeen = []; addonName = id; pollAddon(); addonPoll = setInterval(pollAddon, 2000); }
     if (!id && addonPoll) { clearInterval(addonPoll); addonPoll = null; }
     if (id) drawAddon();
@@ -416,8 +410,9 @@ export function listenView(root, modes) {
   // ---------------------------------------------------------- spectrum
   const canvas = h('canvas', { height: 260, role: 'img', 'aria-label': t('Live spectrum and waterfall of the scanned band. The frequency and state are shown in text above.') });
   const axis = h('div.spectrum-axis');
+  const floor = h('span.faint.small', { hidden: true });
   const spectrumCard = h('section.card.spectrum-card',
-    h('div.card-head', h('h2', t('Spectrum')), h('span.faint.small', t('Yellow line: trigger level'))),
+    h('div.card-head.row.wrap', h('h2', t('Spectrum')), floor, h('span.faint.small', t('Yellow line: trigger level'))),
     h('div.spectrum-wrap', canvas), axis);
   const spectrum = spectrumPainter(canvas, axis);
 
@@ -522,6 +517,13 @@ export function listenView(root, modes) {
     iqBtn.textContent = live.raw_iq ? t('Stop raw IQ') : t('Raw IQ');
     iqBtn.classList.toggle('on', !!live.raw_iq);
     spectrum.draw(live.spectrum);
+    const bins = live.spectrum?.db;
+    floor.hidden = !bins?.length;
+    if (bins?.length) {
+      const sorted = bins.slice().sort((a, b) => a - b);
+      const level = sorted[Math.floor(sorted.length * 0.2)];
+      floor.textContent = t('Spectrum floor {level} dBFS', { level: level.toFixed(1) });
+    }
     renderGain();
     lockDevice(live.running || live.manual_tuning);
     renderFeed();
@@ -537,6 +539,7 @@ export function listenView(root, modes) {
   }
 
   // ---------------------------------------------------------- quick settings
+  const gainField = h('div.col.receiver-gain');
   const renderGain = receiverGainControl(gainField, () =>
     [S.live?.receiver_gain, S.settings.receiver_gain].find((entry) => entry?.driver === cfg().device.driver));
   function renderQuick() {
@@ -549,7 +552,6 @@ export function listenView(root, modes) {
     const ownTrigger = c.bands.filter((b) => b.enabled && b.trigger_level_dbfs != null);
     mount(quick,
       h('div.card-head', h('h2', t('Receiver')), h('span.faint.small', t('Changes apply live'))),
-      pausedGain,
       slider({ name: t('Trigger level'), min: -90, max: 0, step: 1, value: c.trigger_level_dbfs, unit: 'dBFS', oninput: (v) => patchConfig({ trigger_level_dbfs: v }) }),
       ownTrigger.length ? h('p.faint.small', t('Bands with their own trigger level ignore this slider: {names}.', { names: ownTrigger.map((b) => b.label || bandRange(b)).join(', ') })) : null,
       h('div.col', { style: { gap: '6px' } },
@@ -574,7 +576,7 @@ export function listenView(root, modes) {
       duration, interval);
   }
 
-  const { renderDevice, lockDevice } = receiverPanel(device);
+  const { renderDevice, lockDevice } = receiverPanel(device, { gain: gainField });
   // ---------------------------------------------------------- bands
   function bandsSection() {
     const c = cfg();
