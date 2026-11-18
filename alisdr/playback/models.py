@@ -50,6 +50,7 @@ class Recording:
     # re-stat the file: cache_key() at scan time, and the size it saw.
     key: str = ""
     size: int = 0
+    station_name: str = ""
 
     @property
     def transcript_text(self) -> str:

@@ -446,8 +446,8 @@ In **Manual tuning**, choose **DAB/DAB+**, pick a Band III channel, and press
 **Tune**. Press a station in the list to play it, or use its star to
 add or remove it. **Favourites** is selected first in the DAB channel menu each
 time Manual opens. Play or remove saved stations without tuning an ensemble
-first. The browser stores FM and DAB favourites in a cookie so each browser
-profile can keep its own list. The central station information displays the
+first. Drag the handle next to a favourite to change its order. The browser
+stores FM and DAB favourites in a cookie so each profile has its own list. The central station information displays the
 ensemble, codec, broadcast text and DAB slideshow artwork when available.
 
 The SDR must capture the Band III ensemble with about 2 MHz of bandwidth.
@@ -459,9 +459,9 @@ also logs the capture rate, gain and any reported IQ loss to
 
 Use **Record** once tuned to save the audio to **Recordings**. For DAB,
 select a station first. FM and DAB capture stereo audio. **Stop recording**
-saves the file while you keep listening. Stopping tuning, starting Scan,
-or changing to a tuning mode that requires a different audio format also
-saves the file.
+saves the file while you keep listening. Saved recordings include the station
+name when decoded. Switching broadcast stations, stopping tuning or starting
+Scan finishes an active broadcast recording.
 
 **Tune** stops scanning across all receivers. **Start** on the Scan tab
 ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.

@@ -2712,6 +2712,7 @@ class ManualTuningTest(unittest.TestCase):
         ctl.tune_manual({"mode": "WFM", "frequency_hz": 99_500_000})
         self.assertTrue(broadcast.get(timeout=5))
         ctl.record_manual(True)
+        ctl.manual_session.station_info["name"] = "Radio/L'été"
         (recording,) = ctl.open_recording_paths()
         ctl.record_manual(True)  # a repeated start keeps the same file
         self.assertEqual(ctl.open_recording_paths(), {recording})
@@ -2723,7 +2724,9 @@ class ManualTuningTest(unittest.TestCase):
         ctl.tune_manual({"mode": "NFM", "frequency_hz": 145_500_000})
         self.assertFalse(ctl.manual_status()["recording"])
         self.assertEqual(ctl.open_recording_paths(), set())
-        (fm,) = Path(cfg.recording.output_dir).rglob("*_99500.wav")
+        (fm,) = Path(cfg.recording.output_dir).rglob("*_99500~Radio%2FL*.wav")
+        ctl.library.rescan()
+        self.assertEqual(ctl.library.query(q="radio/l'été")["items"][0]["name"], "Radio/L'été")
         with wave.open(str(fm), "rb") as wav:
             self.assertEqual((wav.getframerate(), wav.getnchannels()), (48_000, 2))
             self.assertGreater(wav.getnframes(), 0)
@@ -2809,6 +2812,9 @@ class ManualTuningTest(unittest.TestCase):
         with self.assertRaises(HTTPError) as exc:
             urlopen(Request(station_url, payload, {"X-AliSDR": "1"}), timeout=5)
         self.assertEqual(exc.exception.code, 401)
+        with self.assertRaises(HTTPError) as exc:
+            urlopen(Request(station_url, b'{"sid":43981,"channel":"11D"}', headers), timeout=5)
+        self.assertEqual(exc.exception.code, 400)
         with urlopen(Request(station_url, payload, headers), timeout=5) as response:
             self.assertEqual(json.load(response)["station"], 0xabcd)
         with urlopen(Request(url + "/audio", headers=headers), timeout=5) as response:
@@ -2842,7 +2848,7 @@ class ManualTuningTest(unittest.TestCase):
         with urlopen(Request(record_url, b'{"enabled":false}', headers), timeout=5) as response:
             self.assertFalse(json.load(response)["recording"])
         self.assertEqual(ctl.manual_status()["station"], 0xabcd)
-        (saved_file,) = Path(cfg.recording.output_dir).rglob("*_223936.wav")
+        (saved_file,) = Path(cfg.recording.output_dir).rglob("*_223936~Radio Plus.wav")
         with wave.open(str(saved_file), "rb") as wav:
             self.assertEqual((wav.getframerate(), wav.getnchannels()), (48000, 2))
             stereo = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2").reshape(-1, 2)

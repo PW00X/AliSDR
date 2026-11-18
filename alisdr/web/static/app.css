@@ -185,6 +185,9 @@ label.field > span.hint { color: var(--secondary); font-weight: 400; }
 .manual-station .manual-station-play { flex: 1; min-width: 0; justify-content: flex-start; text-align: left; overflow-wrap: anywhere; }
 .manual-station-play .col { gap: .15rem; }
 .manual-star { flex: none; min-width: 2.75rem; font-size: 1.2em; }
+.manual-drag { flex: none; min-width: 2.75rem; cursor: grab; touch-action: none; user-select: none; }
+.manual-drag:active { cursor: grabbing; }
+.manual-station.drop-target { outline: 2px solid currentColor; border-radius: .5rem; }
 .manual-star[aria-pressed="true"] { color: var(--amber, #f4ba50); }
 .manual-tuning .hero .field { color: #c7c7cc; }
 .manual-tuning .hero .state { white-space: normal; }

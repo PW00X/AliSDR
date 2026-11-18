@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import List
+from urllib.parse import unquote
 
 from alisdr.playback.config import DATE_DIR_FORMAT, FILENAME_REGEX, ALISDR_DIR
 from alisdr.playback.models import MANUAL_FREQ_KHZ
@@ -22,6 +23,7 @@ _NAME_RE = re.compile(FILENAME_REGEX)
 class ParsedName:
     dt_local: datetime
     freq_khz: int
+    station_name: str = ""
 
 
 def parse_filename(name: str) -> ParsedName | None:
@@ -31,7 +33,7 @@ def parse_filename(name: str) -> ParsedName | None:
     m = _NAME_RE.match(name)
     if not m:
         return None
-    year, month, day, hour, minute, second, micros, freq = m.groups()
+    year, month, day, hour, minute, second, micros, freq, station = m.groups()
     dt_local = datetime(
         int(year), int(month), int(day), int(hour), int(minute), int(second),
         microsecond=int(micros) if micros else 0,
@@ -40,7 +42,7 @@ def parse_filename(name: str) -> ParsedName | None:
     # see FILENAME_REGEX's own comment) - no single fixed frequency, so
     # MANUAL_FREQ_KHZ (0, never a real radio frequency) stands in for it.
     freq_khz = int(freq) if freq is not None else MANUAL_FREQ_KHZ
-    return ParsedName(dt_local=dt_local, freq_khz=freq_khz)
+    return ParsedName(dt_local=dt_local, freq_khz=freq_khz, station_name=unquote(station or ""))
 
 
 def organize(root: Path = ALISDR_DIR) -> List[Path]:

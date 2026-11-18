@@ -198,7 +198,7 @@ class Library:
             return None
         rec = Recording(
             path=path, dt_local=parsed.dt_local, dt_utc=parsed.dt_local.astimezone(UTC_TZ),
-            freq_khz=round(snap_airband_hz(parsed.freq_khz * 1000) / 1000), size=st.st_size,
+            freq_khz=round(snap_airband_hz(parsed.freq_khz * 1000) / 1000), size=st.st_size, station_name=parsed.station_name,
         )
         rec.key = self._key(path, st)
         rec.quality = self.quality.get(rec.key)
@@ -314,7 +314,8 @@ class Library:
         blob = self._blobs.get(rel)
         if blob is None:
             blob = " ".join((
-                f"{rec.freq_khz / 1000:.3f}", airband_channel(rec.freq_khz * 1000, ch833=True), names.get(rec.freq_khz, ""),
+                f"{rec.freq_khz / 1000:.3f}", airband_channel(rec.freq_khz * 1000, ch833=True),
+                rec.station_name or names.get(rec.freq_khz, ""),
                 rec.dt_local.strftime("%Y-%m-%d %H:%M:%S"), rec.dt_utc.strftime("%Y-%m-%d %H:%M"),
                 rec.path.name, rec.transcript_text,
             )).lower()
@@ -360,7 +361,7 @@ class Library:
         return {
             "id": rel,
             "freq_khz": rec.freq_khz,
-            "name": names.get(rec.freq_khz, ""),
+            "name": rec.station_name or names.get(rec.freq_khz, ""),
             "manual": rec.freq_khz == MANUAL_FREQ_KHZ,
             "time": rec.dt_utc.isoformat(),
             "size": rec.size,

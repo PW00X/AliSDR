@@ -38,13 +38,14 @@ export const liveAudio = {
   chain: null,
   boostDb: boostDb(),
   ctrl: null,
+  sources: new Set(),
   playing: false,
   broadcast: false,
   volume: parseFloat(localStorage.getItem('volume') ?? '0.9'),
   onchange: () => {},
   t: 0,
 
-  async start() {
+  async prepare() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       this.gain = this.ctx.createGain();
@@ -62,6 +63,10 @@ export const liveAudio = {
     }
     if (this.el) this.el.play().catch(() => {});
     await this.ctx.resume();
+  },
+
+  async start() {
+    await this.prepare();
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({ title: 'AliSDR', artist: 'Live' });
       navigator.mediaSession.setActionHandler('play', () => this.start());
@@ -74,7 +79,7 @@ export const liveAudio = {
 
   stop() {
     this.playing = false;
-    if (this.ctrl) { this.ctrl.abort(); this.ctrl = null; }
+    this.resetStream();
     if (this.el) this.el.pause();
     this.onchange();
   },
@@ -82,8 +87,14 @@ export const liveAudio = {
   useBroadcast(enabled) {
     if (this.broadcast === enabled) return;
     this.broadcast = enabled;
-    if (this.ctrl) { this.ctrl.abort(); this.ctrl = null; }
+    this.resetStream();
     if (this.playing) this._stream();
+  },
+
+  resetStream() {
+    if (this.ctrl) { this.ctrl.abort(); this.ctrl = null; }
+    for (const source of this.sources) source.stop();
+    this.sources.clear();
   },
 
   toggle() { return this.playing ? this.stop() : this.start(); },
@@ -136,7 +147,9 @@ export const liveAudio = {
         const lead = this.t - now;
         const speed = 1 + Math.max(-MAX_RATE_CHANGE, Math.min(MAX_RATE_CHANGE, (lead - LATENCY_S) * 0.5));
         src.playbackRate.value = speed;
+        src.onended = () => this.sources.delete(src);
         src.start(this.t);
+        this.sources.add(src);
         this.t += buf.duration / speed;
       }
     } catch (e) {

@@ -4027,3 +4027,15 @@ msgstr "Nieprawidłowe żądanie nagrywania."
 
 msgid "Tune to a station before recording."
 msgstr "Przed nagrywaniem dostrój się do stacji."
+
+msgid "The DAB channel changed. Try the station again."
+msgstr "Kanał DAB się zmienił. Wybierz stację ponownie."
+
+msgid "Saved station {name} was not found on {channel}."
+msgstr "Nie znaleziono zapisanej stacji {name} na kanale {channel}."
+
+msgid "Looking for {name} on {channel}…"
+msgstr "Wyszukiwanie stacji {name} na kanale {channel}…"
+
+msgid "Reorder favourite {name}"
+msgstr "Zmień pozycję ulubionej stacji {name}"

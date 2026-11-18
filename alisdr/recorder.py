@@ -4,6 +4,7 @@ each; also the continuous manual recording (``single_file``).
 from __future__ import annotations
 
 import datetime as dt
+import re
 import wave
 from pathlib import Path
 from typing import List
@@ -112,12 +113,17 @@ class Recorder:
         return Path(self.config.output_dir) / now.strftime("%Y-%m-%d") / f"{now.strftime('%Y-%m-%d_%H-%M-%S-%f')}_session.wav"
 
     @staticmethod
-    def rename_session_file_with_frequency(path: Path, freq_hz: int) -> Path | None:
+    def rename_session_file_with_frequency(path: Path, freq_hz: int, station_name: str = "") -> Path | None:
         """Renames a closed manual "..._session" file to "..._<freq_khz>",
         like auto-recordings (gotcha 13). Returns None, keeping the old name,
         if there's no marker or the rename fails - never a recording failure."""
         khz = round(freq_hz / 1000)
-        new_name = path.name.replace("_session", f"_{khz}")
+        # Escape path separators, control characters and Windows-reserved
+        # characters. Keep ordinary Unicode readable in downloads.
+        label = re.sub(r'[<>:"/\\|?*%\x00-\x1f]', lambda match: f"%{ord(match[0]):02X}",
+                       station_name.strip()[:48])
+        station_suffix = f"~{label}" if label else ""
+        new_name = path.name.replace("_session", f"_{khz}{station_suffix}")
         if new_name == path.name:
             return None
         new_path = path.with_name(new_name)

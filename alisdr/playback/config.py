@@ -28,7 +28,7 @@ DATE_DIR_FORMAT = "%Y-%m-%d"
 
 # Filename: 2026-07-23_19-31-01-123456_134474.wav - local time, optional
 # microseconds (older files have none), frequency in kHz. A manual recording
-# ends in "_session" instead (gotcha 19). .wav or .mp3.
-FILENAME_REGEX = r"^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})(?:-(\d{6}))?_(?:(\d+)|session)\.(?:wav|mp3)$"
+# ends in "_session" instead (gotcha 19). A station name can follow "~".
+FILENAME_REGEX = r"^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})(?:-(\d{6}))?_(?:(\d+)(?:~([^\r\n]+))?|session)\.(?:wav|mp3)$"
 
 APP_DATA_DIR.mkdir(parents=True, exist_ok=True)

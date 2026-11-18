@@ -112,9 +112,10 @@ def channel_dict(c: Channel) -> dict:
 class _ManualRecording:
     """Record the tuned stream, filling sustained audio gaps with silence."""
 
-    def __init__(self, recorder: Recorder, frequency_hz: int):
+    def __init__(self, recorder: Recorder, frequency_hz: int, station_name: str):
         self.recorder = recorder
         self.frequency_hz = frequency_hz
+        self.station_name = station_name
         self.frame_bytes = recorder.channels * 2
         self.last_audio = self.padded_to = time.monotonic()
         self.second_of_silence = bytes(recorder.audio_rate * self.frame_bytes)
@@ -344,11 +345,13 @@ class Controller:
                          and old.device == device)
             if can_reuse and old.tuning == tuning:
                 if wanted:
+                    if old.station != wanted:
+                        self._stop_manual_recording()
                     old.pending_station = wanted
                 return
             same_receiver = old is not None and old.tuning.receiver == k
             if can_reuse and same_receiver and tuning.mode != "DAB" and old.tuning.mode != "DAB":
-                if (old.tuning.mode == "WFM") != (tuning.mode == "WFM"):
+                if "WFM" in (old.tuning.mode, tuning.mode):
                     self._stop_manual_recording()
                 old.state = "starting"
                 old.tuning = tuning
@@ -409,7 +412,16 @@ class Controller:
                 except OSError as exc:
                     recorder.abort()
                     raise RuntimeError(i18n.tr("Can't start recording: {error}").format(error=exc)) from exc
-                self._manual_recording = _ManualRecording(recorder, session.tuning.frequency_hz)
+                self._manual_recording = _ManualRecording(
+                    recorder, session.tuning.frequency_hz, self._manual_station_name())
+
+    def _manual_station_name(self) -> str:
+        session = self.manual_session
+        if session and session.tuning.mode == "DAB":
+            return session.stations.get(session.station, {}).get("name", "")
+        if session and session.tuning.mode == "WFM":
+            return session.station_info.get("name", "")
+        return ""
 
     @staticmethod
     def _can_record_manual(session: ManualSession | None) -> bool:
@@ -431,7 +443,8 @@ class Controller:
             except OSError as exc:
                 self._manual_recording_failed(recorder, exc)
                 return
-            path = Recorder.rename_session_file_with_frequency(path, recording.frequency_hz) or path
+            name = recording.station_name or self._manual_station_name()
+            path = Recorder.rename_session_file_with_frequency(path, recording.frequency_hz, name) or path
             if recorder.config.output_format == "mp3":
                 self._manual_finishing.add(path)
 
@@ -469,13 +482,17 @@ class Controller:
             except OSError as exc:
                 self._manual_recording_failed(recording.recorder, exc)
 
-    def select_dab_station(self, sid: int) -> None:
+    def select_dab_station(self, sid: int, channel: str | None = None) -> None:
         if type(sid) is not int:
             raise ValueError("Invalid DAB service ID")
         with self._start_lock:
             session = self.manual_session
             if session is None or session.tuning.mode != "DAB":
                 raise RuntimeError(i18n.tr("Tune a DAB channel first."))
+            if channel is not None and channel != session.tuning.channel:
+                raise ValueError(i18n.tr("The DAB channel changed. Try the station again."))
+            if sid in session.stations and session.station != sid:
+                self._stop_manual_recording()
             session.select_station(sid)
 
     def _manual_favourites(self) -> list[dict]:
@@ -793,7 +810,7 @@ class Controller:
         if parsed is None or not parsed.freq_khz:
             return
         names = self.freq_names()
-        self.notifier.on_recording(parsed.freq_khz * 1000, names.get(parsed.freq_khz, ""), str(path))
+        self.notifier.on_recording(parsed.freq_khz * 1000, parsed.station_name or names.get(parsed.freq_khz, ""), str(path))
 
     def _on_spectrum(self, k: int, freqs: Any, db: Any, trigger_dbfs: float, custom: bool) -> None:
         if k != self._audible:

@@ -110,6 +110,7 @@ export function manualView(root) {
   let ready = false;
   let active = null;
   let playingStation = 0;
+  let requestedStation = null;
   let stationKey = '';
   let infoKey = '';
   let latest;
@@ -159,26 +160,132 @@ export function manualView(root) {
       },
     }, saved ? '★' : '☆');
   };
+  const playDab = async (request) => {
+    if (destroyed || requestedStation !== request) return;
+    const { entry, prepared } = request;
+    const ok = await change('/api/manual/dab-station', { sid: entry.id, channel: entry.channel });
+    if (requestedStation !== request) return;
+    requestedStation = null;
+    if (!ok) {
+      liveAudio.stop();
+      return;
+    }
+    try {
+      await prepared;
+      if (destroyed || requestedStation || active?.channel !== entry.channel || playingStation !== entry.id) return;
+      liveAudio.useBroadcast(true);
+      await liveAudio.start();
+    } catch (e) {
+      if (!destroyed) errorToast(e);
+    }
+  };
+  const advanceDab = (data) => {
+    const request = requestedStation;
+    if (!request || request.selecting) return;
+    const { entry, receiver: targetReceiver, deadline } = request;
+    if (active?.mode === 'DAB' && active.channel === entry.channel && active.receiver === targetReceiver
+        && data.state === 'listening' && data.stations.some(({ id }) => id === entry.id)) {
+      request.selecting = true;
+      queueMicrotask(() => { void playDab(request); });
+    } else if (data.error || performance.now() >= deadline) {
+      requestedStation = null;
+      liveAudio.stop();
+      if (!data.error) errorToast(new Error(t('Saved station {name} was not found on {channel}.', {
+        name: entry.name || String(entry.id), channel: entry.channel,
+      })));
+    }
+  };
   const playEntry = async (entry, current) => {
     if (busy) return;
     if (current && liveAudio.playing) {
       liveAudio.stop();
       return;
     }
-    const dab = entry.mode === 'DAB';
+    const values = tuneValues();
+    if (entry.mode === 'DAB') {
+      liveAudio.stop();
+      const prepared = liveAudio.prepare();
+      // Observe rejections immediately, even if discovery is still pending.
+      prepared.catch(() => {});
+      const request = { entry, prepared, receiver: values.receiver, deadline: performance.now() + 35_000 };
+      requestedStation = request;
+      if (active?.mode === 'DAB' && active.channel === entry.channel && active.receiver === values.receiver) {
+        advanceDab(latest);
+      } else {
+        // Discover the ensemble through the same request as Tune. Select the
+        // saved service only after the receiver returns this channel's list.
+        const ok = await change('/api/manual/tune', { ...values, mode: 'DAB', channel: entry.channel });
+        if (!ok && requestedStation === request) {
+          requestedStation = null;
+          liveAudio.stop();
+        }
+      }
+      return;
+    }
+    requestedStation = null;
     liveAudio.useBroadcast(true);
     const wasPlaying = liveAudio.playing;
-    const action = dab && active?.mode === 'DAB' && active.channel === entry.channel
-        && latest.stations.some(({ id }) => id === entry.id)
-      ? change('/api/manual/dab-station', { sid: entry.id })
-      : change('/api/manual/tune', { ...tuneValues(), ...entry, station: dab ? entry.id : 0 });
     try {
-      const [, ok] = await Promise.all([wasPlaying ? null : liveAudio.start(), action]);
+      const [, ok] = await Promise.all([wasPlaying ? null : liveAudio.start(),
+        change('/api/manual/tune', { ...values, mode: entry.mode, frequency_hz: entry.frequency_hz })]);
       if (!ok && !wasPlaying) liveAudio.stop();
     } catch (e) {
       if (!wasPlaying) liveAudio.stop();
       errorToast(e);
     }
+  };
+  const reorderFavourite = (entry, target) => {
+    const all = readFavourites() ?? favourites;
+    const matchingMode = all.filter((fav) => fav.mode === entry.mode);
+    const from = matchingMode.findIndex((fav) => matches(entry, fav));
+    if (from < 0 || from === target || target < 0 || target >= matchingMode.length) return;
+    const [favourite] = matchingMode.splice(from, 1);
+    matchingMode.splice(target, 0, favourite);
+    let i = 0;
+    const ordered = all.map((fav) => fav.mode === entry.mode ? matchingMode[i++] : fav);
+    try {
+      writeFavourites(ordered);
+      favourites = ordered;
+      updateStationCards();
+    } catch (e) { errorToast(e); }
+  };
+  const dragHandle = (entry, index) => {
+    let target = null;
+    const clearTarget = () => {
+      target?.classList.remove('drop-target');
+      target = null;
+    };
+    const name = entry.name || (entry.mode === 'DAB' ? String(entry.id) : formatFM(entry.frequency_hz));
+    const label = t('Reorder favourite {name}', { name });
+    return h('button.manual-drag', {
+      type: 'button', title: label, 'aria-label': label,
+      onpointerdown: (event) => {
+        if (event.button === 0) event.currentTarget.setPointerCapture(event.pointerId);
+      },
+      onpointermove: (event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        clearTarget();
+        const row = document.elementFromPoint(event.clientX, event.clientY)?.closest('li.manual-station');
+        if (row?.parentElement === favouriteRows) {
+          target = row;
+          target.classList.add('drop-target');
+        }
+      },
+      onlostpointercapture: clearTarget,
+      onpointerup: () => {
+        if (!target) return;
+        const destination = Array.from(favouriteRows.children).indexOf(target);
+        clearTarget();
+        reorderFavourite(entry, destination);
+      },
+      onkeydown: (event) => {
+        if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        const destination = index + (event.key === 'ArrowUp' ? -1 : 1);
+        reorderFavourite(entry, destination);
+        favouriteRows.children[destination]?.querySelector('.manual-drag')?.focus();
+      },
+    }, '⋮⋮');
   };
   const updateStationCards = () => {
     if (!latest) return;
@@ -193,7 +300,7 @@ export function manualView(root) {
     const nextStationKey = JSON.stringify([found, saved, active, playingStation, liveAudio.playing]);
     if (nextStationKey !== stationKey) {
       stationKey = nextStationKey;
-      const row = (entry) => {
+      const row = (entry, index = -1) => {
         const dab = entry.mode === 'DAB';
         const current = active?.mode === entry.mode && (dab
           ? active.channel === entry.channel && playingStation === entry.id
@@ -206,10 +313,10 @@ export function manualView(root) {
           type: 'button', 'aria-label': `${playing ? t('Stop listening') : t('Play station')}: ${label}`,
           onclick: () => playEntry(entry, current),
         }, icon(playing ? 'stop' : 'play'), h('span.col', h('strong', label),
-          sub ? h('small.muted', sub) : null)), favouriteButton(entry));
+          sub ? h('small.muted', sub) : null)), favouriteButton(entry), index >= 0 ? dragHandle(entry, index) : null);
       };
       mount(favouriteRows, ...saved.map(row));
-      mount(stationRows, ...found.map(row));
+      mount(stationRows, ...found.map((entry) => row(entry)));
     }
     const dab = active?.mode === 'DAB';
     const fm = active?.mode === 'WFM';
@@ -307,11 +414,15 @@ export function manualView(root) {
         ? t('DAB channel {channel}', active)
         : t('Tuned to {frequency} MHz ({mode})', { frequency: active.frequency_hz / 1e6, mode: active.mode }),
     };
-    const message = data.error || statusText[data.state]();
+    const waiting = requestedStation?.entry;
+    const message = data.error || (waiting && active?.channel === waiting.channel
+      ? t('Looking for {name} on {channel}…', { name: waiting.name || String(waiting.id), channel: waiting.channel })
+      : statusText[data.state]());
     if (status.textContent !== message) mount(status, h('span.dot'), message);
     status.className = `chip state ${data.error ? 'bad' : data.state === 'listening' ? 'good live' : active ? 'accent' : ''}`;
     updateControls();
     updateListen();
+    advanceDab(data);
   };
   const refresh = async () => {
     try {
@@ -365,6 +476,7 @@ export function manualView(root) {
     change('/api/manual/record', { enabled });
   });
   stop.addEventListener('click', async () => {
+    requestedStation = null;
     if (await change('/api/manual/stop', {})) {
       liveAudio.stop();
       liveAudio.useBroadcast(false);
@@ -377,7 +489,10 @@ export function manualView(root) {
     h('section.card.hero', h('div.row', status), frequencyDisplay, info, meter,
       h('form.col', { onsubmit: (event) => {
         event.preventDefault();
-        if (!tune.disabled) change('/api/manual/tune', tuneValues());
+        if (!tune.disabled) {
+          requestedStation = null;
+          change('/api/manual/tune', tuneValues());
+        }
       } },
       h('div.row.wrap', h('label.field', t('Modulation'), mode),
         frequencyField, channelField),
