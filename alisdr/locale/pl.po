@@ -4058,8 +4058,14 @@ msgstr "Skanuj stacje FM"
 msgid "FM stations"
 msgstr "Stacje FM"
 
+msgid "Show stations without RDS names"
+msgstr "Pokaż stacje bez nazw RDS"
+
 msgid "No FM stations found."
 msgstr "Nie znaleziono stacji FM."
+
+msgid "No FM stations with RDS names found."
+msgstr "Nie znaleziono stacji FM z nazwami RDS."
 
 msgid "FM scan"
 msgstr "Skanowanie FM"

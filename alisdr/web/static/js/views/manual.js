@@ -1,4 +1,4 @@
-import { api, errorToast, fmtMHz, h, icon, mount, seg, slider, t } from '../core.js';
+import { api, errorToast, fmtMHz, h, icon, mount, seg, slider, t, toggle } from '../core.js';
 import { liveAudio } from '../live-audio.js';
 import { S, cfg, confirmRecording, on, syncConfig } from '../state.js';
 import { receiverPanel, spectrumPainter } from './listen.js';
@@ -95,9 +95,14 @@ export function manualView(root) {
   const favouritesCard = h('section.card.col', { hidden: true },
     h('div.card-head', h('h2', t('Favourites'))), favouriteRows, stationEmpty);
   const stationHeading = h('h2');
+  let showUnnamedFm = false;
+  const unnamedFmToggle = toggle(t('Show stations without RDS names'), showUnnamedFm, (checked) => {
+    showUnnamedFm = checked;
+    updateStationCards();
+  });
   const noFmStations = h('p.muted', { hidden: true }, t('No FM stations found.'));
   const stations = h('section.card.col', { hidden: true },
-    h('div.card-head', stationHeading), stationRows, noFmStations);
+    h('div.card-head.row.wrap', stationHeading, unnamedFmToggle), stationRows, noFmStations);
   const stationInfo = h('div.col');
   const info = h('section.col', { hidden: true }, h('h2', t('Station information')), stationInfo);
   const canvas = h('canvas', { height: 260, role: 'img', 'aria-label': t('Live spectrum and waterfall around the tuned frequency.') });
@@ -320,11 +325,18 @@ export function manualView(root) {
     const tunedDab = showingDab && active?.mode === 'DAB' && channel.value === active.channel;
     const fmResults = showingFM && Array.isArray(latest.fm_stations);
     const found = tunedDab ? latest.stations.map((entry) => ({ ...entry, mode: 'DAB', channel: active.channel }))
-      : fmResults ? latest.fm_stations.map((entry) => ({ ...entry, mode: 'WFM' })) : [];
+      : fmResults ? latest.fm_stations
+        .filter(({ name }) => showUnnamedFm || name?.trim())
+        .map((entry) => ({ ...entry, mode: 'WFM' })) : [];
     const saved = favourites.filter((entry) => entry.mode === mode.value);
     favouritesCard.hidden = !showingDab && !showingFM;
-    stations.hidden = !found.length && !(fmResults && !latest.fm_scan);
+    stations.hidden = !found.length && !(fmResults && (latest.fm_stations.length || !latest.fm_scan));
+    unnamedFmToggle.hidden = !fmResults;
     noFmStations.hidden = !fmResults || Boolean(latest.fm_scan) || found.length > 0;
+    if (!noFmStations.hidden) {
+      noFmStations.textContent = latest.fm_stations.length
+        ? t('No FM stations with RDS names found.') : t('No FM stations found.');
+    }
     stationHeading.textContent = showingFM ? t('FM stations') : t('DAB/DAB+ stations');
     stationEmpty.hidden = saved.length > 0;
     const nextStationKey = JSON.stringify([found, saved, active, playingStation, liveAudio.playing]);

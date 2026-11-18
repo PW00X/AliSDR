@@ -267,7 +267,8 @@ streams 48 kHz audio and blends towards mono when the stereo pilot is weak.
 Station information shows the RDS service name, programme ID and RadioText
 when decoded. Use the star to save the tuned FM frequency. With FM selected on **Static**, press
 **Scan FM stations** to scan 87.5–108 MHz silently and fill the station list.
-Receivable frequencies appear even when their RDS name is unavailable.
+By default, the list shows stations whose RDS name was decoded. Use
+**Show stations without RDS names** to see the other frequencies found by the scan.
 
 Static defaults to **Auto (hardware)**. To set a different gain mode or level,
 press **Tune** to apply them. The Scan page keeps its own configured gain.
