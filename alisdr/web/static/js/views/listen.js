@@ -312,6 +312,9 @@ export function listenView(root, modes) {
   // Bands/channels that no dongle's antenna range reaches (live.uncovered, antenna_range.py).
   const rangeNotice = h('div.notice.hidden', { role: 'status' }, icon('ban'), h('span', { style: { flex: '1 1 260px' } }));
   const tunerHeader = h('div.tuner-header', modes, h('div.tuner-readout', freqEl, nameEl));
+  const gainField = h('div.col.scan-gain');
+  const tunerGain = h('div', gainField);
+  const pausedGain = h('div', { hidden: true });
   const hero = h('section.card.hero',
     h('div.row', stateChip, h('span.spacer'), cycleText),
     tunerHeader,
@@ -323,6 +326,7 @@ export function listenView(root, modes) {
     h('div.col', { style: { gap: '4px' } },
       h('div.meter', meterFill, meterMark),
       h('div.meter-legend', h('span', '-100'), levelText, h('span', '0 dBFS'))),
+    tunerGain,
     h('div.controls', startBtn, h('div.row', listenBtn, h('div.volume', icon('volume'), volume)), skipBtn, blBtn, holdBtn, recBtn, addChannelBtn),
     h('div.row.wrap', autoRec, h('span.spacer'), h('span.faint.small', t('Boost')), boost, iqBtn));
 
@@ -401,6 +405,9 @@ export function listenView(root, modes) {
     addonPanel.classList.toggle('hidden', !id);
     const modeHost = paused ? addonPanel : tunerHeader;
     if (modes.parentNode !== modeHost) modeHost.prepend(modes);
+    const gainHost = paused ? pausedGain : tunerGain;
+    if (gainField.parentNode !== gainHost) gainHost.append(gainField);
+    pausedGain.hidden = !paused;
     if (id && !addonPoll) { addonLastId = 0; addonSeen = []; addonName = id; pollAddon(); addonPoll = setInterval(pollAddon, 2000); }
     if (!id && addonPoll) { clearInterval(addonPoll); addonPoll = null; }
     if (id) drawAddon();
@@ -530,7 +537,6 @@ export function listenView(root, modes) {
   }
 
   // ---------------------------------------------------------- quick settings
-  const gainField = h('div.col', { style: { gap: '6px' } });
   const renderGain = receiverGainControl(gainField, () =>
     [S.live?.receiver_gain, S.settings.receiver_gain].find((entry) => entry?.driver === cfg().device.driver));
   function renderQuick() {
@@ -543,12 +549,12 @@ export function listenView(root, modes) {
     const ownTrigger = c.bands.filter((b) => b.enabled && b.trigger_level_dbfs != null);
     mount(quick,
       h('div.card-head', h('h2', t('Receiver')), h('span.faint.small', t('Changes apply live'))),
+      pausedGain,
       slider({ name: t('Trigger level'), min: -90, max: 0, step: 1, value: c.trigger_level_dbfs, unit: 'dBFS', oninput: (v) => patchConfig({ trigger_level_dbfs: v }) }),
       ownTrigger.length ? h('p.faint.small', t('Bands with their own trigger level ignore this slider: {names}.', { names: ownTrigger.map((b) => b.label || bandRange(b)).join(', ') })) : null,
       h('div.col', { style: { gap: '6px' } },
         toggle(t('Squelch'), c.squelch_enabled, (v) => { patchConfig({ squelch_enabled: v }); squelch.input.disabled = !v; }, { hint: t('Mutes the noise tail after a transmission ends') }),
         squelch),
-      gainField,
       slider({ name: t('Tuning time'), min: 0, max: 1000, step: 10, value: c.timing.tuning_time_ms, unit: 'ms', oninput: (v) => patchConfig({ timing: { tuning_time_ms: v } }) }),
       slider({ name: t('Hold after a transmission'), min: 0, max: 30000, step: 100, value: c.timing.linger_time_ms, format: (v) => `${(v / 1000).toFixed(1)} s`, oninput: (v) => patchConfig({ timing: { linger_time_ms: v } }) }),
       h('div.col', { style: { gap: '6px' } },
