@@ -386,6 +386,9 @@ class Library:
             rows.sort(key=lambda r: r[1].dt_utc)
         elif sort == "long":
             rows.sort(key=lambda r: (r[1].quality.duration_sec if r[1].quality else 0), reverse=True)
+        elif sort in ("freq", "freq_desc"):
+            rows.sort(key=lambda r: (r[1].dt_utc, r[0]))
+            rows.sort(key=lambda r: r[1].freq_khz, reverse=sort == "freq_desc")
         else:
             rows.sort(key=lambda r: r[1].dt_utc, reverse=True)
         names = self._freq_names()

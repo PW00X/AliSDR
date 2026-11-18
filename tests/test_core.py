@@ -171,6 +171,24 @@ class ConfigTest(unittest.TestCase):
 
 
 class LibraryTest(_LibCase):
+    def test_frequency_sort_keeps_each_frequency_in_oldest_first_order(self) -> None:
+        older_low = "2026-01-01/2026-01-01_10-00-00_118100.wav"
+        newer_low = "2026-01-02/2026-01-02_10-00-00_118100.wav"
+        older_high = "2026-01-01/2026-01-01_09-00-00_121500.wav"
+        newer_high = "2026-01-03/2026-01-03_10-00-00_121500.wav"
+        for name in (newer_high, newer_low, older_high, older_low):
+            _wav(self.root, name)
+        self.lib.rescan()
+        result = self.lib.query(sort="freq")
+        self.assertEqual([item["id"] for item in result["items"]],
+                         [older_low, newer_low, older_high, newer_high])
+        self.assertEqual([item["id"] for item in self.lib.query(sort="freq_desc")["items"]],
+                         [older_high, newer_high, older_low, newer_low])
+        page = self.lib.query(sort="freq", offset=1, limit=2)
+        self.assertEqual([item["id"] for item in page["items"]], [newer_low, older_high])
+        one = self.lib.query(sel=["freq:118100"], sort="old")
+        self.assertEqual([item["id"] for item in one["items"]], [older_low, newer_low])
+
     def test_rescan_reads_only_folders_whose_listing_changed(self) -> None:
         import os
         from unittest import mock

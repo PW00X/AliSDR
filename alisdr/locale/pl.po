@@ -3935,6 +3935,15 @@ msgstr "Strojenie"
 msgid "Receiver mode"
 msgstr "Tryb odbiornika"
 
+msgid "Frequency: low to high"
+msgstr "Częstotliwość: rosnąco"
+
+msgid "Frequency: high to low"
+msgstr "Częstotliwość: malejąco"
+
+msgid "Sort recordings"
+msgstr "Sortuj nagrania"
+
 msgid "Spectrum floor {level} dBFS"
 msgstr "Poziom tła widma {level} dBFS"
 

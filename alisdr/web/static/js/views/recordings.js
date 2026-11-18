@@ -12,7 +12,7 @@ import { openChannelForFrequency } from './channels.js';
 
 const PAGE = 120;
 // Kept across visits to the tab.
-const F = { mode: 'frequencies', sel: [], q: '', range: 'all', minq: 0, sort: 'new', facetSort: 'count', facetQ: '', autoNext: localStorage.getItem('autonext') !== '0' };
+const F = { mode: 'frequencies', sel: [], q: '', range: 'all', minq: 0, sort: 'freq', facetSort: 'count', facetQ: '', autoNext: localStorage.getItem('autonext') !== '0' };
 
 function rangeSince(range) {
   const now = Date.now() / 1000;
@@ -38,7 +38,7 @@ export function transcriptStatus(tr, queued) {
 export function recordingsView(root) {
   const offs = [];
   const preset = sessionStorage.getItem('openFreq');  // from Statistics
-  if (preset) { F.sel = [preset]; F.mode = 'frequencies'; sessionStorage.removeItem('openFreq'); }
+  if (preset) { F.sel = [preset]; F.mode = 'frequencies'; F.sort = 'old'; sessionStorage.removeItem('openFreq'); }
   let items = [], total = 0, loading = false, current = null, selected = new Set(), facets = null, anchor = null, lastRes = null;
   const audio = new Audio();
   audio.preload = 'metadata';
@@ -55,11 +55,13 @@ export function recordingsView(root) {
     facetList);
 
   const search = h('input', { type: 'search', placeholder: t('Search frequency, name, date or transcript…'), value: F.q, oninput: debounce((e) => { F.q = e.target.value; reload(); }, 300) });
+  const sort = select([['freq', t('Frequency: low to high')], ['freq_desc', t('Frequency: high to low')], ['old', t('Oldest first')], ['new', t('Newest first')], ['quality', t('Best quality')], ['long', t('Longest')]],
+    F.sort, (v) => { F.sort = v; reload(); }, { 'aria-label': t('Sort recordings') });
   const toolbar = h('div.toolbar',
     h('div.search', icon('search'), search),
     select([['all', t('Any time')], ['today', t('Today')], ['24h', t('Last 24 h')], ['7d', t('Last 7 days')], ['30d', t('Last 30 days')]], F.range, (v) => { F.range = v; reload(); }),
     h('div.minq', slider({ name: t('Quality'), min: 0, max: 100, step: 5, value: F.minq, format: (v) => (+v ? `${v}+` : t('Any quality')), oninput: debounce((v) => { F.minq = v; reload(); }, 300) })),
-    select([['new', t('Newest first')], ['old', t('Oldest first')], ['quality', t('Best quality')], ['long', t('Longest')]], F.sort, (v) => { F.sort = v; reload(); }));
+    sort);
   const statusLine = h('div.row.wrap.small.muted');
   const recordingNow = h('div.row.wrap.small.hidden');
   const bulk = h('div.bulk.hidden');
@@ -127,6 +129,8 @@ export function recordingsView(root) {
         if (key === 'all') F.sel = [];
         else if (e.ctrlKey || e.metaKey) F.sel = F.sel.includes(key) ? F.sel.filter((k) => k !== key) : [...F.sel, key];
         else F.sel = F.sel.length === 1 && F.sel[0] === key ? [] : [key];
+        F.sort = F.sel.length === 1 && F.sel[0].startsWith('freq:') ? 'old' : 'freq';
+        sort.value = F.sort;
         renderFacets();
         reload();
       },
