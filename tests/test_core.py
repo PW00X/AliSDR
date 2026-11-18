@@ -3349,6 +3349,29 @@ class FilenameTimeZoneTest(unittest.TestCase):
 
 
 class WorkerTokenTest(unittest.TestCase):
+    def test_standalone_worker_uses_the_cli_url_and_environment(self) -> None:
+        import sys
+        from unittest.mock import Mock, patch
+        from alisdr import worker
+
+        url = "http://127.0.0.1:2424"
+        instance = Mock()
+
+        def make_worker(*args, **kwargs):
+            instance.start.side_effect = kwargs["on_detach"]
+            return instance
+
+        with patch.object(sys, "argv", ["alisdr.worker", url]), \
+                patch("signal.signal"), \
+                patch("alisdr.venv_paths.VENV_PYTHON", Path(_HOME) / "missing-venv-python"), \
+                patch("alisdr.config.AppConfig.load", return_value=AppConfig()), \
+                patch.dict(os.environ, {"ALISDR_ACCESS_TOKEN": "test-token", "ALISDR_WORKER_NAME": "remote-pc"}), \
+                patch.object(worker, "Worker", side_effect=make_worker) as factory:
+            self.assertEqual(worker.main(), 0)
+        self.assertEqual(factory.call_args.args, (url, "test-token"))
+        self.assertEqual(factory.call_args.kwargs["name"], "remote-pc")
+        instance.stop.assert_called_once()
+
     def test_api_follows_a_password_changed_while_running(self) -> None:
         from alisdr.worker import Api
         holder = {"token": ""}

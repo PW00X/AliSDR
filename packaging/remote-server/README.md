@@ -44,6 +44,15 @@ moves the existing service data to `/var/lib/alisdr`.
 
 ## Headless transcription worker
 
+For Windows x64, build a portable worker from the source checkout:
+
+```powershell
+.\packaging\windows-worker\build.ps1 -OutputZip .\AliSDR-Worker-Windows-x64.zip
+```
+
+Extract the ZIP on the worker PC and open **Start AliSDR Worker.cmd**.
+Enter the receiver address when prompted. The ZIP includes Python.
+
 Install the Python dependencies from a checkout on the worker host, then
 connect it to the receiver:
 

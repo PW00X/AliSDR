@@ -1,0 +1,16 @@
+AliSDR transcription worker for Windows x64
+
+1. Extract the entire ZIP to a folder you can write to.
+2. Open Start AliSDR Worker.cmd. Enter the receiver's address, including
+   its port if it uses a custom one. A plain hostname or IP uses port 2424.
+3. Leave the window open. In the receiver's web app, go to Add-ons >
+   Transcription & computers. Find this computer and choose Install or
+   Install with GPU support, then enable Transcribe here.
+
+Python is included. The first transcription setup downloads the selected
+engine and Whisper model. A receiver password is requested when needed.
+The launcher remembers the receiver address and keeps the password in memory.
+Press Ctrl+C in the worker window to stop it.
+
+Source and build script: https://github.com/PW00X/AliSDR
+Python licence: runtime/LICENSE.txt
