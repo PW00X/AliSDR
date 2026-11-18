@@ -1,7 +1,7 @@
 import { api, errorToast, fmtMHz, h, icon, mount, t, toggle } from '../core.js';
 import { liveAudio } from '../live-audio.js';
 import { S, cfg, confirmRecording, on, syncConfig } from '../state.js';
-import { receiverGainControl, receiverPanel, spectrumPainter } from './listen.js';
+import { liveListenButton, receiverGainControl, receiverPanel, spectrumPainter } from './listen.js';
 
 const analogModes = ['AM', 'NFM', 'WFM', 'SSB', 'USB', 'LSB'];
 
@@ -57,7 +57,7 @@ export function manualView(root, modes) {
   const stop = h('button.big', { type: 'button', disabled: true }, icon('stop'), t('Stop tuning'));
   const record = h('button.recbtn.big', { type: 'button', disabled: true,
     title: t('Continuous recording of what you hear, including silence') }, icon('record'), t('Record'));
-  const listen = h('button.big', { type: 'button', hidden: true, onclick: () => liveAudio.toggle().catch(errorToast) });
+  const { button: listen, render: renderAudio } = liveListenButton();
   const status = h('span.chip.state', { role: 'status' }, t('Loading…'));
   const readout = h('div.freq', '—');
   const frequencyDisplay = h('div', readout);
@@ -69,7 +69,7 @@ export function manualView(root, modes) {
     h('div.meter-legend', h('span', '-100'), rfLevel, h('span', '0 dBFS')));
   const volume = h('input', { type: 'range', min: 0, max: 1.5, step: 0.05, value: liveAudio.volume,
     title: t('Volume'), oninput: (event) => liveAudio.setVolume(+event.target.value) });
-  const audio = h('div.row', { hidden: true }, listen, h('div.volume', icon('volume'), volume));
+  const audio = h('div.row', listen, h('div.volume', icon('volume'), volume));
   const stationRows = h('ul.manual-stations');
   const favouriteRows = h('ul.manual-stations');
   const stationEmpty = h('p.muted', t('No favourites saved.'));
@@ -124,6 +124,7 @@ export function manualView(root, modes) {
     stop.disabled = busy || !active;
     scanFm.hidden = mode.value !== 'WFM';
     scanFm.disabled = !ready || busy || Boolean(latest?.fm_scan);
+    listen.disabled = busy || Boolean(latest?.fm_scan);
     const recording = Boolean(latest?.recording);
     record.disabled = busy || (!recording && !latest?.can_record);
     if (recording !== record.classList.contains('on')) {
@@ -374,10 +375,7 @@ export function manualView(root, modes) {
     updateStationCards();
   };
   const updateListen = () => {
-    audio.hidden = !active || Boolean(latest?.fm_scan);
-    listen.hidden = !active || active.mode === 'DAB';
-    mount(listen, icon(liveAudio.playing ? 'mute' : 'headphones'),
-      liveAudio.playing ? t('Stop listening') : t('Listen live'));
+    renderAudio();
     updateStationCards();
   };
   const render = (data) => {
@@ -524,7 +522,7 @@ export function manualView(root, modes) {
       } },
       h('div.row.wrap', h('label.field', t('Modulation'), mode),
         frequencyField, channelField),
-      h('div.controls', tune, scanFm, stop, record, audio))),
+      h('div.controls', tune, audio, scanFm, stop, record))),
     spectrumCard, stations),
     h('div.col', favouritesCard, deviceCard))));
   updateMode();

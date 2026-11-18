@@ -246,6 +246,16 @@ export function stateLabel(state) {
   }[state] || state;
 }
 
+export function liveListenButton() {
+  const button = h('button.big', { type: 'button', onclick: () => liveAudio.toggle().catch(errorToast) });
+  const render = () => {
+    button.classList.toggle('on', liveAudio.playing);
+    mount(button, icon(liveAudio.playing ? 'headphones' : 'mute'), liveAudio.playing ? t('Listening') : t('Listen'));
+  };
+  render();
+  return { button, render };
+}
+
 function stateClass(live) {
   if (!live.running) return '';
   if (live.state === 'SIGNAL_DETECTED') return 'good live';
@@ -275,7 +285,7 @@ export function listenView(root, modes) {
   const cycleText = h('span.faint.small');
 
   const startBtn = h('button.big.primary', { onclick: () => toggleScan() });
-  const listenBtn = h('button.big', { onclick: () => liveAudio.toggle().catch(errorToast) });
+  const { button: listenBtn, render: renderAudio } = liveListenButton();
   const volume = h('input', { type: 'range', min: 0, max: 1.5, step: 0.05, value: liveAudio.volume, oninput: (e) => liveAudio.setVolume(+e.target.value), title: t('Volume') });
   const boost = select(BOOST_STEPS_DB.map((db) => [db, db ? `+${db} dB` : t('No boost')]), liveAudio.boostDb, (v) => liveAudio.setBoost(+v),
     { style: { width: 'auto' }, title: t('Louder quiet voices on a phone or a weak speaker - loud peaks are still held back') });
@@ -510,11 +520,6 @@ export function listenView(root, modes) {
     renderFeed();
   }
 
-  function renderAudio() {
-    listenBtn.classList.toggle('on', liveAudio.playing);
-    mount(listenBtn, icon(liveAudio.playing ? 'headphones' : 'mute'), liveAudio.playing ? t('Listening') : t('Listen'));
-  }
-
   let lastFeedId = -1;
   function renderFeed() {
     const last = S.log.length ? S.log[S.log.length - 1].id : 0;
@@ -642,7 +647,6 @@ export function listenView(root, modes) {
   renderQuick();
   renderDevice();
   renderBands();
-  renderAudio();
   renderLive();
   offs.push(on('live', renderLive), on('audio', renderAudio), on('settings', () => { renderQuick(); renderDevice(); renderBands(); }));
   let lastSolo = S.live && S.live.solo_band;

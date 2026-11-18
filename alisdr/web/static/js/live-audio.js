@@ -97,7 +97,7 @@ export const liveAudio = {
     this.sources.clear();
   },
 
-  toggle() { return this.playing ? this.stop() : this.start(); },
+  async toggle() { return this.playing ? this.stop() : this.start(); },
 
   setVolume(v) {
     this.volume = v;

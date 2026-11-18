@@ -261,7 +261,7 @@ Tune opens with DAB/DAB+ selected on a new browser and remembers the
 last modulation you chose. For analog tuning, select a receiver and enter
 a frequency in MHz. Use WFM for broadcast FM,
 or choose AM, NFM, SSB, USB or LSB for other signals. Press **Tune**, then
-**Listen live**. Click the spectrum to fill in a nearby frequency. Analog
+**Listen**. Click the spectrum to fill in a nearby frequency. Analog
 tuning plays continuously, even below the scanner's trigger level. WFM
 streams 48 kHz audio and blends towards mono when the stereo pilot is weak.
 Station information shows the RDS service name, programme ID and RadioText
