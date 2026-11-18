@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Builds a self-contained ("fat") .deb for FalconSDR: a PyInstaller
+# Builds a self-contained ("fat") .deb for AliSDR: a PyInstaller
 # --onedir bundle (its own Python + numpy/scipy/pyrtlsdrlib + the web UI's
 # static files, all frozen in) wrapped in a Debian package, so an end user
-# needs nothing beyond `sudo apt install ./falconsdr_*.deb` - no pip, no
+# needs nothing beyond `sudo apt install ./alisdr_*.deb` - no pip, no
 # venv. The UI itself runs in the browser the app opens.
 #
 # Deliberately built in a *throwaway* venv (packaging/linux-deb/build-venv,
@@ -26,10 +26,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD="$SCRIPT_DIR/build"
 VENV="$SCRIPT_DIR/build-venv"
 ARCH="$(dpkg --print-architecture)"
-VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$REPO_ROOT/falconsdr/__init__.py")"
-PKG=falconsdr
+VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$REPO_ROOT/alisdr/__init__.py")"
+PKG=alisdr
 
-echo "== FalconSDR .deb build =="
+echo "== AliSDR .deb build =="
 echo "repo root: $REPO_ROOT"
 echo "version:   $VERSION"
 echo "arch:      $ARCH"
@@ -94,9 +94,9 @@ collect_native_libs strict
     --name "$PKG" \
     --onedir \
     --noconfirm \
-    --add-data "$REPO_ROOT/falconsdr/locale/pl.po:falconsdr/locale" \
-    --add-data "$REPO_ROOT/falconsdr/presets/band_presets.json:falconsdr/presets" \
-    --add-data "$REPO_ROOT/falconsdr/web/static:falconsdr/web/static" \
+    --add-data "$REPO_ROOT/alisdr/locale/pl.po:alisdr/locale" \
+    --add-data "$REPO_ROOT/alisdr/presets/band_presets.json:alisdr/presets" \
+    --add-data "$REPO_ROOT/alisdr/web/static:alisdr/web/static" \
     --collect-data tzdata \
     --collect-data pyrtlsdrlib     --collect-data imageio_ffmpeg     --collect-all pip \
     "${NATIVE_ARGS[@]}" \
@@ -107,8 +107,8 @@ collect_native_libs strict
 )
 
 # Fails the build if PyInstaller silently dropped something (tzdata,
-# librtlsdr...) - falconsdr/selftest.py; packaging/windows/build.ps1 does the same.
-FALCONSDR_REQUIRE_NATIVE_LIBS=1 "$BUILD/dist/$PKG/$PKG" --self-test
+# librtlsdr...) - alisdr/selftest.py; packaging/windows/build.ps1 does the same.
+ALISDR_REQUIRE_NATIVE_LIBS=1 "$BUILD/dist/$PKG/$PKG" --self-test
 
 echo "-- 3/5: assembling the .deb tree --"
 DEBROOT="$BUILD/deb"
@@ -130,9 +130,9 @@ exec /opt/$PKG/$PKG "\$@"
 WRAPPER
 chmod 755 "$DEBROOT/usr/bin/$PKG"
 
-cp "$SCRIPT_DIR/falconsdr.desktop" "$DEBROOT/usr/share/applications/"
-cp "$REPO_ROOT/falconsdr/web/static/icon.svg" \
-   "$DEBROOT/usr/share/icons/hicolor/scalable/apps/falconsdr.svg"
+cp "$SCRIPT_DIR/alisdr.desktop" "$DEBROOT/usr/share/applications/"
+cp "$REPO_ROOT/alisdr/web/static/icon.svg" \
+   "$DEBROOT/usr/share/icons/hicolor/scalable/apps/alisdr.svg"
 cp "$SCRIPT_DIR/README.md" "$DEBROOT/usr/share/doc/$PKG/packaging-README.md"
 # GPL: the license text must ship with the binary package.
 cp "$SCRIPT_DIR/../../LICENSE" "$DEBROOT/usr/share/doc/$PKG/copyright"
@@ -163,8 +163,8 @@ Priority: optional
 Architecture: $ARCH
 Installed-Size: $INSTALLED_SIZE_KB
 Recommends: ffmpeg
-Conflicts: smartscanatc
-Replaces: smartscanatc
+Conflicts: smartscanatc, falconsdr
+Replaces: smartscanatc, falconsdr
 Maintainer: rafafunt <rafafunt@gmail.com>
 Description: Wideband SDR ATC/radio scanner (self-contained build)
  Scans a radio band with an RTL-SDR (or a HackRF or Airspy, experimental)

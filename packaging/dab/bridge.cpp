@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// C ABI between FalconSDR's Python receiver and dab-cmdline's Mode I decoder.
+// C ABI between AliSDR's Python receiver and dab-cmdline's Mode I decoder.
 #include "dab-api.h"
 #include <atomic>
 #include <map>

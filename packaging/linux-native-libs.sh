@@ -3,11 +3,11 @@
 # SoapySDR on a machine with nothing installed. PyInstaller adds their libusb on its own.
 #   collect_native_libs strict   - a missing library fails the build (the .deb: built in a known container)
 #   collect_native_libs soft     - a missing library is only a warning (build.sh run by hand on whatever machine)
-#   FALCONSDR_REQUIRE_NATIVE_LIBS=1 (set by every build-in-docker.sh) makes it strict, and --self-test then requires them too.
+#   ALISDR_REQUIRE_NATIVE_LIBS=1 (set by every build-in-docker.sh) makes it strict, and --self-test then requires them too.
 # Needs the packages libhackrf0 and libairspy0 (Debian/Ubuntu) / hackrf and airspyone_host (Fedora).
 collect_native_libs() {
   local mode="$1" cache lib path
-  [ "${FALCONSDR_REQUIRE_NATIVE_LIBS:-}" = 1 ] && mode=strict   # the container builds: a missing library fails them
+  [ "${ALISDR_REQUIRE_NATIVE_LIBS:-}" = 1 ] && mode=strict   # the container builds: a missing library fails them
   NATIVE_ARGS=()
   cache="$(mktemp)"
   ldconfig -p > "$cache" 2>/dev/null || true       # to a file: `ldconfig -p | awk` would SIGPIPE under pipefail

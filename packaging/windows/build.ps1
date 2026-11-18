@@ -1,7 +1,7 @@
-# Builds FalconSDR for Windows: a self-contained PyInstaller --onedir bundle
+# Builds AliSDR for Windows: a self-contained PyInstaller --onedir bundle
 # (its own Python + numpy/scipy/pyrtlsdrlib + the web UI), shipped two ways:
-#   out\FalconSDR-<version>-windows-x64-portable.zip  - unzip and run falconsdr.exe
-#   out\FalconSDR-<version>-windows-x64-setup.exe     - Inno Setup installer
+#   out\AliSDR-<version>-windows-x64-portable.zip  - unzip and run alisdr.exe
+#   out\AliSDR-<version>-windows-x64-setup.exe     - Inno Setup installer
 # The Windows counterpart of packaging/linux-deb/build.sh - same PyInstaller
 # flags and the same reasons for them (AGENTS.md gotcha 35); see README.md here.
 #
@@ -22,13 +22,13 @@ $RepoRoot = (Resolve-Path "$ScriptDir\..\..").Path
 $Build = "$ScriptDir\build"
 $Venv = "$ScriptDir\build-venv"
 $Out = "$ScriptDir\out"
-$Version = (Select-String -Path "$RepoRoot\falconsdr\__init__.py" -Pattern '^__version__ = "(.+)"').Matches[0].Groups[1].Value
-$Dist = "$Build\dist\falconsdr"
+$Version = (Select-String -Path "$RepoRoot\alisdr\__init__.py" -Pattern '^__version__ = "(.+)"').Matches[0].Groups[1].Value
+$Dist = "$Build\dist\alisdr"
 
 function Step($text) { Write-Host "-- $text --" -ForegroundColor Cyan }
 function Check($ok, $text) { if (-not $ok) { throw $text } }
 
-Write-Host "== FalconSDR Windows build =="
+Write-Host "== AliSDR Windows build =="
 Write-Host "repo root: $RepoRoot"
 Write-Host "version:   $Version"
 
@@ -52,12 +52,12 @@ VSVersionInfo(
   kids=[
     StringFileInfo([StringTable('040904B0', [
       StringStruct('CompanyName', 'rafafunt'),
-      StringStruct('FileDescription', 'FalconSDR'),
+      StringStruct('FileDescription', 'AliSDR'),
       StringStruct('FileVersion', '$Version'),
-      StringStruct('InternalName', 'falconsdr'),
+      StringStruct('InternalName', 'alisdr'),
       StringStruct('LegalCopyright', 'GPL-3.0-or-later'),
-      StringStruct('OriginalFilename', 'falconsdr.exe'),
-      StringStruct('ProductName', 'FalconSDR'),
+      StringStruct('OriginalFilename', 'alisdr.exe'),
+      StringStruct('ProductName', 'AliSDR'),
       StringStruct('ProductVersion', '$Version')])]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
@@ -71,19 +71,19 @@ VSVersionInfo(
 # --python-option "X utf8": Python's UTF-8 mode, only a safety net - every text
 # read/write in the code names its encoding (Windows' default is cp1250).
 # --noconsole: the app runs in the background with its UI in the browser;
-# main.py sends its log to ~\.config\FalconSDR\falconsdr.log instead.
+# main.py sends its log to ~\.config\AliSDR\alisdr.log instead.
 Push-Location $RepoRoot
 try {
     & "$Venv\Scripts\pyinstaller.exe" `
-        --name falconsdr `
+        --name alisdr `
         --onedir `
         --noconsole `
         --noconfirm `
-        --icon "$ScriptDir\..\icons\falconsdr.ico" `
+        --icon "$ScriptDir\..\icons\alisdr.ico" `
         --version-file "$Build\version_info.txt" `
-        --add-data "$RepoRoot\falconsdr\locale\pl.po;falconsdr\locale" `
-        --add-data "$RepoRoot\falconsdr\presets\band_presets.json;falconsdr\presets" `
-        --add-data "$RepoRoot\falconsdr\web\static;falconsdr\web\static" `
+        --add-data "$RepoRoot\alisdr\locale\pl.po;alisdr\locale" `
+        --add-data "$RepoRoot\alisdr\presets\band_presets.json;alisdr\presets" `
+        --add-data "$RepoRoot\alisdr\web\static;alisdr\web\static" `
         --collect-data tzdata `
         --collect-data pyrtlsdrlib `
         --collect-data imageio_ffmpeg `
@@ -95,7 +95,7 @@ try {
         main.py
     Check ($LASTEXITCODE -eq 0) "PyInstaller failed"
 } finally { Pop-Location }
-Check (Test-Path "$Dist\falconsdr.exe") "falconsdr.exe was not produced"
+Check (Test-Path "$Dist\alisdr.exe") "alisdr.exe was not produced"
 # python3.dll (stable ABI): nothing in the app itself needs it, so PyInstaller
 # leaves it out - but add-on wheels built for abi3 (PyAV, used by in-app
 # transcription) fail to load without it ("DLL load failed while importing _core").
@@ -118,7 +118,7 @@ Get-Content -Raw -Encoding UTF8 "$Native\LICENSES.txt" | Add-Content -Encoding U
 
 # The checks run the built exe the way a machine with nothing installed would:
 # empty profile, PATH without Python, SDR programs or this repo's DLLs.
-$TestHome = Join-Path ([IO.Path]::GetTempPath()) "falconsdr-build-test-$PID"
+$TestHome = Join-Path ([IO.Path]::GetTempPath()) "alisdr-build-test-$PID"
 function Invoke-Clean([string[]]$ArgList, [switch]$NoWait) {
     New-Item -ItemType Directory -Force $TestHome | Out-Null
     $saved = @{ PATH = $env:PATH; USERPROFILE = $env:USERPROFILE; HOME = $env:HOME }
@@ -126,21 +126,21 @@ function Invoke-Clean([string[]]$ArgList, [switch]$NoWait) {
     $env:USERPROFILE = $TestHome
     $env:HOME = $TestHome
     try {
-        return Start-Process -FilePath "$Dist\falconsdr.exe" -ArgumentList $ArgList -PassThru -Wait:(-not $NoWait) -WindowStyle Hidden
+        return Start-Process -FilePath "$Dist\alisdr.exe" -ArgumentList $ArgList -PassThru -Wait:(-not $NoWait) -WindowStyle Hidden
     } finally {
         $env:PATH = $saved.PATH; $env:USERPROFILE = $saved.USERPROFILE; $env:HOME = $saved.HOME
     }
 }
-$TestLog = "$TestHome\.config\FalconSDR\falconsdr.log"
+$TestLog = "$TestHome\.config\AliSDR\alisdr.log"
 # A real user's profile holds non-ASCII data (Polish band names, transcripts with
 # typographic quotes) - an empty one once hid a cp1250 decode crash at startup.
 $TestLabel = "Lotnictwo $([char]0x0141)$([char]0x0105)czno$([char]0x015B)$([char]0x0107) $([char]0x2018)test$([char]0x2019)"
 function Initialize-TestProfile {
     $utf8 = New-Object System.Text.UTF8Encoding $false
-    New-Item -ItemType Directory -Force "$TestHome\.config\FalconSDR", "$TestHome\.local\share\FalconSDR" | Out-Null
-    [IO.File]::WriteAllText("$TestHome\.config\FalconSDR\config.json",
+    New-Item -ItemType Directory -Force "$TestHome\.config\AliSDR", "$TestHome\.local\share\AliSDR" | Out-Null
+    [IO.File]::WriteAllText("$TestHome\.config\AliSDR\config.json",
         "{`"bands`": [{`"start_hz`": 118000000, `"stop_hz`": 136975000, `"step_hz`": 8333, `"label`": `"$TestLabel`"}]}", $utf8)
-    [IO.File]::WriteAllText("$TestHome\.local\share\FalconSDR\transcription_cache.json",
+    [IO.File]::WriteAllText("$TestHome\.local\share\AliSDR\transcription_cache.json",
         "{`"x|1|1`": {`"text`": `"$TestLabel`"}}", $utf8)
 }
 
@@ -157,7 +157,7 @@ $Wheels = "$Build\wheels"
 Check ($LASTEXITCODE -eq 0) "downloading the test wheel failed"
 $pipLog = "$Build\pip-test.log"
 New-Item -ItemType Directory -Force $TestHome | Out-Null
-$p = Start-Process -FilePath "$Dist\falconsdr.exe" -Wait -PassThru -WindowStyle Hidden -RedirectStandardOutput $pipLog `
+$p = Start-Process -FilePath "$Dist\alisdr.exe" -Wait -PassThru -WindowStyle Hidden -RedirectStandardOutput $pipLog `
     -ArgumentList @("--pip", "install", "--no-index", "--no-deps", "--disable-pip-version-check", "--target", "`"$TestHome\addons-test`"", "`"$((Get-ChildItem "$Wheels\*.whl")[0].FullName)`"")
 Get-Content $pipLog | Write-Host
 Check ($p.ExitCode -eq 0 -and (Test-Path "$TestHome\addons-test\bin\pip.exe")) "the bundled pip could not install a wheel (exit $($p.ExitCode))"
@@ -183,7 +183,7 @@ try {
         Check ($r.StatusCode -eq 200) "GET $url -> $($r.StatusCode)"
         Write-Host "OK    GET $url ($($r.RawContentLength) bytes)"
     }
-    Invoke-WebRequest -UseBasicParsing -Method Post "http://127.0.0.1:$port/api/quit" -Headers @{ "X-FalconSDR" = "1" } -ContentType "application/json" -Body "{}" | Out-Null
+    Invoke-WebRequest -UseBasicParsing -Method Post "http://127.0.0.1:$port/api/quit" -Headers @{ "X-AliSDR" = "1" } -ContentType "application/json" -Body "{}" | Out-Null
     Check ($p.WaitForExit(15000)) "the app did not quit within 15 s after /api/quit"
     Write-Host "OK    quit cleanly"
 } finally {
@@ -193,16 +193,16 @@ try {
 
 Step "5/7: portable ZIP"
 New-Item -ItemType Directory -Force $Out | Out-Null
-$Stage = "$Build\zip\FalconSDR"
+$Stage = "$Build\zip\AliSDR"
 New-Item -ItemType Directory -Force $Stage | Out-Null
 Copy-Item -Recurse "$Dist\*" $Stage
 Copy-Item "$ScriptDir\DRIVER-pl.txt" "$Stage\Sterownik RTL-SDR (Zadig) - PRZECZYTAJ.txt"
 Copy-Item "$ScriptDir\DRIVER-en.txt" "$Stage\RTL-SDR driver (Zadig) - README.txt"
 Copy-Item "$RepoRoot\LICENSE" "$Stage\LICENSE.txt"
-$Zip = "$Out\FalconSDR-$Version-windows-x64-portable.zip"
+$Zip = "$Out\AliSDR-$Version-windows-x64-portable.zip"
 if (Test-Path $Zip) { Remove-Item -Force $Zip }
 # tar.exe (bsdtar, built into Windows 10+) - far faster than Compress-Archive.
-& "$env:SystemRoot\System32\tar.exe" -a -c -f $Zip -C "$Build\zip" FalconSDR
+& "$env:SystemRoot\System32\tar.exe" -a -c -f $Zip -C "$Build\zip" AliSDR
 Check ($LASTEXITCODE -eq 0) "creating the ZIP failed"
 
 Step "6/7: installer (Inno Setup)"
@@ -216,9 +216,9 @@ if ($SkipInstaller) {
         "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
     ) | Where-Object { Test-Path $_ } | Select-Object -First 1
     Check $Iscc "Inno Setup 6 not found - install it (winget install JRSoftware.InnoSetup) or pass -SkipInstaller"
-    & $Iscc /Q "/DAppVersion=$Version" "/DSourceDir=$Dist" "/DOutputDir=$Out" "$ScriptDir\falconsdr.iss"
+    & $Iscc /Q "/DAppVersion=$Version" "/DSourceDir=$Dist" "/DOutputDir=$Out" "$ScriptDir\alisdr.iss"
     Check ($LASTEXITCODE -eq 0) "Inno Setup failed"
-    $Setup = "$Out\FalconSDR-$Version-windows-x64-setup.exe"
+    $Setup = "$Out\AliSDR-$Version-windows-x64-setup.exe"
 }
 
 Step "7/7: checksums + Windows Sandbox test config"
@@ -233,12 +233,12 @@ Get-ChildItem $Out -Include *.zip, *.exe -Recurse | Get-FileHash -Algorithm SHA2
   <MappedFolders>
     <MappedFolder>
       <HostFolder>$Out</HostFolder>
-      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\FalconSDR-build</SandboxFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\AliSDR-build</SandboxFolder>
       <ReadOnly>true</ReadOnly>
     </MappedFolder>
   </MappedFolders>
   <LogonCommand>
-    <Command>explorer.exe C:\Users\WDAGUtilityAccount\Desktop\FalconSDR-build</Command>
+    <Command>explorer.exe C:\Users\WDAGUtilityAccount\Desktop\AliSDR-build</Command>
   </LogonCommand>
 </Configuration>
 "@ | Set-Content -Encoding UTF8 "$Out\test-in-sandbox.wsb"

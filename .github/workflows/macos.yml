@@ -1,4 +1,4 @@
-# Experimental macOS build: GitHub's macOS runners build FalconSDR.app from a
+# Experimental macOS build: GitHub's macOS runners build AliSDR.app from a
 # release tag, run its self-test and attach the zipped app to that release.
 # Unsigned (no Apple Developer account) and untested on a real Mac with an
 # SDR - hence "experimental". Run it from the Actions tab: "Run workflow".
@@ -47,17 +47,17 @@ jobs:
         run: |
           brew install hackrf airspy
           for lib in libhackrf libairspy; do ls -la "$(brew --prefix)/lib/$lib.dylib"; done
-      - name: Build FalconSDR.app
+      - name: Build AliSDR.app
         # Same bundling rules as packaging/linux-deb/build.sh (AGENTS.md gotcha 35/43).
         run: |
           python -m venv venv
           venv/bin/pip install -q -r requirements.txt pyinstaller pillow
-          echo "VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' falconsdr/__init__.py)" >> "$GITHUB_ENV"
-          venv/bin/pyinstaller --name FalconSDR --windowed --onedir --noconfirm \
-            --icon packaging/icons/falconsdr.png --osx-bundle-identifier app.falconsdr \
-            --add-data falconsdr/locale/pl.po:falconsdr/locale \
-            --add-data falconsdr/presets/band_presets.json:falconsdr/presets \
-            --add-data falconsdr/web/static:falconsdr/web/static \
+          echo "VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' alisdr/__init__.py)" >> "$GITHUB_ENV"
+          venv/bin/pyinstaller --name AliSDR --windowed --onedir --noconfirm \
+            --icon packaging/icons/alisdr.png --osx-bundle-identifier app.alisdr \
+            --add-data alisdr/locale/pl.po:alisdr/locale \
+            --add-data alisdr/presets/band_presets.json:alisdr/presets \
+            --add-data alisdr/web/static:alisdr/web/static \
             --collect-data tzdata --collect-data pyrtlsdrlib \
             --collect-data imageio_ffmpeg --collect-all pip \
             --add-binary "$(brew --prefix)/lib/libhackrf.dylib:." \
@@ -65,17 +65,17 @@ jobs:
             main.py
       - name: Self-test of the built app
         env:
-          FALCONSDR_REQUIRE_NATIVE_LIBS: "1"
+          ALISDR_REQUIRE_NATIVE_LIBS: "1"
         run: |
           set +e
-          dist/FalconSDR.app/Contents/MacOS/FalconSDR --self-test
+          dist/AliSDR.app/Contents/MacOS/AliSDR --self-test
           rc=$?
-          cat ~/.config/FalconSDR/falconsdr.log 2>/dev/null
+          cat ~/.config/AliSDR/alisdr.log 2>/dev/null
           exit $rc
       # BSD-3-Clause (libhackrf, libairspy) wants its notice with a binary; the same file the Windows/Linux packages carry.
       - name: Third-party licences
         run: |
-          out=dist/FalconSDR.app/Contents/Resources/THIRD-PARTY-LICENSES.txt
+          out=dist/AliSDR.app/Contents/Resources/THIRD-PARTY-LICENSES.txt
           venv/bin/python packaging/collect_licenses.py "$out"
           { for f in libhackrf libairspy; do
               printf '\n==============================================================================\n%s (bundled shared library)\n==============================================================================\n\n' "$f"
@@ -90,17 +90,17 @@ jobs:
       # again (the nested code is already signed), then fail the build if the signature is not valid.
       - name: Re-seal and verify the signature
         run: |
-          codesign --force --sign - dist/FalconSDR.app
-          codesign --verify --deep --strict --verbose=2 dist/FalconSDR.app
+          codesign --force --sign - dist/AliSDR.app
+          codesign --verify --deep --strict --verbose=2 dist/AliSDR.app
       - name: Zip the app
-        run: ditto -c -k --keepParent dist/FalconSDR.app "FalconSDR-$VERSION-macos-${{ matrix.arch }}-experimental.zip"
+        run: ditto -c -k --keepParent dist/AliSDR.app "AliSDR-$VERSION-macos-${{ matrix.arch }}-experimental.zip"
       # Kept as a workflow artifact too: a draft release has no tag yet, and a failed attach must not lose the build.
       - uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}
-          path: FalconSDR-*-macos-*-experimental.zip
+          path: AliSDR-*-macos-*-experimental.zip
       - name: Attach to the release
         if: inputs.attach
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ inputs.tag }}" "FalconSDR-$VERSION-macos-${{ matrix.arch }}-experimental.zip" --clobber
+        run: gh release upload "${{ inputs.tag }}" "AliSDR-$VERSION-macos-${{ matrix.arch }}-experimental.zip" --clobber

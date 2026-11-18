@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/PW00X/AliSDR/master/packaging/insta
 ```
 
 It installs this fork's `master` branch and keeps its checkout in
-`/opt/falconsdr-src`. Set `FALCONSDR_REF=<tag or branch>` before `bash` to
+`/opt/alisdr-src`. Set `ALISDR_REF=<tag or branch>` before `bash` to
 choose a different ref. The optional `--with-dab` flag builds AliSDR's
 in-process DAB/DAB+ decoder on the receiver. Or, from a checkout of
 this repository:
@@ -27,17 +27,19 @@ sudo packaging/remote-server/install.sh
 Either way the service is started (and on every boot) and the address to
 open is printed at the end.
 
-The script copies the app to `/opt/falconsdr`, creates its own Python
-venv there, adds the unprivileged `falconsdr` user (settings in
-`/var/lib/falconsdr/.config/FalconSDR`, recordings by default in
-`/var/lib/falconsdr/FalconSDR/recordings`), installs the RTL-SDR udev
+The script copies the app to `/opt/alisdr`, creates its own Python
+venv there, adds the unprivileged `alisdr` user (settings in
+`/var/lib/alisdr/.config/AliSDR`, recordings by default in
+`/var/lib/alisdr/AliSDR/recordings`), installs the RTL-SDR udev
 rule and DVB-T driver blacklist, and the systemd unit. Re-run it after
 `git pull` to update; settings and recordings stay. An older install that ran
 as root has its settings moved over automatically the first time.
 
 The web client opens on **Manual**. Scanning begins when you press
-**Start** on **Scan**. Stopping `falconsdr-receiver.service` closes open
-recordings cleanly.
+**Start** on **Scan**. Stopping `alisdr-receiver.service` closes open
+recordings cleanly. On upgrade, the installer replaces the standalone
+receiver unit with an alias to `alisdr-receiver.service` so existing scripts and unit overrides continue to work. The upgrade
+moves the existing service data to `/var/lib/alisdr`.
 
 ## Transcription and copies on your PC
 
@@ -65,4 +67,4 @@ lxc config device add INSTANCE rtlsdr usb vendorid=0bda productid=2838
 ```
 
 The service reconnects by itself once the device appears. Check with
-`rtl_test -t` and `systemctl status falconsdr-receiver`.
+`rtl_test -t` and `systemctl status alisdr-receiver`.

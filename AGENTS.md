@@ -1,13 +1,13 @@
-# AGENTS.md — FalconSDR
+# AGENTS.md — AliSDR
 
 Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-FalconSDR scans a radio band (default: airband ATC 118–136 MHz) via
+AliSDR scans a radio band (default: airband ATC 118–136 MHz) via
 SoapySDR (Linux) or a native librtlsdr backend (Windows/macOS — gotcha 16)
 and records audio **only** for transmissions the scanner actually stops on —
-never the retuning noise. `falconsdr/scanner_engine.py`'s state machine is
+never the retuning noise. `alisdr/scanner_engine.py`'s state machine is
 the authoritative spec.
 
 The UI is a **web app** served by the program itself (Python standard
@@ -16,10 +16,10 @@ program, three modes (`main.py`):
 
 - **local** (default) — this computer scans; UI on `http://127.0.0.1:8765`,
   opened in the browser automatically. A second launch just reopens it.
-- **server** (`--server`, systemd `falconsdr-receiver.service`) — same,
+- **server** (`--server`, systemd `alisdr-receiver.service`) — same,
   reachable from the whole network (phones too). `sdr-mode` (the owner's
-  mode switcher on the receiver) starts/stops exactly this unit — keep the
-  unit name and its clean SIGTERM shutdown (gotcha 41).
+  mode switcher on the receiver) can use the legacy alias. Keep its clean
+  SIGTERM shutdown (gotcha 41).
 - **client** — `AppConfig.remote_receiver.enabled`: this computer doesn't
   scan; it runs a `Worker` for a server (local Whisper transcription and/or
   a verified local copy of the recordings) and opens the server's UI.
@@ -45,7 +45,7 @@ permissive. A new dependency must be GPLv3-compatible.
 
 **i18n**: Python strings go through `tr()`, browser strings through `t()`
 (`static/js/core.js`) — both use the English text as the key into the same
-`.po` files under `falconsdr/locale/` (hand-rolled reader, no `gettext`/`.mo`;
+`.po` files under `alisdr/locale/` (hand-rolled reader, no `gettext`/`.mo`;
 `GET /api/i18n` hands the browser its catalog — "auto" language = the
 browser's). Every new UI string needs a `pl.po` entry. **Never build a
 module-level constant from `tr()`/`t()` calls** — they'd freeze before the
@@ -56,30 +56,30 @@ catalog loads; wrap them in a function called at point of use
 
 - `main.py` — CLI/modes, single-instance check, clean shutdown on
   SIGTERM/SIGINT, mode switches (gotcha 41).
-- `falconsdr/web/server.py` — `ThreadingHTTPServer` + JSON API + live-audio
+- `alisdr/web/server.py` — `ThreadingHTTPServer` + JSON API + live-audio
   stream + recording files (HTTP Range) + worker protocol; auth/CSRF in
   `_route` (gotcha 38). `web/static/` — `index.html`, `app.css`,
   `js/core.js` (DOM/i18n/dialogs), `js/state.js` (settings, live polling,
   legal notices), `js/live-audio.js` (gotcha 40), `js/views/*.js` (Listen,
   Recordings, Channels, Statistics, Settings).
-- `falconsdr/controller.py` — `Controller`: owns `AppConfig`, Memory List,
+- `alisdr/controller.py` — `Controller`: owns `AppConfig`, Memory List,
   blacklist, the one `ScannerEngine`, its live snapshot, audio fan-out and
   the `Library`; config edits arrive as JSON patches (`merge_patch`).
-- `falconsdr/playback/index.py` — `Library`: in-memory index of closed
+- `alisdr/playback/index.py` — `Library`: in-memory index of closed
   recordings + quality/transcript/favorite/mirrored state, queries, facets,
   stats, retention, and the server side of the worker protocol (gotcha 37).
-- `falconsdr/worker.py` — `Worker`: transcription jobs (leased), mirroring,
+- `alisdr/worker.py` — `Worker`: transcription jobs (leased), mirroring,
   one-shot upload/import of a client's own library, install command.
-- `falconsdr/addons/` — optional decoders: built-in APRS/ACARS on a slot's audio, external rtl_433/dumpvdl2
+- `alisdr/addons/` — optional decoders: built-in APRS/ACARS on a slot's audio, external rtl_433/dumpvdl2
   supervised as processes (gotcha 58, `docs/addons.md`). `AppConfig.addons`; UI `views/addons.js`, `views/messages.js`.
-- `falconsdr/models.py` — `ScannerState`, `Channel`, `BlacklistEntry`.
-- `falconsdr/config.py` — `AppConfig`, persisted (atomically) to
-  `~/.config/FalconSDR/config.json`; unknown keys ignored on load.
+- `alisdr/models.py` — `ScannerState`, `Channel`, `BlacklistEntry`.
+- `alisdr/config.py` — `AppConfig`, persisted (atomically) to
+  `~/.config/AliSDR/config.json`; unknown keys ignored on load.
   `device.sample_rate_hz` is the wideband **capture bandwidth**;
   `memory_channel_bandwidth_hz` is the per-channel power-window width for
   Memory List channels (a band uses its own `step_hz` instead).
-- `falconsdr/storage.py` — CSV read/write for `channels.csv`/`blacklist.csv`.
-- `falconsdr/schedule.py` — time-of-day schedule (`ScheduleConfig`): which
+- `alisdr/storage.py` — CSV read/write for `channels.csv`/`blacklist.csv`.
+- `alisdr/schedule.py` — time-of-day schedule (`ScheduleConfig`): which
   bands and whether the Memory List are scanned now. Overlapping entries
   scan the union; between entries `outside` = "off" (nothing) or "normal"
   (the bands' own switches). An entry crossing midnight belongs to its start
@@ -87,23 +87,23 @@ catalog loads; wrap them in a function called at point of use
   the id (`views/bands.js` `newBand`), so it is stable before any reload.
   `ScannerEngine._maybe_follow_schedule()` rebuilds the windows when the
   active set changes (checked every 5 s).
-- `falconsdr/channelizer.py` — `plan_windows()` groups channel frequencies
+- `alisdr/channelizer.py` — `plan_windows()` groups channel frequencies
   into the fewest capture windows; `channel_powers_dbfs()`/
   `channel_powers_from_spectrum()` do one FFT per block and sum power per
   channel's bins; `spectrum_snapshot()` feeds the UI spectrum;
   `extend_boundary_window()` probes just past a *swept band's* edge (gotcha
   31/32 — never a single point).
-- `falconsdr/dsp.py` — `Demodulator` (AM/NFM/WFM/SSB → mono audio, gotcha
+- `alisdr/dsp.py` — `Demodulator` (AM/NFM/WFM/SSB → mono audio, gotcha
   7/25) and `NoiseReducer` (spectral-gate, minimum-statistics noise floor).
-- `falconsdr/sdr_backend.py` — `SoapyBackend`, `RtlSdrBackend` (gotcha 16),
+- `alisdr/sdr_backend.py` — `SoapyBackend`, `RtlSdrBackend` (gotcha 16),
   `SimulatedBackend`, `AcquisitionThread` (gotcha 11 — this is what
   `ScannerEngine._backend` actually is). `open_real_backend()`/
   `create_backend()` pick/fall back (gotcha 8/9/10).
-- `falconsdr/agc.py` — `SoftwareAgc`, software-driven RF gain control
+- `alisdr/agc.py` — `SoftwareAgc`, software-driven RF gain control
   (gotcha 27).
-- `falconsdr/recorder.py` — WAV writer only (gotcha 14: mp3 is a post-close
+- `alisdr/recorder.py` — WAV writer only (gotcha 14: mp3 is a post-close
   transcode, not a `Recorder` concern). `single_file` flag: gotcha 13/23.
-- `falconsdr/scanner_engine.py` — `ScannerEngine(threading.Thread)`:
+- `alisdr/scanner_engine.py` — `ScannerEngine(threading.Thread)`:
   `CALCULATE_NEXT_FREQ → TUNING → SCANNING → SIGNAL_DETECTED ⇄ LINGER`.
   Retunes to a whole capture window, not a single channel; `SCANNING` picks
   the strongest non-blacklisted candidate per tick, `_service_active_slots()`
@@ -290,7 +290,7 @@ catalog loads; wrap them in a function called at point of use
     the triggering toggle/button and have zero side effects.
 
 21. **Band presets (`military_presets.py`) are JSON, not a hardcoded list**:
-    bundled `falconsdr/presets/band_presets.json` + user's
+    bundled `alisdr/presets/band_presets.json` + user's
     `CONFIG_DIR/band_presets.json` (edits/additions/hidden-builtin-ids),
     merged live via `get_all_presets()` — **never cache this** (same class
     of bug as the i18n module-constant trap). Editing a built-in shadows it
@@ -337,7 +337,7 @@ catalog loads; wrap them in a function called at point of use
 
 27. **Three gain modes (`DeviceConfig.gain_mode`): `"manual"`, `"auto"` =
     the tuner's own hardware AGC (passed straight to `backend.set_gain`),
-    `"sw_auto"` = `SoftwareAgc` (`falconsdr/agc.py`, the default).**
+    `"sw_auto"` = `SoftwareAgc` (`alisdr/agc.py`, the default).**
     Hardware AGC can overdrive the ADC (measured +0.7/+1 dBFS peaks, extra
     spurious neighbour detections), so `"sw_auto"` is the default: `_maybe_apply_gain()`/`_maybe_run_software_agc()` send explicit
     `"manual"` values computed from each tick's IQ peak (target ≈ −6 dBFS,
@@ -421,7 +421,7 @@ catalog loads; wrap them in a function called at point of use
     silent file (stays all-zero).
 35. **`packaging/linux-deb/build.sh`** builds a self-contained PyInstaller
     `--onedir` bundle wrapped in a .deb (RTL-SDR only - no SoapySDR - plus
-    `falconsdr/web/static` as data; see its own header comment and
+    `alisdr/web/static` as data; see its own header comment and
     README.md for the full rationale/known limitations). Several real,
     clean-container-verified gotchas any other frozen build (Windows .exe,
     AppImage) will also hit - the first two are the same underlying
@@ -509,7 +509,7 @@ catalog loads; wrap them in a function called at point of use
     explicit choice — it's a home-LAN tool). When set (`/api/access`), every
     `/api/` call except session/login/i18n needs the HttpOnly cookie or
     `Authorization: Bearer`. Independently, every POST/PUT must carry
-    `X-FalconSDR: 1` (a non-simple header → CORS preflight this server never
+    `X-AliSDR: 1` (a non-simple header → CORS preflight this server never
     answers → other websites can't trigger actions), and local mode with no
     password refuses non-loopback `Host` headers (DNS rebinding). Keep both
     when adding endpoints; `api()` in `core.js` and `worker.Api` add the
@@ -550,14 +550,14 @@ catalog loads; wrap them in a function called at point of use
 
 43. **Windows release = `packaging/windows/build.ps1`** (PyInstaller
     `--onedir --noconsole` → portable ZIP + Inno Setup installer,
-    `falconsdr.iss`; see its README). Same `--collect-data` rules as gotcha
-    35. Every build runs `main.py --self-test` (`falconsdr/selftest.py`) and
+    `alisdr.iss`; see its README). Same `--collect-data` rules as gotcha
+    35. Every build runs `main.py --self-test` (`alisdr/selftest.py`) and
     a smoke run on the *built* exe with `PATH` = System32 and an empty
     profile - a dependency the bundle lacks must fail the build, never a
     user's first launch (`build.sh` runs the self-test too). Add a check to
     `selftest.py` for any new runtime-loaded dependency. A windowed exe has
     `sys.stdout`/`stderr` = None - `main.py` points them at
-    `CONFIG_DIR/falconsdr.log`. The installer never touches the user's
+    `CONFIG_DIR/alisdr.log`. The installer never touches the user's
     profile; its `AppId` must never change (upgrades/uninstall find the
     install by it). **Packaged builds install transcription too**: `main.py
     --pip` runs the bundled pip (`--collect-all pip`, plus a distlib finder
@@ -573,14 +573,14 @@ catalog loads; wrap them in a function called at point of use
     `imageio-ffmpeg`'s binary; spawn console tools with `NO_WINDOW` (the
     windowed exe would flash a console per call). Never assume text files
     are read in UTF-8 on Windows - always pass `encoding="utf-8"`. **The
-    installer's "Launch FalconSDR" goes through `explorer.exe`, never the exe
+    installer's "Launch AliSDR" goes through `explorer.exe`, never the exe
     directly**: a process Inno Setup starts inherits its RedirectionTrust
     mitigation and can't follow the (non-admin) symlinks of the Hugging Face
     model cache - every model load failed with "Unable to open file
     'model.bin'" until the app was restarted from the Start menu. A model
     that can't load raises `ModelUnavailable` - the recording goes back to
     the queue (worker retries in `_MODEL_RETRY_S`), never an "error" result.
-44. **"Start with the system" (`falconsdr/autostart.py`) is off by default
+44. **"Start with the system" (`alisdr/autostart.py`) is off by default
     and the OS login item is its only state** (HKCU `Run` / XDG autostart
     `.desktop` / macOS LaunchAgent - the last untested on a real Mac), no
     config flag that could disagree with it. Always `--no-browser`. Local
@@ -591,7 +591,7 @@ catalog loads; wrap them in a function called at point of use
 
 45. **Digital voice (DMR, C4FM/YSF) is an optional add-on, never bundled**
     (`digital_voice.py`): dsd-fme + mbelib (AMBE/IMBE vocoder - patent-
-    encumbered, so FalconSDR must never distribute it) are fetched from their
+    encumbered, so AliSDR must never distribute it) are fetched from their
     authors on the user's machine - the authors' Windows zip, pinned source
     built into `DSD_DIR` elsewhere (`install_hint()` gives the root command for
     the -dev packages; the app never asks for a password). `dsd_executable()`
@@ -726,7 +726,7 @@ catalog loads; wrap them in a function called at point of use
     only a fifth of it. Per block, same output: `channelizer._power_spectrum` is scipy complex64 (3.4x), the mixer
     reuses one rotation vector per channel (`Demodulator._mix`), and `StreamResampler` decimates in two stages when the
     ratio is large (4x; level 0.00005 dB, audio -72 dB; digital voice keeps one stage).
-    `FALCONSDR_DEBUG_LIVE_AUDIO=1` now also prints GC
+    `ALISDR_DEBUG_LIVE_AUDIO=1` now also prints GC
     pauses >= 20 ms (`[gc ...]`) and, for a tick > 150 ms, where the engine
     thread was (`[stall ...]`, sampled every 5 ms; far fewer samples than
     elapsed/5 ms = the GIL was held in C code). Measure gaps from the client
@@ -803,7 +803,7 @@ catalog loads; wrap them in a function called at point of use
     marker file `CONFIG_DIR/rtlsdr_stream.active` (pid) is written when a stream first starts and removed by a clean
     `close()`; one left by another process = the last run died while streaming, so the stream stays off for this run only
     (not saved: a kill or power cut leaves the same marker). Not verified on a real affected dongle - the cause is inferred
-    (probably `rtlsdr_cancel_async`); ask for the traceback in `falconsdr.log`.
+    (probably `rtlsdr_cancel_async`); ask for the traceback in `alisdr.log`.
 
 55. **HackRF/Airspy natively (`sdr_native.py`, drivers `hackrf_native`/`airspy_native`) is experimental** - the author owns an RTL-SDR
     only. **Only a HackRF One has run so far** (a user, Linux 6.12 `+deb13` kernel, 10 MS/s, issue #9, 2026-11-01, `--probe-sdr`: both ways
@@ -812,14 +812,14 @@ catalog loads; wrap them in a function called at point of use
     "DC spike" below; Airspy never.) SoapySDR stays the default for both; the native
     path is the way out when SoapySDR is missing/fails (`open_real_backend`: `hackrf`/`airspy` without SoapySDR
     open natively) and a way to compare. `libhackrf`/`libairspy` are loaded by `_find_library` (bundle folder, system
-    package, `FALCONSDR_LIBHACKRF`/`FALCONSDR_LIBAIRSPY`) and **bundled in the Windows build, every Linux package and (since 1.4.1) the macOS builds (Homebrew `hackrf`/`airspy`, `--add-binary`, self-test required via `FALCONSDR_REQUIRE_NATIVE_LIBS`; the workflow's `attach` input off = a test build that never touches a release)** (the
-    `build-in-docker.sh` scripts install them - Fedora: `hackrf`, `airspyone_host` - and set `FALCONSDR_REQUIRE_NATIVE_LIBS=1`: a missing
+    package, `ALISDR_LIBHACKRF`/`ALISDR_LIBAIRSPY`) and **bundled in the Windows build, every Linux package and (since 1.4.1) the macOS builds (Homebrew `hackrf`/`airspy`, `--add-binary`, self-test required via `ALISDR_REQUIRE_NATIVE_LIBS`; the workflow's `attach` input off = a test build that never touches a release)** (the
+    `build-in-docker.sh` scripts install them - Fedora: `hackrf`, `airspyone_host` - and set `ALISDR_REQUIRE_NATIVE_LIBS=1`: a missing
     one fails the build and `--self-test` requires them). Licences checked from the sources on 2026-10-31: both libraries BSD-3-Clause
     (GPL-compatible; a binary needs their notice: `fetch_native_libs.py` and `linux-native-libs.sh` append it to
     THIRD-PARTY-LICENSES.txt), libusb LGPL-2.1 and libwinpthread MIT, as separate DLLs/.so. Windows DLLs come from
     conda-forge, pinned by SHA-256 in `packaging/windows/fetch_native_libs.py` (HackRF publishes no Windows binaries;
     Airspy's own zip needs the VC++ 2010 runtime) - update them there; `--self-test` loads both (a dropped file fails
-    the build; `FALCONSDR_REQUIRE_NATIVE_LIBS=1` makes it required on Linux too). Do not copy SoapyHackRF (MIT) / hackrf-tools
+    the build; `ALISDR_REQUIRE_NATIVE_LIBS=1` makes it required on Linux too). Do not copy SoapyHackRF (MIT) / hackrf-tools
     (GPL-2.0) code; the gain split is our own. What the code assumes and `main.py --probe-sdr` must confirm on a
     real board: how many blocks after a retune still hold the old frequency (`CallbackStream.begin_retune` drops
     those that arrive within one transfer + a margin of the retune - the same bug SoapySDR had, gotcha 54), the
@@ -858,7 +858,7 @@ catalog loads; wrap them in a function called at point of use
     `streaming` is always True: the spacing of reads says nothing about loss on a TCP stream (late data waits in the
     socket), the health line's `iq_uncovered` showed a false 37 % otherwise; loss on the server side (rtl_tcp drops
     buffers for a slow client) is invisible from here. **Verified on the owner's receiver (RTL-SDR Blog V4, Debian rtl_tcp
-    2.0.1, FalconSDR on another PC over a LAN, 2026-11-10):** scan of 9 windows 2.46 s per cycle against 1.81 s with the
+    2.0.1, AliSDR on another PC over a LAN, 2026-11-10):** scan of 9 windows 2.46 s per cycle against 1.81 s with the
     dongle local (librtlsdr, same code), 0 blocks dropped, a real recording (132.350 MHz, SNR 29.9 dB), noise floors
     within 0.4 dB of the local read, reconnect after `kill -9 rtl_tcp` (RECONNECTING, retry every 2 s, back ~3 s after
     the server). The owner's `rtl-tcp-proxy` (coalesces frequency commands to one per 150 ms) changed nothing for a
@@ -901,7 +901,7 @@ catalog loads; wrap them in a function called at point of use
     from the file). A `createMediaElementSource` audio element is silent while
     its `AudioContext` is suspended: the player resumes it on `play`.
 
-58. **Add-ons (`falconsdr/addons/`, design in `docs/addons.md`).** Built-in decoders (APRS, ACARS) are *data slots*:
+58. **Add-ons (`alisdr/addons/`, design in `docs/addons.md`).** Built-in decoders (APRS, ACARS) are *data slots*:
     `AddonManager.claim(freq)` (enabled add-on, within `CLAIM_TOLERANCE_HZ` = half the 8.333 kHz grid, so only the
     nearest grid point) makes `_open_slot` force the demodulation the decoder needs and attach `slot.data_decoder`;
     `_process_one_slot` feeds it the demod audio and returns before `_play_and_record_slot` (nothing played or
@@ -952,7 +952,7 @@ catalog loads; wrap them in a function called at point of use
     disk (`backfill`). Overview = one tile per add-on and a stacked activity chart (the only comparison that means
     something); one page per add-on for its own figures. Rows link to Messages through `sessionStorage.msgQuery`.
 
-59. **Notifications (`falconsdr/notifier.py`, last card of the Add-ons page, `views/notify.js`) and the rtl_433 catalog
+59. **Notifications (`alisdr/notifier.py`, last card of the Add-ons page, `views/notify.js`) and the rtl_433 catalog
     (`addons/sensors.py`).** Rules (`NotifyConfig.rules`: source message/recording/transcript/system; addons, text_any,
     who, label, freq_mhz ±4200 Hz, metric/op/value, within_km) go to channels (ntfy, Telegram, webhook, MQTT QoS 0 - stdlib
     only, no dependency). Nothing leaves the machine until the user adds a channel, and the UI says the message text then
@@ -979,7 +979,7 @@ Unit tests: `python -m unittest tests/test_core.py` (sets its own scratch
 `"debug_mode": true, "device": {"driver": "simulated"}` and a scratch
 `recording.output_dir` — otherwise
 config edits during a manual test run land in the real
-`~/.config/FalconSDR/config.json`. When constructing `Controller`/
+`~/.config/AliSDR/config.json`. When constructing `Controller`/
 `ScannerEngine` directly in a script, set config overrides *before*
 construction. UI changes: check every page in a headless Chrome (DevTools
 protocol: console errors + screenshots, desktop and ~390 px wide). Verified

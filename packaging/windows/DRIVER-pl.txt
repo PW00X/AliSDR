@@ -1,4 +1,4 @@
-﻿FalconSDR - sterownik odbiornika RTL-SDR (Windows)
+﻿AliSDR - sterownik odbiornika RTL-SDR (Windows)
 ==================================================
 
 Windows obsługuje odbiornik RTL-SDR tylko przez sterownik WinUSB. Instaluje
@@ -18,7 +18,7 @@ Instalacja sterownika (ok. 2 minuty):
      NIE wybieraj "Interface 1" ani klawiatury, myszy czy słuchawek.
   5. Po prawej stronie strzałki musi być "WinUSB". Kliknij
      "Replace Driver" (lub "Install Driver") i poczekaj na koniec.
-  6. Odłącz odbiornik, podłącz go ponownie i w FalconSDR naciśnij Start.
+  6. Odłącz odbiornik, podłącz go ponownie i w AliSDR naciśnij Start.
 
 Uwaga: po podłączeniu odbiornika do innego portu USB może być potrzebne
 powtórzenie tych kroków.
@@ -26,5 +26,5 @@ powtórzenie tych kroków.
 Tę samą instrukcję znajdziesz w programie: strona "Nasłuch" -> karta
 "Urządzenie SDR" -> "Odbiornik niewykryty? Instrukcja sterownika (Zadig)".
 
-Interfejs FalconSDR działa w przeglądarce: http://127.0.0.1:8765
+Interfejs AliSDR działa w przeglądarce: http://127.0.0.1:8765
 Program działa w tle - zamkniesz go w Ustawienia -> Zaawansowane -> Zamknij.

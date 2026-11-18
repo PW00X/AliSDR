@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Builds a self-contained FalconSDR AppImage: a PyInstaller --onedir bundle
+# Builds a self-contained AliSDR AppImage: a PyInstaller --onedir bundle
 # (its own Python + numpy/scipy/pyrtlsdrlib + the web UI's static files)
 # packed with appimagetool into one executable file that runs on most
 # modern distributions with no install step:
 #
-#   chmod +x FalconSDR-<version>-x86_64.AppImage
-#   ./FalconSDR-<version>-x86_64.AppImage
+#   chmod +x AliSDR-<version>-x86_64.AppImage
+#   ./AliSDR-<version>-x86_64.AppImage
 #
 # The AppImage counterpart of packaging/linux-deb/build.sh - same PyInstaller
 # flags and the same reasons for them (AGENTS.md gotcha 35).
@@ -33,10 +33,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD="$SCRIPT_DIR/build"
 VENV="$SCRIPT_DIR/build-venv"
 ARCH="$(uname -m)"
-VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$REPO_ROOT/falconsdr/__init__.py")"
-PKG=falconsdr
+VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$REPO_ROOT/alisdr/__init__.py")"
+PKG=alisdr
 
-echo "== FalconSDR AppImage build =="
+echo "== AliSDR AppImage build =="
 echo "repo root: $REPO_ROOT"
 echo "version:   $VERSION"
 echo "arch:      $ARCH"
@@ -71,9 +71,9 @@ collect_native_libs soft
     --name "$PKG" \
     --onedir \
     --noconfirm \
-    --add-data "$REPO_ROOT/falconsdr/locale/pl.po:falconsdr/locale" \
-    --add-data "$REPO_ROOT/falconsdr/presets/band_presets.json:falconsdr/presets" \
-    --add-data "$REPO_ROOT/falconsdr/web/static:falconsdr/web/static" \
+    --add-data "$REPO_ROOT/alisdr/locale/pl.po:alisdr/locale" \
+    --add-data "$REPO_ROOT/alisdr/presets/band_presets.json:alisdr/presets" \
+    --add-data "$REPO_ROOT/alisdr/web/static:alisdr/web/static" \
     --collect-data tzdata \
     --collect-data pyrtlsdrlib \
     --collect-data imageio_ffmpeg \
@@ -92,13 +92,13 @@ APPDIR="$BUILD/AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/scalable/apps"
 cp -r "$BUILD/dist/$PKG" "$APPDIR/usr/bin/$PKG"
-cp "$REPO_ROOT/packaging/linux-deb/falconsdr.desktop" "$APPDIR/usr/share/applications/"
-cp "$APPDIR/usr/share/applications/falconsdr.desktop" "$APPDIR/falconsdr.desktop"
+cp "$REPO_ROOT/packaging/linux-deb/alisdr.desktop" "$APPDIR/usr/share/applications/"
+cp "$APPDIR/usr/share/applications/alisdr.desktop" "$APPDIR/alisdr.desktop"
 # desktop entry must point at the AppRun-launched binary for appimagetool lint
-sed -i 's|^Exec=.*|Exec=falconsdr|' "$APPDIR/falconsdr.desktop" "$APPDIR/usr/share/applications/falconsdr.desktop"
-cp "$REPO_ROOT/falconsdr/web/static/icon.svg" "$APPDIR/falconsdr.svg"
-cp "$REPO_ROOT/falconsdr/web/static/icon.svg" "$APPDIR/usr/share/icons/hicolor/scalable/apps/falconsdr.svg"
-cp "$REPO_ROOT/packaging/icons/falconsdr.png" "$APPDIR/falconsdr.png" 2>/dev/null || true
+sed -i 's|^Exec=.*|Exec=alisdr|' "$APPDIR/alisdr.desktop" "$APPDIR/usr/share/applications/alisdr.desktop"
+cp "$REPO_ROOT/alisdr/web/static/icon.svg" "$APPDIR/alisdr.svg"
+cp "$REPO_ROOT/alisdr/web/static/icon.svg" "$APPDIR/usr/share/icons/hicolor/scalable/apps/alisdr.svg"
+cp "$REPO_ROOT/packaging/icons/alisdr.png" "$APPDIR/alisdr.png" 2>/dev/null || true
 cp "$SCRIPT_DIR/AppRun" "$APPDIR/AppRun"
 chmod 755 "$APPDIR/AppRun"
 cp "$REPO_ROOT/LICENSE" "$APPDIR/"
@@ -107,7 +107,7 @@ append_native_licenses "$APPDIR/THIRD-PARTY-LICENSES.txt"
 
 echo "-- 4/4: appimagetool --"
 mkdir -p "$SCRIPT_DIR/out"
-OUT="$SCRIPT_DIR/out/FalconSDR-${VERSION}-${ARCH}.AppImage"
+OUT="$SCRIPT_DIR/out/AliSDR-${VERSION}-${ARCH}.AppImage"
 # UPDATE_INFORMATION left empty on purpose: updates ship via GitHub Releases.
 ARCH="$ARCH" appimagetool "$APPDIR" "$OUT"
 

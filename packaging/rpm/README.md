@@ -1,12 +1,12 @@
-# FalconSDR — self-contained .rpm (test build)
+# AliSDR — self-contained .rpm (test build)
 
 ## What this is
 
 A "fat" RPM: [PyInstaller](https://pyinstaller.org/) freezes the app
 together with its own Python interpreter and every pip-installable
 dependency (numpy, scipy, pyrtlsdrlib) plus the web UI's static files into
-one self-contained folder at `/opt/falconsdr`. A user installs it with
-`sudo dnf install ./falconsdr-*.rpm` (or `sudo zypper install` /
+one self-contained folder at `/opt/alisdr`. A user installs it with
+`sudo dnf install ./alisdr-*.rpm` (or `sudo zypper install` /
 `sudo rpm -i` on openSUSE) and gets a working scanner with **zero** extra
 `pip install` steps for RTL-SDR. The RPM counterpart of
 `packaging/linux-deb/` - same bundle, same tradeoff.
@@ -29,7 +29,7 @@ A device already plugged in at install time still needs a replug.
   (x86_64/aarch64), or a system `ffmpeg` on `PATH` if present
   (`Recommends: ffmpeg`).
 - **In-app transcription install** uses the pip bundled in the app
-  (`falconsdr --pip`) - the same mechanism verified on the Windows build.
+  (`alisdr --pip`) - the same mechanism verified on the Windows build.
 
 ## Building it
 
@@ -47,18 +47,18 @@ machine.
 
 Builds in a **throwaway venv** (`packaging/rpm/build-venv/`, gitignored) -
 never the project's own `.venv`. Output:
-`packaging/rpm/out/falconsdr-<version>-1.<arch>.rpm`.
+`packaging/rpm/out/alisdr-<version>-1.<arch>.rpm`.
 
-`packaging/rpm/falconsdr.spec` is the source-build spec for COPR/OBS
+`packaging/rpm/alisdr.spec` is the source-build spec for COPR/OBS
 (reviewers, rebuild-from-tag workflows); `build.sh` generates an
 equivalent binary-from-tree spec internally for the local PyInstaller
-bundle. Both read the version from `falconsdr/__init__.py` - the one
+bundle. Both read the version from `alisdr/__init__.py` - the one
 place the version lives.
 
 ## Testing without fooling yourself
 
 Same rule as the .deb README: install it on an account/machine that has
 none of your dev environment (no active `.venv`, no `PYTHONPATH`, `cd /`
-before running), and confirm `which falconsdr` is `/usr/bin/falconsdr`.
-`falconsdr --self-test` runs as part of the build; a real scan needs the
+before running), and confirm `which alisdr` is `/usr/bin/alisdr`.
+`alisdr --self-test` runs as part of the build; a real scan needs the
 dongle plus the udev rule + replug above.

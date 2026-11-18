@@ -12,7 +12,7 @@ import unittest
 import numpy as np
 
 # Every path the app derives from ~ must land in a scratch home (same as test_core.py).
-_HOME = tempfile.mkdtemp(prefix="falconsdr-addon-test-")
+_HOME = tempfile.mkdtemp(prefix="alisdr-addon-test-")
 os.environ["HOME"] = _HOME
 os.environ["USERPROFILE"] = _HOME
 
@@ -38,7 +38,7 @@ def _ax25(src: str, dest: str, path: list[str], info: bytes) -> bytes:
         return bytes((ord(c) << 1) for c in name.ljust(6)) + bytes([0x60 | (int(ssid or 0) << 1) | (1 if last else 0)])
     calls = [dest, src] + path
     body = b"".join(addr(c, i == len(calls) - 1) for i, c in enumerate(calls)) + b"\x03\xf0" + info
-    from falconsdr.addons.aprs import fcs16
+    from alisdr.addons.aprs import fcs16
     crc = fcs16(body)
     return body + bytes([crc & 0xFF, crc >> 8])
 
@@ -65,7 +65,7 @@ def _afsk(frame: bytes, lead_flags: int = 40, tail_flags: int = 6) -> np.ndarray
 
 
 def _decode_aprs(audio: np.ndarray) -> list[dict]:
-    from falconsdr.addons.aprs import AprsDecoder
+    from alisdr.addons.aprs import AprsDecoder
     dec = AprsDecoder()
     out: list[dict] = []
     for i in range(0, audio.size, 375):          # the engine's 30 ms blocks
@@ -99,7 +99,7 @@ class AprsTest(unittest.TestCase):
         self.assertEqual(_decode_aprs(_afsk(bytes(frame))), [])
 
     def test_the_information_field_parser(self) -> None:
-        from falconsdr.addons.aprs import parse_aprs
+        from alisdr.addons.aprs import parse_aprs
         c = parse_aprs("APRS", b"=/5L!!<*e7>7P[")                  # compressed position (the APRS 1.0 example)
         self.assertAlmostEqual(c["lat"], 49.5, places=3)
         self.assertAlmostEqual(c["lon"], -72.75, places=3)
@@ -112,7 +112,7 @@ class AprsTest(unittest.TestCase):
         self.assertEqual((o["type"], o["name"], o["course"], o["speed_kn"]), ("object", "LEADER", 88, 36))
 
     def test_mic_e(self) -> None:
-        from falconsdr.addons.aprs import parse_aprs
+        from alisdr.addons.aprs import parse_aprs
         # Made with the Mic-E rules: 33 deg 25.64' N, 112 deg 07.74' W, 36 kn at 251 deg.
         dest, info = "SUQ5V4", bytes([0x60, 112 - 100 + 28 + 100 - 100 + 0, 7 + 28, 74 + 28, 3 + 28, 2 * 10 + 28 + 5, 1 + 28, ord("j"), ord("/")])
         # lat digits 3 3 2 5 6 4 -> 'S' '3'->'3' ... built below instead of by hand
@@ -130,7 +130,7 @@ class AprsTest(unittest.TestCase):
 # -- ACARS -------------------------------------------------------------------------------------------
 
 def _acars_block(text: bytes, registration: str = ".SP-LWA", label: str = "H1", block_id: str = "2") -> bytes:
-    from falconsdr.addons import acars
+    from alisdr.addons import acars
     body = (b"2" + registration.encode().ljust(7, b".")[:7] + b"\x15" + label.encode() + block_id.encode()
             + bytes([acars.STX]) + text + bytes([acars.ETX]))
     chars = bytes(acars.with_parity(c) for c in body)
@@ -139,7 +139,7 @@ def _acars_block(text: bytes, registration: str = ".SP-LWA", label: str = "H1", 
 
 
 def _acars_audio(block: bytes, mapping: str) -> np.ndarray:
-    from falconsdr.addons import acars
+    from alisdr.addons import acars
     head = [b for c in (0x2B, 0x2A, acars.SYN, acars.SYN, acars.SOH) for b in acars.char_bits(acars.with_parity(c))]
     bits = [1] * 16 + head + [b for byte in block for b in acars.char_bits(byte)] + [b for b in acars.char_bits(acars.DEL)]
     tones, tone = [], 1
@@ -156,7 +156,7 @@ def _acars_audio(block: bytes, mapping: str) -> np.ndarray:
 
 
 def _decode_acars(audio: np.ndarray, **kw) -> list[dict]:
-    from falconsdr.addons.acars import AcarsDecoder
+    from alisdr.addons.acars import AcarsDecoder
     dec = AcarsDecoder(**kw)
     out: list[dict] = []
     for i in range(0, audio.size, 375):
@@ -188,7 +188,7 @@ class AcarsTest(unittest.TestCase):
         self.assertEqual((len(shown), shown[0]["crc_ok"]), (1, False))
 
     def test_crc16_matches_the_known_check_value(self) -> None:
-        from falconsdr.addons.acars import crc16
+        from alisdr.addons.acars import crc16
         self.assertEqual(crc16(b"123456789"), 0x2189)          # CRC-16/KERMIT
 
 
@@ -198,7 +198,7 @@ class HubTest(unittest.TestCase):
     def test_events_get_ids_survive_a_restart_and_old_days_are_pruned(self) -> None:
         from datetime import date, timedelta
         from pathlib import Path
-        from falconsdr.addons.events import EventHub
+        from alisdr.addons.events import EventHub
         folder = Path(tempfile.mkdtemp(dir=_HOME))
         old = folder / f"events-{(date.today() - timedelta(days=30)).isoformat()}.jsonl"
         old.write_text("{}\n", encoding="utf-8")
@@ -215,12 +215,12 @@ class HubTest(unittest.TestCase):
 
 class ManagerTest(unittest.TestCase):
     def _manager(self):
-        from falconsdr.addons.manager import AddonManager
-        from falconsdr.config import AppConfig
+        from alisdr.addons.manager import AddonManager
+        from alisdr.config import AppConfig
         return AddonManager(AppConfig())
 
     def test_a_channel_is_claimed_only_by_an_enabled_add_on_and_only_the_nearest_grid_point(self) -> None:
-        from falconsdr.models import Modulation
+        from alisdr.models import Modulation
         m = self._manager()
         self.assertIsNone(m.claim(131_725_000))                    # off by default
         m.configure("acars", {"enabled": True})
@@ -259,7 +259,7 @@ class ExternalTest(unittest.TestCase):
     def test_lines_are_read_and_the_exit_is_reported(self) -> None:
         import sys
         import threading
-        from falconsdr.addons.external import ExternalRunner
+        from alisdr.addons.external import ExternalRunner
         code = "import json;print(json.dumps({'model':'Acurite-Tower','id':7,'temperature_C':21.5,'humidity':55}),flush=True);print('noise')"
         lines, done = [], threading.Event()
         runner = ExternalRunner([sys.executable, "-c", code], lines.append, lambda c: (lines.append(f"exit {c}"), done.set()))
@@ -271,7 +271,7 @@ class ExternalTest(unittest.TestCase):
     def test_stop_ends_a_running_program(self) -> None:
         import sys
         import threading
-        from falconsdr.addons.external import ExternalRunner
+        from alisdr.addons.external import ExternalRunner
         done = threading.Event()
         runner = ExternalRunner([sys.executable, "-c", "import time;print('x',flush=True);time.sleep(60)"], lambda l: None, lambda c: done.set())
         runner.start()
@@ -281,7 +281,7 @@ class ExternalTest(unittest.TestCase):
         self.assertFalse(runner.alive)
 
     def test_what_rtl_433_and_dumpvdl2_print(self) -> None:
-        from falconsdr.addons.external import parse_rtl_433, parse_vdl2
+        from alisdr.addons.external import parse_rtl_433, parse_vdl2
         event, summary = parse_rtl_433('{"time":"2026-11-16 10:00:00","model":"Acurite-Tower","id":7,"channel":"A","temperature_C":21.5,"humidity":55,"battery_ok":1}')
         self.assertEqual((event["kind"], event["device_id"]), ("sensor", 7))
         self.assertIn("21.5 °C", summary)
@@ -300,11 +300,11 @@ class EngineSlotTest(unittest.TestCase):
     def _setup(self, listen: bool):
         from types import SimpleNamespace
         from unittest import mock
-        from falconsdr.addons.aprs import AprsDecoder
-        from falconsdr.addons.manager import AddonManager
-        from falconsdr.config import AppConfig
-        from falconsdr.models import Modulation
-        from falconsdr.scanner_engine import ScannerEngine
+        from alisdr.addons.aprs import AprsDecoder
+        from alisdr.addons.manager import AddonManager
+        from alisdr.config import AppConfig
+        from alisdr.models import Modulation
+        from alisdr.scanner_engine import ScannerEngine
         cfg = AppConfig()
         cfg.addons.enabled, cfg.addons.listen_to_data = ["aprs"], listen
         mgr = AddonManager(cfg)
@@ -350,8 +350,8 @@ class BusyReceiverTest(unittest.TestCase):
     def test_a_receiver_that_is_still_busy_is_retried_and_then_works(self) -> None:
         import time
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig
         folder = tempfile.mkdtemp(dir=_HOME)
         counter = os.path.join(folder, "runs")
         program = _script(folder, f"""import sys, json, time
@@ -381,8 +381,8 @@ time.sleep(30)
     def test_a_program_that_fails_for_another_reason_is_reported_not_retried(self) -> None:
         import time
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig
         folder = tempfile.mkdtemp(dir=_HOME)
         program = _script(folder, "import sys\nsys.stderr.write('unknown option\\n'); sys.exit(3)\n")
         m = mgr.AddonManager(AppConfig())
@@ -403,9 +403,9 @@ class TwoReceiversTest(unittest.TestCase):
     def test_only_the_chosen_receiver_pauses_and_comes_back(self) -> None:
         import time
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig
-        from falconsdr.controller import Controller
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig
+        from alisdr.controller import Controller
         folder = tempfile.mkdtemp(dir=_HOME)
         program = _script(folder, "import time\ntime.sleep(60)\n")
         cfg = AppConfig()
@@ -438,10 +438,10 @@ class TwoReceiversTest(unittest.TestCase):
     def test_the_scanner_can_start_while_an_add_on_holds_the_other_receiver(self) -> None:
         import time
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.antenna_range import OPEN_END_HZ, device_ranges
-        from falconsdr.config import AppConfig
-        from falconsdr.controller import Controller
+        from alisdr.addons import manager as mgr
+        from alisdr.antenna_range import OPEN_END_HZ, device_ranges
+        from alisdr.config import AppConfig
+        from alisdr.controller import Controller
         folder = tempfile.mkdtemp(dir=_HOME)
         program = _script(folder, "import time\ntime.sleep(60)\n")
         cfg = AppConfig()
@@ -471,9 +471,9 @@ class TwoReceiversTest(unittest.TestCase):
     def test_a_program_that_ends_by_itself_gives_its_receiver_back(self) -> None:
         import time
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig
-        from falconsdr.controller import Controller
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig
+        from alisdr.controller import Controller
         folder = tempfile.mkdtemp(dir=_HOME)
         program = _script(folder, "import time\ntime.sleep(1.5)\n")             # exits 0 after a moment
         cfg = AppConfig()
@@ -500,9 +500,9 @@ class TwoReceiversTest(unittest.TestCase):
 
     def test_with_one_receiver_the_scanner_cannot_start_while_an_add_on_holds_it(self) -> None:
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig
-        from falconsdr.controller import Controller
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig
+        from alisdr.controller import Controller
         folder = tempfile.mkdtemp(dir=_HOME)
         program = _script(folder, "import time\ntime.sleep(60)\n")
         cfg = AppConfig()
@@ -520,8 +520,8 @@ class TwoReceiversTest(unittest.TestCase):
             ctl.shutdown()
 
     def test_a_built_in_decoder_listens_only_on_its_receiver(self) -> None:
-        from falconsdr.addons.manager import AddonManager
-        from falconsdr.config import AppConfig
+        from alisdr.addons.manager import AddonManager
+        from alisdr.config import AppConfig
         m = AddonManager(AppConfig())
         m.configure("aprs", {"enabled": True, "receiver": 1})
         self.assertIsNone(m.claim(144_800_000, 0))
@@ -533,9 +533,9 @@ class TwoReceiversTest(unittest.TestCase):
     def test_with_one_receiver_the_scanner_pauses_and_resumes(self) -> None:
         import time
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig
-        from falconsdr.controller import Controller
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig
+        from alisdr.controller import Controller
         folder = tempfile.mkdtemp(dir=_HOME)
         program = _script(folder, "import time\ntime.sleep(60)\n")
         cfg = AppConfig()
@@ -558,7 +558,7 @@ class TwoReceiversTest(unittest.TestCase):
 
 
 class InstallerTest(unittest.TestCase):
-    """Installing from the author's release: only the tested file, checked, unpacked into FalconSDR's own folder."""
+    """Installing from the author's release: only the tested file, checked, unpacked into AliSDR's own folder."""
 
     def _fake_zip(self) -> bytes:
         import io
@@ -575,7 +575,7 @@ class InstallerTest(unittest.TestCase):
         import time
         from pathlib import Path
         from unittest import mock
-        from falconsdr.addons import install
+        from alisdr.addons import install
         folder = Path(tempfile.mkdtemp(dir=_HOME))
 
         @contextlib.contextmanager
@@ -621,7 +621,7 @@ class InstallerTest(unittest.TestCase):
         import sys
         import time
         from unittest import mock
-        from falconsdr.addons import install
+        from alisdr.addons import install
         if sys.platform == "win32":
             self.skipTest("dumpvdl2 is built on Linux and macOS")
         with mock.patch.object(install, "which", lambda name: None):
@@ -636,7 +636,7 @@ class InstallerTest(unittest.TestCase):
         install.uninstall("vdl2")
 
     def test_the_pinned_sources_are_the_ones_named_in_the_docs(self) -> None:
-        from falconsdr.addons import install
+        from alisdr.addons import install
         for name, url, sha in install._VDL2_SOURCES:
             self.assertIn("/tags/v", url)
             self.assertEqual(len(sha), 64)
@@ -646,8 +646,8 @@ class InstallerTest(unittest.TestCase):
 class OptionsTest(unittest.TestCase):
     """The friendly settings become the program's flags - and only valid ones do."""
     def _manager(self):
-        from falconsdr.addons.manager import AddonManager
-        from falconsdr.config import AppConfig
+        from alisdr.addons.manager import AddonManager
+        from alisdr.config import AppConfig
         return AddonManager(AppConfig())
 
     def test_rtl_433_flags_follow_the_settings(self) -> None:
@@ -683,7 +683,7 @@ class OptionsTest(unittest.TestCase):
 class StatsTest(unittest.TestCase):
     def _store(self, home=(50.0, 21.0)):
         from pathlib import Path
-        from falconsdr.addons.stats import StatsStore
+        from alisdr.addons.stats import StatsStore
         folder = Path(tempfile.mkdtemp(dir=_HOME))
         return StatsStore(folder, lambda: home), folder
 
@@ -712,7 +712,7 @@ class StatsTest(unittest.TestCase):
         self.assertEqual((a["n"], a["pos"]), (2, 2))                       # the 40-day-old packet is outside 1 day
         self.assertEqual(a["farthest"]["who"], "SP9FAR")
         self.assertAlmostEqual(a["farthest"]["km"], 111.2, delta=0.5)
-        from falconsdr.addons.external import parse_rtl_433
+        from alisdr.addons.external import parse_rtl_433
         import json
         for temp, batt in ((20.0, 1), (24.0, 0)):
             ev, _ = parse_rtl_433(json.dumps({"model": "Nexus-T", "id": 7, "temperature_C": temp, "humidity": 50, "battery_ok": batt}))
@@ -725,8 +725,8 @@ class StatsTest(unittest.TestCase):
         self.assertEqual((sensors["Honeywell-Security #9"]["category"], sensors["Honeywell-Security #9"]["vmin"]), ("security", None))   # no number to chart
 
     def test_it_survives_a_restart_and_a_hub_keeps_link_frames_off_the_disk(self) -> None:
-        from falconsdr.addons.events import EventHub
-        from falconsdr.addons.stats import StatsStore
+        from alisdr.addons.events import EventHub
+        from alisdr.addons.stats import StatsStore
         st, folder = self._store()
         hub = EventHub(folder / "events", keep_days=7, stats=st)
         hub.publish("vdl2", {"kind": "vdl2", "layer": "link", "freq_hz": 136975000}, "link")
@@ -741,7 +741,7 @@ class StatsTest(unittest.TestCase):
     def test_the_first_start_counts_the_messages_already_on_disk(self) -> None:
         import json
         from pathlib import Path
-        from falconsdr.addons.stats import StatsStore
+        from alisdr.addons.stats import StatsStore
         folder = Path(tempfile.mkdtemp(dir=_HOME))
         (folder / "events-2026-11-10.jsonl").write_text("\n".join(json.dumps(e) for e in (
             {"addon": "aprs", "kind": "aprs", "source": "SP9ABC", "type": "position", "ts": 1_800_000_000.0},
@@ -755,7 +755,7 @@ class StatsTest(unittest.TestCase):
     def test_statistics_written_before_sensors_were_classified_still_load(self) -> None:
         import json
         from pathlib import Path
-        from falconsdr.addons.stats import StatsStore
+        from alisdr.addons.stats import StatsStore
         folder = Path(tempfile.mkdtemp(dir=_HOME))
         old = {"1800000000": {"rtl_433": {"n": 2, "link": 0, "last": 1800000001.0, "freq": {}, "lvl": {}, "who": {}, "labels": {}, "types": {}, "pos": 0,
                "sensors": {"Nexus-T #7": {"n": 2, "tn": 2, "tsum": 40.0, "last": 1800000001.0, "tmin": 19.0, "tmax": 21.0, "batt": 1}}}}}
@@ -764,7 +764,7 @@ class StatsTest(unittest.TestCase):
         self.assertEqual((s["device"], s["vmin"], s["vmax"], s["vavg"], s["unit"]), ("Nexus-T #7", 19.0, 21.0, 20.0, "°C"))
 
     def test_a_flood_of_link_frames_does_not_push_messages_out_of_the_list(self) -> None:
-        from falconsdr.addons.events import EventHub
+        from alisdr.addons.events import EventHub
         hub = EventHub(None, ring=50)
         hub.publish("vdl2", {"kind": "vdl2", "layer": "acars", "registration": "SP-LWA"}, "msg")
         for _ in range(2000):
@@ -777,7 +777,7 @@ class ScheduleTest(unittest.TestCase):
     MON_10 = None
 
     def _config(self):
-        from falconsdr.config import AppConfig, ScheduleEntry, VfoRangeConfig
+        from alisdr.config import AppConfig, ScheduleEntry, VfoRangeConfig
         cfg = AppConfig()
         cfg.bands = [VfoRangeConfig(id="a", start_hz=118_000_000, stop_hz=118_200_000, step_hz=25_000, label="A"),
                      VfoRangeConfig(id="b", start_hz=130_000_000, stop_hz=130_200_000, step_hz=25_000, label="B")]
@@ -789,7 +789,7 @@ class ScheduleTest(unittest.TestCase):
 
     def test_each_receiver_gets_its_own_plan(self) -> None:
         import datetime as dt
-        from falconsdr import schedule
+        from alisdr import schedule
         cfg = self._config()
         day = schedule.assignments(cfg, 3, now=dt.datetime(2026, 11, 16, 10, 0))             # Monday 10:00
         self.assertEqual([[b.id for b in p.bands] for p in day], [["a"], ["b"], ["a"]])
@@ -801,7 +801,7 @@ class ScheduleTest(unittest.TestCase):
 
     def test_an_add_on_that_cannot_run_does_not_waste_the_receiver(self) -> None:
         import datetime as dt
-        from falconsdr import schedule
+        from alisdr import schedule
         cfg = self._config()
         plans = schedule.assignments(cfg, 3, now=dt.datetime(2026, 11, 16, 22, 0), addon_ok=lambda a: False)
         self.assertEqual([p.addon for p in plans], ["", "", ""])
@@ -811,8 +811,8 @@ class ScheduleTest(unittest.TestCase):
 
     def test_without_receivers_named_the_add_on_goes_to_its_own_receiver_and_the_first_entry_wins(self) -> None:
         import datetime as dt
-        from falconsdr import schedule
-        from falconsdr.config import ScheduleEntry
+        from alisdr import schedule
+        from alisdr.config import ScheduleEntry
         cfg = self._config()
         cfg.schedule.entries = [ScheduleEntry(start="00:00", end="00:00", addon="rtl_433"), ScheduleEntry(start="00:00", end="00:00", addon="vdl2")]
         plans = schedule.assignments(cfg, 2, now=dt.datetime(2026, 11, 16, 12, 0), addon_receiver=lambda a: 1)
@@ -822,7 +822,7 @@ class ScheduleTest(unittest.TestCase):
 
     def test_an_old_schedule_behaves_as_before(self) -> None:
         import datetime as dt
-        from falconsdr import schedule
+        from alisdr import schedule
         cfg = self._config()
         cfg.schedule.entries = cfg.schedule.entries[:1]                                      # only "day", for everyone
         plans = schedule.assignments(cfg, 2, now=dt.datetime(2026, 11, 16, 10, 0))
@@ -833,7 +833,7 @@ class ScheduleTest(unittest.TestCase):
         self.assertEqual([b.id for b in schedule.assignments(cfg, 2)[1].bands], ["a", "b"])
 
     def test_the_engines_scan_what_their_receiver_was_given(self) -> None:
-        from falconsdr.scanner_engine import ScannerEngine, SharedFrequencies
+        from alisdr.scanner_engine import ScannerEngine, SharedFrequencies
         cfg = self._config()
         cfg.schedule.entries = cfg.schedule.entries[:2]                                      # "day" may be off at test time: use all-day ones
         cfg.schedule.entries[0].start = cfg.schedule.entries[0].end = "00:00"
@@ -851,9 +851,9 @@ class ScheduleTest(unittest.TestCase):
     def test_the_controller_starts_and_stops_a_scheduled_add_on_and_respects_a_manual_stop(self) -> None:
         import time
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig, ScheduleEntry
-        from falconsdr.controller import Controller
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig, ScheduleEntry
+        from alisdr.controller import Controller
         folder = tempfile.mkdtemp(dir=_HOME)
         program = _script(folder, "import time\ntime.sleep(60)\n")
         cfg = AppConfig()
@@ -890,9 +890,9 @@ class ScheduleTest(unittest.TestCase):
     @unittest.skipIf(os.name == "nt", "the stand-in program is a shebang script")
     def test_two_add_ons_run_at_once_on_different_receivers(self) -> None:
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig
-        from falconsdr.controller import Controller
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig
+        from alisdr.controller import Controller
         folder = tempfile.mkdtemp(dir=_HOME)
         program = _script(folder, "import time\ntime.sleep(60)\n")
         cfg = AppConfig()
@@ -919,12 +919,12 @@ class ScheduleTest(unittest.TestCase):
 
 class NotifyTest(unittest.TestCase):
     def _rule(self, **kw):
-        from falconsdr.notifier import clean_rule
+        from alisdr.notifier import clean_rule
         base = {"name": "r", "source": "message", "channels": ["c1"], "cooldown_s": 0}
         return clean_rule({**base, **kw}, {"c1"})
 
     def test_matching(self) -> None:
-        from falconsdr.notifier import matches
+        from alisdr.notifier import matches
         sensor = {"addon": "rtl_433", "kind": "sensor", "model": "Nexus-T", "device_id": 7, "fields": {"temperature_C": -2.5, "battery_ok": 0}, "summary": "Nexus-T #7"}
         self.assertTrue(matches(self._rule(metric="temperature_C", op="<", value=0), "message", sensor))
         self.assertFalse(matches(self._rule(metric="temperature_C", op=">", value=0), "message", sensor))
@@ -945,8 +945,8 @@ class NotifyTest(unittest.TestCase):
         self.assertTrue(matches(self._rule(source="transcript", text_any="mayday"), "transcript", {"text": "Mayday mayday", "freq_hz": 121_500_000}))
 
     def _notifier(self, cooldown=0):
-        from falconsdr.config import AppConfig
-        from falconsdr.notifier import Notifier, clean_channel
+        from alisdr.config import AppConfig
+        from alisdr.notifier import Notifier, clean_channel
         cfg = AppConfig()
         cfg.notify.enabled = True
         cfg.notify.channels = [clean_channel({"id": "c1", "type": "webhook", "name": "hook", "settings": {"url": "http://127.0.0.1:9/x"}})]
@@ -987,8 +987,8 @@ class NotifyTest(unittest.TestCase):
         self.assertLessEqual(len(n.since(0)), 6)                           # at most 6 a minute per rule
 
     def test_a_burst_on_one_frequency_is_one_notice_and_the_next_one_says_how_many_were_held_back(self) -> None:
-        from falconsdr.config import AppConfig
-        from falconsdr.notifier import MIN_COOLDOWN_S, Notifier
+        from alisdr.config import AppConfig
+        from alisdr.notifier import MIN_COOLDOWN_S, Notifier
         cfg = AppConfig()
         cfg.notify.enabled = True
         cfg.notify.rules = [self._rule(id="r1", name="Alert", source="recording", freq_mhz=121.5, cooldown_s=0)]   # "no limit" is clamped
@@ -1005,7 +1005,7 @@ class NotifyTest(unittest.TestCase):
         self.assertIn("+7 ", items[1]["message"])             # in whichever language is set
 
     def test_discord_and_slack_webhooks_get_their_own_json(self) -> None:
-        from falconsdr.notifier import webhook_body
+        from alisdr.notifier import webhook_body
         d = webhook_body("https://discord.com/api/webhooks/123/abc", "Alert", "SP-LWA fuel", {"rule": "x"})
         self.assertEqual(d["content"], "**Alert**\nSP-LWA fuel")
         self.assertEqual(d["allowed_mentions"], {"parse": []})                          # @everyone in a radio message must not ping
@@ -1016,7 +1016,7 @@ class NotifyTest(unittest.TestCase):
         self.assertIn("title", webhook_body("https://discord.com.evil.example/api/webhooks/1/a", "t", "m", {}))   # not Discord
 
     def test_channels_are_checked_and_secrets_stay_masked(self) -> None:
-        from falconsdr.notifier import MASK, clean_channel, mask
+        from alisdr.notifier import MASK, clean_channel, mask
         for bad in ({"type": "ntfy", "settings": {"topic": "bad topic!"}}, {"type": "webhook", "settings": {"url": "ftp://x"}},
                     {"type": "telegram", "settings": {"token": "", "chat_id": "1"}}, {"type": "mqtt", "settings": {"host": ""}}, {"type": "carrier-pigeon", "settings": {}}):
             with self.assertRaises(ValueError, msg=bad):
@@ -1032,7 +1032,7 @@ class NotifyTest(unittest.TestCase):
         import json
         import threading
         from http.server import BaseHTTPRequestHandler, HTTPServer
-        from falconsdr.notifier import clean_channel, send
+        from alisdr.notifier import clean_channel, send
         got = []
 
         class Handler(BaseHTTPRequestHandler):
@@ -1057,7 +1057,7 @@ class NotifyTest(unittest.TestCase):
     def test_mqtt_publish_speaks_enough_of_the_protocol(self) -> None:
         import socket
         import threading
-        from falconsdr.notifier import mqtt_publish
+        from alisdr.notifier import mqtt_publish
         got = {}
         srv = socket.socket()
         srv.bind(("127.0.0.1", 0)); srv.listen(1)
@@ -1071,7 +1071,7 @@ class NotifyTest(unittest.TestCase):
             conn.close()
         t = threading.Thread(target=broker, daemon=True)
         t.start()
-        mqtt_publish("127.0.0.1", srv.getsockname()[1], False, "user", "pw", "falconsdr/notify", b'{"a":1}')
+        mqtt_publish("127.0.0.1", srv.getsockname()[1], False, "user", "pw", "alisdr/notify", b'{"a":1}')
         t.join(5)
         srv.close()
         self.assertEqual(got["connect"][0], 0x10)
@@ -1079,14 +1079,14 @@ class NotifyTest(unittest.TestCase):
         self.assertIn(b"user", got["connect"])
         pub = got["publish"]
         self.assertEqual(pub[0], 0x30)
-        self.assertIn(b"falconsdr/notify", pub)
+        self.assertIn(b"alisdr/notify", pub)
         self.assertTrue(pub.rstrip(b"\xe0\x00").endswith(b'{"a":1}'))
 
     def test_the_controller_fires_rules_from_decoded_messages_and_new_transcripts(self) -> None:
         import time
         from pathlib import Path
-        from falconsdr.config import AppConfig
-        from falconsdr.controller import Controller
+        from alisdr.config import AppConfig
+        from alisdr.controller import Controller
         cfg = AppConfig()
         cfg.notify.enabled = True
         cfg.notify.rules = [self._rule(id="m", name="Fuel", text_any="fuel", channels=[]), self._rule(id="t", name="Mayday", source="transcript", text_any="mayday", channels=[])]
@@ -1111,7 +1111,7 @@ class NotifyTest(unittest.TestCase):
 class SensorCatalogTest(unittest.TestCase):
     def _parse(self, d, allow=False):
         import json
-        from falconsdr.addons.external import parse_rtl_433
+        from alisdr.addons.external import parse_rtl_433
         return parse_rtl_433(json.dumps(d), allow)
 
     def test_the_kind_of_device_and_its_readings_are_recognised(self) -> None:
@@ -1162,8 +1162,8 @@ class SensorCatalogTest(unittest.TestCase):
 class Rtl433OptionsTest(unittest.TestCase):
     def test_sample_rate_wm_bus_and_extra_decoders(self) -> None:
         from unittest import mock
-        from falconsdr.addons import manager as mgr
-        from falconsdr.config import AppConfig
+        from alisdr.addons import manager as mgr
+        from alisdr.config import AppConfig
         m = mgr.AddonManager(AppConfig())
         dev = {"driver": "auto", "device_args": ""}
         m.configure("rtl_433", {"options": {"band": "wmbus"}})
@@ -1183,7 +1183,7 @@ class Rtl433OptionsTest(unittest.TestCase):
     def test_the_protocol_list_is_read_from_the_program(self) -> None:
         import stat
         import sys
-        from falconsdr.addons import external
+        from alisdr.addons import external
         folder = tempfile.mkdtemp(dir=_HOME)
         path = os.path.join(folder, "fake_433")
         with open(path, "w", encoding="utf-8") as f:
@@ -1197,8 +1197,8 @@ class Rtl433OptionsTest(unittest.TestCase):
 
 class ReviewFixesTest(unittest.TestCase):
     def test_program_path_and_arguments_need_this_computer_or_a_password(self) -> None:
-        from falconsdr.controller import Controller
-        from falconsdr.web.server import may_change_command_line
+        from alisdr.controller import Controller
+        from alisdr.web.server import may_change_command_line
         self.assertTrue(may_change_command_line("", "127.0.0.1"))
         self.assertTrue(may_change_command_line("", "::1"))
         self.assertTrue(may_change_command_line("secret", "192.168.1.50"))              # authenticated by the password
@@ -1215,9 +1215,9 @@ class ReviewFixesTest(unittest.TestCase):
     def test_a_scheduled_add_on_that_dies_is_not_started_again_by_the_schedule(self) -> None:
         import sys
         import time
-        from falconsdr.addons.external import parse_rtl_433
-        from falconsdr.addons.manager import AddonManager
-        from falconsdr.config import AppConfig
+        from alisdr.addons.external import parse_rtl_433
+        from alisdr.addons.manager import AddonManager
+        from alisdr.config import AppConfig
         failures = []
         m = AddonManager(AppConfig(), lambda *_: None, lambda _id: None)
         m.on_failed = lambda addon, why: failures.append(addon)
@@ -1233,9 +1233,9 @@ class ReviewFixesTest(unittest.TestCase):
         self.assertFalse(m.can_run("rtl_433"))
 
     def test_ids_keep_counting_up_across_a_restart_and_vdl2_cooldown_is_per_aircraft(self) -> None:
-        from falconsdr.addons.events import EventHub
-        from falconsdr.config import AppConfig
-        from falconsdr.notifier import Notifier, _who
+        from alisdr.addons.events import EventHub
+        from alisdr.config import AppConfig
+        from alisdr.notifier import Notifier, _who
         first = EventHub(None).publish("acars", {"kind": "acars"}, "x")["id"]
         import time
         time.sleep(0.01)
@@ -1244,8 +1244,8 @@ class ReviewFixesTest(unittest.TestCase):
         self.assertGreater(Notifier(AppConfig(), sender=lambda *a: None).seq, 1_000_000_000_000)
 
     def test_telegram_api_base_must_be_http_and_results_are_copied(self) -> None:
-        from falconsdr.config import AppConfig
-        from falconsdr.notifier import Notifier, clean_channel
+        from alisdr.config import AppConfig
+        from alisdr.notifier import Notifier, clean_channel
         with self.assertRaises(ValueError):
             clean_channel({"type": "telegram", "settings": {"token": "1:A", "chat_id": "2", "api_base": "file:///etc/passwd"}})
         self.assertEqual(clean_channel({"type": "telegram", "settings": {"token": "1:A", "chat_id": "2"}})["settings"]["api_base"], "https://api.telegram.org")
@@ -1259,7 +1259,7 @@ class ReviewFixesTest(unittest.TestCase):
         import os
         import stat
         import sys
-        from falconsdr.addons import external
+        from alisdr.addons import external
         if os.name == "nt":
             self.skipTest("a shebang script")
         folder = tempfile.mkdtemp(dir=_HOME)

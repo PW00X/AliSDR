@@ -1,6 +1,6 @@
 # AliSDR
 
-<img src="falconsdr/web/static/icon.svg" width="96" align="right" alt="AliSDR logo">
+<img src="alisdr/web/static/icon.svg" width="96" align="right" alt="AliSDR logo">
 
 A wideband radio scanner for SDR receivers that **records only the
 transmissions it actually stops on** - no hours of empty noise, no retuning
@@ -9,9 +9,6 @@ services, military UHF…) and get a searchable library of conversations.
 
 It runs in your web browser: on the computer the SDR is plugged into, or as a
 headless receiver you listen to from any phone or PC on your network.
-
-**You can try UI and UX also in virtual ether (simulated transmissions) before downloading:** the real interface on a simulated
-receiver at [falconsdr.com](https://falconsdr.com).
 
 > Listening to and recording some radio services is restricted or illegal in
 > many countries - see [Legal](#legal).
@@ -135,15 +132,15 @@ Developed and tested with an **RTL-SDR Blog V4** on Linux and Windows 11.
 A **HackRF One** has been checked on Linux (10 MHz capture; SoapySDR and
 libhackrf both scan, libhackrf reported no lost samples) by
 [phutch](https://github.com/phutch) in
-[issue #9](https://github.com/rafafunt/FalconSDR/issues/9) - thank you.
+[upstream issue #9](https://github.com/rafafunt/FalconSDR/issues/9) - thank you.
 Other receivers and macOS (experimental builds) should work but haven't been
 tested yet - reports are welcome.
 
-**Testing a receiver:** stop the scanner and run `falconsdr --probe-sdr`
+**Testing a receiver:** stop the scanner and run `alisdr --probe-sdr`
 (from source: `python main.py --probe-sdr`; add `hackrf_native` / `hackrf` /
 `airspy_native` / `airspy` to pick the way it is opened, or `rtl_tcp` to
 measure the server whose address is saved on the Scan page; on Windows the output
-goes to `%USERPROFILE%\.config\FalconSDR\falconsdr.log`). It measures the
+goes to `%USERPROFILE%\.config\AliSDR\alisdr.log`). It measures the
 gain steps, the DC spike, how many blocks after a retune still hold the old
 frequency, and sample losses, and prints one `RESULT {...}`
 line - please paste it into an issue together with your receiver's model.
@@ -220,10 +217,10 @@ install does not bring along: add `--with-sdr-libs` (installs `libhackrf0` and
 Download the `.deb` from [Releases](../../releases) and install it:
 
 ```
-sudo apt install ./falconsdr_<version>_amd64.deb
+sudo apt install ./alisdr_<version>_amd64.deb
 ```
 
-Start **FalconSDR** from the application menu. Unplug and replug the dongle
+Start **AliSDR** from the application menu. Unplug and replug the dongle
 once after installing - the package adds a udev rule for USB access and stops
 the DVB-T TV driver from taking the dongle.
 
@@ -235,7 +232,7 @@ experimental; no Python needed). For SoapySDR devices, run from source instead.
 Download the `.rpm` from [Releases](../../releases) and install it:
 
 ```
-sudo dnf install ./falconsdr-<version>-1.<arch>.rpm
+sudo dnf install ./alisdr-<version>-1.<arch>.rpm
 ```
 
 Same self-contained bundle and the same udev/DVB-T handling as the `.deb`;
@@ -243,24 +240,23 @@ replug the dongle once after installing. Needs glibc 2.38+ (current
 Fedora / openSUSE Tumbleweed); RHEL/Rocky 9 are too old for this build -
 run from source there instead.
 
-### Arch Linux - AUR
+### Arch Linux
 
 ```
-yay -S falconsdr
+cd packaging/aur && makepkg -si
 ```
 
-(repackages the official release build; maintained by
-[@9M2PJU](https://github.com/9M2PJU)).
+The recipe builds from the AliSDR Git tag and uses Arch system packages.
 
 ### Any distribution - AppImage
 
-Download `FalconSDR-<version>-<arch>.AppImage` from
+Download `AliSDR-<version>-<arch>.AppImage` from
 [Releases](../../releases), make it executable and run it - no install, no
 root:
 
 ```
-chmod +x FalconSDR-*.AppImage
-./FalconSDR-*.AppImage
+chmod +x AliSDR-*.AppImage
+./AliSDR-*.AppImage
 ```
 
 One manual step on a machine with no RTL-SDR software installed yet: copy
@@ -270,9 +266,9 @@ and replug the dongle (the `.deb`/`.rpm` do this for you).
 ### Windows - installer or portable ZIP
 
 Download from [Releases](../../releases) either
-`FalconSDR-<version>-windows-x64-setup.exe` (installs for your user, no
-administrator rights needed) or `FalconSDR-<version>-windows-x64-portable.zip`
-(unzip anywhere and run `falconsdr.exe`). Both are self-contained - no Python
+`AliSDR-<version>-windows-x64-setup.exe` (installs for your user, no
+administrator rights needed) or `AliSDR-<version>-windows-x64-portable.zip`
+(unzip anywhere and run `alisdr.exe`). Both are self-contained - no Python
 needed; MP3 recording works out of the box and transcription installs from
 Settings like in any other install. The program is not code-signed yet: if
 SmartScreen says "Windows protected your PC", choose **More info → Run
@@ -288,14 +284,14 @@ steps are in the app (Listen → SDR device). A HackRF or Airspy may need the
 same driver step; the built-in access to them is untested on Windows with real
 hardware.
 
-FalconSDR runs in the background with its interface in the browser; quit it
+AliSDR runs in the background with its interface in the browser; quit it
 in Settings → Advanced. "Start with the system" is there too (off by default).
 
 ### macOS - experimental
 
-Download `FalconSDR-<version>-macos-arm64-experimental.zip` (Apple Silicon:
+Download `AliSDR-<version>-macos-arm64-experimental.zip` (Apple Silicon:
 M1 and newer) or `…-macos-x86_64-…` (Intel Macs) from
-[Releases](../../releases), unzip it and move **FalconSDR** to Applications.
+[Releases](../../releases), unzip it and move **AliSDR** to Applications.
 These builds are made automatically and pass the same self-test as the other
 packages, but haven't been tried on a real Mac with an SDR yet - feedback in
 [Discussions](../../discussions) is very welcome.
@@ -306,7 +302,7 @@ right-click → Open no longer skips this check; on older macOS it does). If
 macOS says the app "is damaged", clear the download flag in Terminal:
 
 ```
-xattr -dr com.apple.quarantine /Applications/FalconSDR.app
+xattr -dr com.apple.quarantine /Applications/AliSDR.app
 ```
 
 Builds before 1.5.0 had a broken signature seal (a licence file was added
@@ -324,8 +320,8 @@ check that the libraries load - no real Mac with a HackRF or Airspy has tried th
 Requires Python 3.10+.
 
 ```
-git clone https://github.com/rafafunt/FalconSDR.git
-cd FalconSDR
+git clone https://github.com/PW00X/AliSDR.git
+cd AliSDR
 python3 -m venv --system-site-packages .venv       # lets the venv see python3-soapysdr (Linux)
 .venv/bin/pip install -r requirements.txt        # Windows: .venv\Scripts\pip ...
 .venv/bin/python main.py                          # Windows: .venv\Scripts\python main.py
@@ -333,7 +329,7 @@ python3 -m venv --system-site-packages .venv       # lets the venv see python3-s
 
 The interface opens at `http://127.0.0.1:8765`. To update: `git pull`, run the
 `pip install` line again and restart (or run the one-liner with
-`--from-source` again from the folder above `FalconSDR/`).
+`--from-source` again from the folder above `AliSDR/`).
 
 - **Linux:** for RTL-SDR access without root, install your distribution's
   `rtl-sdr` package (udev rules) or copy `packaging/linux-deb/60-rtl-sdr.rules`
@@ -353,15 +349,15 @@ The interface opens at `http://127.0.0.1:8765`. To update: `git pull`, run the
 
 ### Updating and removing
 
-Quit FalconSDR, then install the newer `.deb`, `.rpm` or Windows installer over
+Quit AliSDR, then install the newer `.deb`, `.rpm` or Windows installer over
 the old one - settings, channels, favorites and recordings are kept. Start it
 again afterwards (a copy left running through the update shows errors). An
 AppImage is replaced by downloading the new one. A source install is updated
 by running the `--from-source` line again from the folder that holds
-`FalconSDR/` (it pulls the checkout and refreshes the venv), or by `git pull`
+`AliSDR/` (it pulls the checkout and refreshes the venv), or by `git pull`
 in the checkout and the `pip install` line; the headless receiver, by its own
 line again (see below). Remove with `sudo apt remove
-falconsdr`, `sudo dnf remove falconsdr` or Windows *Settings → Apps*; your
+alisdr`, `sudo dnf remove alisdr` or Windows *Settings → Apps*; your
 recordings and settings stay on disk (see
 [Where things are stored](#where-things-are-stored)).
 
@@ -382,7 +378,7 @@ transcription: [packaging/remote-server/README.md](packaging/remote-server/READM
 It also installs `libhackrf0` and `libairspy0` (small), so a HackRF or Airspy
 works through the built-in access without extra steps. The service sees the system's SoapySDR: `sudo apt install python3-soapysdr
 soapysdr-module-<your receiver>` and restart it (`sudo systemctl restart
-falconsdr-receiver`), then pick the access method under *SDR device*.
+alisdr-receiver`), then pick the access method under *SDR device*.
 
 ### Network receiver (rtl_tcp)
 
@@ -437,7 +433,7 @@ streams 48 kHz audio and blends towards mono when the stereo pilot is weak.
 Station information shows the RDS service name, programme ID and RadioText
 when decoded. Use the star to save the tuned FM frequency.
 
-Set the gain mode and level on the Manual page for analog or DAB, then
+Manual defaults to **Auto (hardware)**. To set a different gain mode or level,
 press **Tune** to apply them. The Scan page keeps its own configured gain.
 With the native Airspy driver, the slider shows the 0–21 sensitivity index.
 
@@ -459,7 +455,7 @@ If reception fails, the receiver reports whether it synchronized or found
 audio stations. The browser receives stereo audio at 48 kHz. The spectrum,
 waterfall and signal meter are available during DAB reception. On a headless receiver, a timeout
 also logs the capture rate, gain and any reported IQ loss to
-`journalctl -u falconsdr-receiver`.
+`journalctl -u alisdr-receiver`.
 
 Use **Record** once tuned to save the audio to **Recordings**. For DAB,
 select a station first. FM and DAB capture stereo audio. **Stop recording**
@@ -494,29 +490,29 @@ ends manual tuning before scanning. **Stop tuning** leaves the receiver idle.
 
 ## Command line
 
-`falconsdr` for the installed packages (Windows: `falconsdr.exe` in its install
+`alisdr` for the installed packages (Windows: `alisdr.exe` in its install
 folder), `python main.py` from source:
 
 ```
-falconsdr               local mode: scan on this computer, UI on 127.0.0.1:8765
-falconsdr --server      reachable from the whole network
-falconsdr --start       start scanning right away
-falconsdr --local       scan locally even if this computer is set up as a client of a server
-falconsdr --port 9000   another port
-falconsdr --no-browser  don't open the browser
-falconsdr --version     show the version
-falconsdr --self-test   check this install has everything it needs
-falconsdr --probe-sdr   measure the receiver with the scanner stopped (see Hardware)
+alisdr               local mode: scan on this computer, UI on 127.0.0.1:8765
+alisdr --server      reachable from the whole network
+alisdr --start       start scanning right away
+alisdr --local       scan locally even if this computer is set up as a client of a server
+alisdr --port 9000   another port
+alisdr --no-browser  don't open the browser
+alisdr --version     show the version
+alisdr --self-test   check this install has everything it needs
+alisdr --probe-sdr   measure the receiver with the scanner stopped (see Hardware)
 ```
 
 ## Where things are stored
 
 | What | Where |
 |---|---|
-| Settings, channels, blacklist | `~/.config/FalconSDR/` |
-| Recordings (default, changeable) | `~/FalconSDR/recordings/`, one folder per day |
-| Quality scores, transcripts, favorites | `~/.local/share/FalconSDR/` |
-| Add-ons: decoded messages, statistics, installed programs | `~/.config/FalconSDR/addons/` |
+| Settings, channels, blacklist | `~/.config/AliSDR/` |
+| Recordings (default, changeable) | `~/AliSDR/recordings/`, one folder per day |
+| Quality scores, transcripts, favorites | `~/.local/share/AliSDR/` |
+| Add-ons: decoded messages, statistics, installed programs | `~/.config/AliSDR/addons/` |
 
 (`~` is your home folder, also on Windows.)
 
@@ -550,8 +546,8 @@ falconsdr --probe-sdr   measure the receiver with the scanner stopped (see Hardw
   Advanced, at the bottom), your OS, how you installed it, your SDR and the
   band.
 - **Translations:** the interface is English with a Polish translation in
-  `falconsdr/locale/pl.po`; a new language is a copy of that file (see
-  `falconsdr/i18n.py`).
+  `alisdr/locale/pl.po`; a new language is a copy of that file (see
+  `alisdr/i18n.py`).
 - **Code:** pull requests are welcome; `AGENTS.md` describes the architecture
   and the pitfalls already hit once. Tests: `python -m unittest tests/test_core.py`.
 

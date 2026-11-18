@@ -1,6 +1,6 @@
 // Run by tests/test_addons.py (DongleChoiceTest) - the rules of the Listen page's extra-dongle choices, without a browser.
 import assert from 'node:assert/strict';
-import { groupDevices, groupOfExtra, heldGroups, isTwice, nextGroup, takenByExtra, usableFor } from '../falconsdr/web/static/js/views/dongles.js';
+import { groupDevices, groupOfExtra, heldGroups, isTwice, nextGroup, takenByExtra, usableFor } from '../alisdr/web/static/js/views/dongles.js';
 
 const dev = (driver, args, group, method) => ({ driver, args, group, method, label: `${group} - ${method}` });
 // Two real dongles, each openable two ways, plus the network entry that is always listed.

@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Transcription may live in this repo's own .venv (PEP 668 fallback - see
 # transcription_install.py): re-exec into it before importing anything heavy.
 if not getattr(sys, "frozen", False):
-    from falconsdr.venv_paths import VENV_DIR, VENV_PYTHON
+    from alisdr.venv_paths import VENV_DIR, VENV_PYTHON
 else:
     VENV_DIR = VENV_PYTHON = None
 if VENV_PYTHON is not None and VENV_PYTHON.exists() and Path(sys.prefix).resolve() != VENV_DIR.resolve():
@@ -33,7 +33,7 @@ if getattr(sys, "frozen", False):
     import multiprocessing
     multiprocessing.freeze_support()
 
-# Packaged build only: `falconsdr --pip ...` runs the pip bundled inside it
+# Packaged build only: `alisdr --pip ...` runs the pip bundled inside it
 # (the in-app transcription installer - transcription_install.py).
 if getattr(sys, "frozen", False) and sys.argv[1:2] == ["--pip"]:
     import pip._vendor.distlib as _distlib
@@ -55,8 +55,8 @@ import webbrowser  # noqa: E402
 from urllib.parse import quote  # noqa: E402
 from urllib.request import urlopen  # noqa: E402
 
-from falconsdr import __version__  # noqa: E402
-from falconsdr.config import CONFIG_DIR, AppConfig  # noqa: E402
+from alisdr import __version__  # noqa: E402
+from alisdr.config import CONFIG_DIR, AppConfig, migrate_legacy_home  # noqa: E402
 
 DEFAULT_PORT = 8765
 
@@ -94,32 +94,39 @@ def main() -> int:
 
     if args.list_native_sdr:
         import json
-        from falconsdr import sdr_native
+        from alisdr import sdr_native
         print(json.dumps(sdr_native.enumerate_here()), flush=True)
         return 0
+    migrate_legacy_home()
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     if sys.stdout is None or sys.stderr is None:
         # Windowed build (no console): keep the log where support can find it.
-        log = (CONFIG_DIR / "falconsdr.log").open("w", encoding="utf-8", buffering=1)
+        log = (CONFIG_DIR / "alisdr.log").open("w", encoding="utf-8", buffering=1)
         sys.stdout = sys.stdout or log
         sys.stderr = sys.stderr or log
     if getattr(sys, "frozen", False):
-        from falconsdr.playback.transcription_install import enable_addons
+        from alisdr.playback.transcription_install import enable_addons
         enable_addons()
     if args.self_test:
-        from falconsdr import selftest
+        from alisdr import selftest
         return selftest.run()
     if args.probe_sdr is not None:
-        from falconsdr import sdr_probe
+        from alisdr import sdr_probe
         return sdr_probe.run(args.probe_sdr)
     faulthandler.enable(file=(CONFIG_DIR / "crash.log").open("a", encoding="utf-8", buffering=1), all_threads=True)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-    from falconsdr import i18n
-    from falconsdr.web.server import App, serve
-    from falconsdr.worker import Worker
+    from alisdr import i18n
+    from alisdr.web.server import App, serve
+    from alisdr.worker import Worker
 
     config = AppConfig.load()
+    if not args.server and not args.no_browser:
+        from alisdr.autostart import migrate_legacy_login_item
+        try:
+            migrate_legacy_login_item()
+        except OSError as exc:
+            logging.warning("Could not migrate the login item: %s", exc)
     i18n.set_language(config.language)
     client_mode = config.remote_receiver.enabled and not args.server and not args.local
     host = args.host or ("0.0.0.0" if args.server else "127.0.0.1")
@@ -144,7 +151,7 @@ def main() -> int:
     controller = worker = None
     if client_mode:
         rr = config.remote_receiver
-        worker = Worker(rr.url, rr.token, name=os.environ.get("FALCONSDR_WORKER_NAME", ""),
+        worker = Worker(rr.url, rr.token, name=os.environ.get("ALISDR_WORKER_NAME", ""),
                         local_root=Path(config.recording.output_dir),
                         on_detach=lambda: (setattr(rr, "enabled", False), config.save(), stop.set()),
                         on_restart=switch_mode)
@@ -153,7 +160,7 @@ def main() -> int:
         browser_url = f"{rr.url}/#token={quote(rr.token, safe='')}"
         print(i18n.tr("Working for the server {url} - press Ctrl+C to stop.").format(url=rr.url), flush=True)
     else:
-        from falconsdr.controller import Controller
+        from alisdr.controller import Controller
         controller = Controller(config)
         # Indexing a large library takes a while - never hold up the UI or the scanner for it.
         threading.Thread(target=controller.start_background, daemon=True, name="library-start").start()
@@ -161,7 +168,7 @@ def main() -> int:
                   on_quit=stop.set)
         browser_url = f"http://127.0.0.1:{args.port}/"
         # This computer's own transcription helper - talks to its own API.
-        worker = Worker(f"http://127.0.0.1:{args.port}", lambda: app.token, name=os.environ.get("FALCONSDR_WORKER_NAME", ""),
+        worker = Worker(f"http://127.0.0.1:{args.port}", lambda: app.token, name=os.environ.get("ALISDR_WORKER_NAME", ""),
                         embedded=True, on_restart=switch_mode)
         worker.start()
         if args.start:

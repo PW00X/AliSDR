@@ -1,5 +1,5 @@
-// FalconSDR online demo: a virtual receiver living in this service worker.
-// It answers the unchanged web UI's /api/* calls the way falconsdr/web/server.py
+// AliSDR online demo: a virtual receiver living in this service worker.
+// It answers the unchanged web UI's /api/* calls the way alisdr/web/server.py
 // does - scanner state machine, spectrum, live audio stream, recordings
 // library, statistics - from synthetic transmissions (demo/audio.py).
 // State stays in this browser (Cache Storage), nothing is sent anywhere.
@@ -20,7 +20,7 @@ const DEMO_TEXT = {
   pl: {
     'Demo RTL-SDR (simulated, 2.4 MHz)': 'Demo RTL-SDR (symulowany, 2,4 MHz)',
     'Demo wideband SDR (simulated, 10 MHz)': 'Demo SDR szerokopasmowy (symulowany, 10 MHz)',
-    'Not available in the online demo - download FalconSDR to use it.': 'Niedostępne w demo online - pobierz FalconSDR, żeby z tego skorzystać.',
+    'Not available in the online demo - download AliSDR to use it.': 'Niedostępne w demo online - pobierz AliSDR, żeby z tego skorzystać.',
   },
 };
 
@@ -99,7 +99,7 @@ function save() {
   saveTimer = setTimeout(async () => {
     st.running = sim.running;
     try {
-      const cache = await caches.open('falconsdr-demo');
+      const cache = await caches.open('alisdr-demo');
       await cache.put(STATE_KEY, new Response(JSON.stringify(st), { headers: { 'Content-Type': 'application/json' } }));
     } catch { /* no Cache Storage (some in-app browsers): the demo just starts fresh next time */ }
   }, 400);
@@ -111,7 +111,7 @@ function init() {
   ready ||= (async () => {
     [FX, CLIPS] = await Promise.all(['/demo/fixtures.json', '/demo/audio/clips.json'].map((u) => fetch(u, { cache: 'no-cache' }).then((r) => r.json())));
     let saved = null;
-    try { saved = await (await caches.open('falconsdr-demo')).match(STATE_KEY); } catch { /* see save() */ }
+    try { saved = await (await caches.open('alisdr-demo')).match(STATE_KEY); } catch { /* see save() */ }
     st = saved ? await saved.json() : null;
     if (!st || st.version !== `${FX.version}/${STATE_VERSION}`) st = freshState(st);
     addLog(tr('Ready.'));
@@ -143,7 +143,7 @@ function defaultConfig() {
   delete c.access_token;
   c.device.driver = DEVICES[0].driver;
   c.device.sample_rate_hz = DEVICES[0].rate;
-  c.recording.output_dir = '/home/demo/FalconSDR/recordings';
+  c.recording.output_dir = '/home/demo/AliSDR/recordings';
   c.bands = [bandFrom('civil_air', true), bandFrom('pmr446', true), bandFrom('ham_2m', true), bandFrom('fm_broadcast', false)];
   c.workers = {};
   // Nothing real can be heard or recorded here - the app shows its legal notices once it's installed.
@@ -256,7 +256,7 @@ const BIRDIE_DELAY_S = 60;
 const onAir = (src) => !!(src.loop || (src.birdie ? sim.firstStart !== null && nowS() - sim.firstStart >= BIRDIE_DELAY_S : srcState(src).playing));
 const loopClip = (src) => convLines(src.loop)[0];
 
-// ------------------------------------------------------------------ schedule (falconsdr/schedule.py)
+// ------------------------------------------------------------------ schedule (alisdr/schedule.py)
 const minutes = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 function isActive(e, d) {
   const start = minutes(e.start), end = minutes(e.end), t = d.getHours() * 60 + d.getMinutes(), day = (d.getDay() + 6) % 7;
@@ -306,7 +306,7 @@ function scanList() {
   return out.filter((x) => !blacklisted(x.f)).sort((a, b) => a.f - b.f).filter((x, i, a) => !i || x.f - a[i - 1].f > 1000);
 }
 
-// ------------------------------------------------------------------ antenna range (falconsdr/antenna_range.py)
+// ------------------------------------------------------------------ antenna range (alisdr/antenna_range.py)
 const OPEN_END = 2 ** 40;
 const rangeOf = (d) => {
   const lo = Math.max(0, +d.range_start_hz || 0), hi = +d.range_stop_hz > 0 ? +d.range_stop_hz : OPEN_END;
@@ -906,7 +906,7 @@ function presetId(label) {
   return id;
 }
 
-const notInDemo = () => { throw new Error(tr('Not available in the online demo - download FalconSDR to use it.')); };
+const notInDemo = () => { throw new Error(tr('Not available in the online demo - download AliSDR to use it.')); };
 
 // ------------------------------------------------------------------ routes
 async function body(req) { try { return await req.json(); } catch { return {}; } }
@@ -1028,7 +1028,7 @@ const ROUTES = {
   },
   'GET /api/dirs': (req, q) => {
     const path = q.get('path') || '/home/demo';
-    const kids = { '/': ['home'], '/home': ['demo'], '/home/demo': ['FalconSDR', 'Music'], '/home/demo/FalconSDR': ['recordings'] }[path] || [];
+    const kids = { '/': ['home'], '/home': ['demo'], '/home/demo': ['AliSDR', 'Music'], '/home/demo/AliSDR': ['recordings'] }[path] || [];
     return { path, parent: path === '/' ? null : path.replace(/\/[^/]+$/, '') || '/', dirs: kids.map((n) => ({ name: n, path: `${path === '/' ? '' : path}/${n}` })), roots: ['/'] };
   },
   'POST /api/library/delete': async (req) => {

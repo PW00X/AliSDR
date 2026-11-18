@@ -1,4 +1,4 @@
-﻿FalconSDR - RTL-SDR dongle driver (Windows)
+﻿AliSDR - RTL-SDR dongle driver (Windows)
 ===========================================
 
 Windows only talks to an RTL-SDR dongle through the WinUSB driver. It is
@@ -18,7 +18,7 @@ Installing the driver (about 2 minutes):
      Do NOT pick "Interface 1", or your keyboard, mouse or headset.
   5. The driver to the right of the arrow must be "WinUSB". Click
      "Replace Driver" (or "Install Driver") and wait until it finishes.
-  6. Unplug the dongle, plug it back in and press Start in FalconSDR.
+  6. Unplug the dongle, plug it back in and press Start in AliSDR.
 
 Note: plugging the dongle into a different USB port may need these steps
 again.
@@ -26,5 +26,5 @@ again.
 The same instructions are in the app: "Listen" page -> "SDR device" card ->
 "Dongle not detected? Driver (Zadig) instructions".
 
-The FalconSDR interface runs in your browser: http://127.0.0.1:8765
+The AliSDR interface runs in your browser: http://127.0.0.1:8765
 The program runs in the background - quit it in Settings -> Advanced -> Quit.

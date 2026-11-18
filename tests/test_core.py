@@ -17,14 +17,14 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 # Every path the app derives from ~ (config, caches) must land in a scratch
-# home - set before importing falconsdr.
-_HOME = tempfile.mkdtemp(prefix="falconsdr-test-")
+# home - set before importing alisdr.
+_HOME = tempfile.mkdtemp(prefix="alisdr-test-")
 os.environ["HOME"] = _HOME
 os.environ["USERPROFILE"] = _HOME  # Path.home() on Windows
 
-from falconsdr import config as config_mod  # noqa: E402
-from falconsdr.config import AppConfig  # noqa: E402
-from falconsdr.playback.index import Library  # noqa: E402
+from alisdr import config as config_mod  # noqa: E402
+from alisdr.config import AppConfig  # noqa: E402
+from alisdr.playback.index import Library  # noqa: E402
 
 NAME = "2026-01-01_10-00-00_{khz}.wav"
 
@@ -48,6 +48,40 @@ class _LibCase(unittest.TestCase):
 
 
 class ConfigTest(unittest.TestCase):
+    def test_legacy_brand_migration_preserves_data_and_gain(self) -> None:
+        from unittest.mock import patch
+
+        from alisdr import config as config_mod
+
+        with tempfile.TemporaryDirectory(dir=_HOME) as directory:
+            home = Path(directory)
+            old_settings = home / ".config" / "FalconSDR"
+            old_index = home / ".local" / "share" / "FalconSDR"
+            old_recordings = home / "FalconSDR" / "recordings"
+            new_settings = home / ".config" / "AliSDR"
+            new_recordings = home / "AliSDR" / "recordings"
+            for folder in (old_settings, old_index, old_recordings):
+                folder.mkdir(parents=True)
+            (old_settings / "config.json").write_text(json.dumps({
+                "recording": {"output_dir": str(old_recordings)},
+                "device": {"gain_mode": "manual"},
+            }), encoding="utf-8")
+            (old_settings / "channels.csv").touch()
+            (old_index / "transcription_cache.json").touch()
+            (old_recordings / "sample.wav").touch()
+            with patch.object(Path, "home", return_value=home), \
+                 patch.object(config_mod, "CONFIG_DIR", new_settings), \
+                 patch.object(config_mod, "CONFIG_PATH", new_settings / "config.json"), \
+                 patch.object(config_mod, "DEFAULT_RECORDINGS_DIR", str(new_recordings)):
+                for _ in range(2):
+                    cfg = AppConfig.load()
+                    self.assertEqual(cfg.device.gain_mode, "manual")
+                    self.assertEqual(cfg.recording.output_dir, str(new_recordings))
+            self.assertTrue((new_settings / "channels.csv").is_file())
+            self.assertTrue((old_index.with_name("AliSDR") / "transcription_cache.json").is_file())
+            self.assertTrue((new_recordings / "sample.wav").is_file())
+            self.assertEqual(AppConfig().device.gain_mode, "auto")
+
     def test_unknown_keys_are_ignored_and_save_is_atomic(self) -> None:
         config_mod.CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         config_mod.CONFIG_PATH.write_text(json.dumps({
@@ -104,7 +138,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_non_ascii_files_load_on_any_locale(self) -> None:
         # Windows' default text encoding is cp1250/cp1252 - every reader must say utf-8.
-        from falconsdr.playback.transcription_cache import TranscriptionCache
+        from alisdr.playback.transcription_cache import TranscriptionCache
         cache = Path(tempfile.mkdtemp(dir=_HOME)) / "t.json"
         cache.write_text(json.dumps({"k": {"text": "Wieża Okęcie, dzień dobry ‘’"}}, ensure_ascii=False), encoding="utf-8")
         self.assertIn("Okęcie", TranscriptionCache(cache)._data["k"]["text"])
@@ -114,7 +148,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_transcription_languages_follow_the_system(self) -> None:
         from unittest import mock
-        from falconsdr.config import TranscriptionConfig
+        from alisdr.config import TranscriptionConfig
         for env, want in (("de_DE.UTF-8", ["en", "de"]), ("en_GB.UTF-8", ["en"]), ("Polish_Poland", None)):
             with mock.patch.dict(os.environ, {"LC_ALL": env}):
                 langs = TranscriptionConfig().candidate_languages
@@ -124,7 +158,7 @@ class ConfigTest(unittest.TestCase):
                     self.assertNotIn("po", langs)
 
     def test_list_dirs(self) -> None:
-        from falconsdr.web.server import list_dirs
+        from alisdr.web.server import list_dirs
         root = Path(tempfile.mkdtemp(dir=_HOME))
         (root / "b").mkdir()
         (root / "A").mkdir()
@@ -138,7 +172,7 @@ class ConfigTest(unittest.TestCase):
 
 class AutostartTest(unittest.TestCase):
     def test_login_item_never_opens_the_browser_and_quotes_paths(self) -> None:
-        from falconsdr import autostart
+        from alisdr import autostart
         self.assertEqual(autostart.command()[-1], "--no-browser")
         self.assertEqual(autostart._desktop_exec(["/opt/falcon sdr/x", "--no-browser"]), '"/opt/falcon sdr/x" --no-browser')
         self.assertEqual(autostart._desktop_exec(['/a"b$c']), r'"/a\"b\$c"')
@@ -168,7 +202,7 @@ class LibraryTest(_LibCase):
                                                   "2026-10-02/2026-10-02_13-00-00_124625.wav"])
 
     def test_item_reports_the_voice_level_in_dbfs(self) -> None:
-        from falconsdr.playback.models import QualityMetrics
+        from alisdr.playback.models import QualityMetrics
         _wav(self.root, "2026-10-01/2026-10-01_12-00-00_130875.wav")
         self.lib.rescan()
         rel, rec = next(iter(self.lib._recs.items()))
@@ -260,7 +294,7 @@ class LibraryTest(_LibCase):
     def test_packaged_uninstall_waits_for_a_restart_only_while_in_use(self) -> None:
         import sys
         from unittest import mock
-        from falconsdr.playback import transcription_install as ti
+        from alisdr.playback import transcription_install as ti
         lines: list[str] = []
         with mock.patch.object(sys, "frozen", True, create=True):
             ti.enable_addons()
@@ -294,7 +328,7 @@ class LibraryTest(_LibCase):
 
     def test_uninstall_deletes_only_the_chosen_models(self) -> None:
         from unittest import mock
-        from falconsdr.playback import transcription_install as ti
+        from alisdr.playback import transcription_install as ti
         cache = Path(tempfile.mkdtemp())
         for repo in ("Systran--faster-whisper-large-v3", "jacktol--atc", "someone--other"):
             (cache / f"models--{repo}" / "blobs").mkdir(parents=True)
@@ -309,8 +343,8 @@ class LibraryTest(_LibCase):
         import sys
         import types
         from unittest import mock
-        from falconsdr.playback import transcription_engine as te
-        from falconsdr.playback.models import Recording
+        from alisdr.playback import transcription_engine as te
+        from alisdr.playback.models import Recording
         fake = types.ModuleType("faster_whisper.audio")
         fake.decode_audio = lambda path: None
         rec = Recording(path=self.root / "x.wav", dt_local=None, dt_utc=None, freq_khz=0)
@@ -332,8 +366,8 @@ class LibraryTest(_LibCase):
 
 class GridTest(unittest.TestCase):
     def test_airband_raster_is_exact_and_windows_stay_on_it(self) -> None:
-        from falconsdr.config import VfoRangeConfig
-        from falconsdr.scanner_engine import _band_grid, _wide_anchor_windows
+        from alisdr.config import VfoRangeConfig
+        from alisdr.scanner_engine import _band_grid, _wide_anchor_windows
         band = VfoRangeConfig(start_hz=121_000_000, stop_hz=136_800_000, step_hz=8333)
         grid = set(_band_grid(band)[0])
         for carrier in (131_400_000, 126_800_000, 126_808_333, 126_816_667):
@@ -344,7 +378,7 @@ class GridTest(unittest.TestCase):
 
 class AirbandChannelTest(unittest.TestCase):
     def test_carrier_to_published_channel_name(self) -> None:
-        from falconsdr.models import airband_channel
+        from alisdr.models import airband_channel
         self.assertEqual(airband_channel(126_800_000, ch833=True), "126.805")
         self.assertEqual(airband_channel(130_875_000), "130.875")  # 25 kHz-grid carrier: 25 kHz name by default
         self.assertEqual(airband_channel(126_808_333), "126.810")
@@ -353,14 +387,14 @@ class AirbandChannelTest(unittest.TestCase):
         self.assertEqual(airband_channel(148_750_000), "")         # not airband
 
     def test_near_duplicate_airband_frequencies_snap_to_one_channel(self) -> None:
-        from falconsdr.models import snap_airband_hz
+        from alisdr.models import snap_airband_hz
         self.assertEqual(snap_airband_hz(130_874_000), 130_875_000)
         self.assertEqual(snap_airband_hz(135_966_000), 135_966_667)
         self.assertEqual(snap_airband_hz(121_501_000), 121_501_000)  # guard untouched
         self.assertEqual(snap_airband_hz(149_162_000), 149_162_000)  # not airband
 
     def test_ch833_round_trips_through_csv_row(self) -> None:
-        from falconsdr.models import Channel
+        from alisdr.models import Channel
         self.assertTrue(Channel.from_row(Channel(126_800_000, ch833=True).to_row()).ch833)
         self.assertFalse(Channel.from_row(["130875000", "x", "AM", "1", "", "0.0"]).ch833)  # old 6-column file
 
@@ -368,8 +402,8 @@ class AirbandChannelTest(unittest.TestCase):
 class SquelchTest(unittest.TestCase):
     def test_band_squelch_overrides_global_and_never_exceeds_trigger(self) -> None:
         from types import SimpleNamespace
-        from falconsdr.config import VfoRangeConfig
-        from falconsdr.scanner_engine import ScannerEngine
+        from alisdr.config import VfoRangeConfig
+        from alisdr.scanner_engine import ScannerEngine
         cfg = AppConfig()
         cfg.squelch_enabled, cfg.squelch_offset_db = False, -6.0
         band = VfoRangeConfig(squelch_enabled=True, squelch_offset_db=4.0)  # positive offset must clamp to 0
@@ -390,7 +424,7 @@ class RawReadTest(unittest.TestCase):
     def _backend(self, stream):
         import numpy as np
         from types import SimpleNamespace
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         backend = object.__new__(sb.RtlSdrBackend)
         backend._carry = np.empty(0, dtype=np.uint8)
         backend._io_diag = SimpleNamespace(record_read=lambda *a: None)
@@ -418,7 +452,7 @@ class RawReadTest(unittest.TestCase):
 
     def test_acquisition_thread_converts_on_the_consumer_side(self) -> None:
         import numpy as np
-        from falconsdr.sdr_backend import AcquisitionThread
+        from alisdr.sdr_backend import AcquisitionThread
         calls = {"raw": 0, "iq": 0}
 
         class Fake:
@@ -510,13 +544,13 @@ class RtlTcpTest(unittest.TestCase):
     """RtlTcpBackend against a fake rtl_tcp server (gotcha 56)."""
 
     def _backend(self, server, **kw):
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         args = dict(device_args=f"host=127.0.0.1,port={server.port}", sample_rate=1_000_000.0, gain_mode="manual", gain_db=30.0)
         args.update(kw)
         return sb.RtlTcpBackend(**args)
 
     def test_args(self) -> None:
-        from falconsdr.sdr_backend import parse_rtl_tcp_args
+        from alisdr.sdr_backend import parse_rtl_tcp_args
         self.assertEqual(parse_rtl_tcp_args("host=192.168.1.5,port=4321"), ("192.168.1.5", 4321))
         self.assertEqual(parse_rtl_tcp_args("host=pi.local"), ("pi.local", 1234))
         for bad in ("", "port=1234", "host=x,port=0", "host=x,port=99999", "host=x,port=abc"):
@@ -554,7 +588,7 @@ class RtlTcpTest(unittest.TestCase):
         server.close()
 
     def test_a_rate_the_dongle_cannot_do_is_refused_before_connecting(self) -> None:
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         for rate in (500_000.0, 3_600_000.0, 61_440_000.0):
             with self.assertRaises(RuntimeError, msg=rate):
                 sb.RtlTcpBackend("host=127.0.0.1,port=9", rate, "manual", 30.0)  # nothing listens: it must not even try
@@ -581,7 +615,7 @@ class RtlTcpTest(unittest.TestCase):
 
     def test_reads_exact_blocks_and_converts_like_the_local_backend(self) -> None:
         import numpy as np
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         server = _FakeRtlTcp()
         backend = self._backend(server)
         try:
@@ -598,7 +632,7 @@ class RtlTcpTest(unittest.TestCase):
     def test_retune_drops_what_belongs_to_the_old_frequency(self) -> None:
         import numpy as np
         from unittest import mock
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         for stale, expect_all_new in ((0.4, True), (0.0, False)):  # the server needs 0.15 s to retune
             server = _FakeRtlTcp(retune_delay=0.15)
             backend = self._backend(server)
@@ -617,12 +651,12 @@ class RtlTcpTest(unittest.TestCase):
                 server.close()
 
     def test_connection_problems_are_clear(self) -> None:
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         import socket
         gone = socket.create_server(("127.0.0.1", 0))
         port = gone.getsockname()[1]
         gone.close()
-        from falconsdr.i18n import tr  # the texts follow the language the other tests left set
+        from alisdr.i18n import tr  # the texts follow the language the other tests left set
         with self.assertRaises(RuntimeError) as ctx:
             sb.RtlTcpBackend(f"host=127.0.0.1,port={port}", 1_000_000.0, "manual", 30.0)
         self.assertTrue(str(ctx.exception).startswith(tr("Can't connect to rtl_tcp at {addr} ({error}).").split("{addr}")[0]))
@@ -634,19 +668,19 @@ class RtlTcpTest(unittest.TestCase):
 
     def test_a_busy_server_that_never_greets_times_out(self) -> None:
         from unittest import mock
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         silent = _FakeRtlTcp(stream=None)  # accepts, says nothing (another client holds the real one)
         with mock.patch.object(sb, "_RTLTCP_CONNECT_S", 0.3):
             with self.assertRaises(RuntimeError) as ctx:
                 self._backend(silent)
-            from falconsdr.i18n import tr
+            from alisdr.i18n import tr
             self.assertEqual(str(ctx.exception), tr("rtl_tcp at {addr} didn't answer - it serves one program at a time; is another one connected?")
                              .format(addr=f"127.0.0.1:{silent.port}"))
         silent.close()
 
     def test_a_stream_that_stops_raises_and_works_under_the_acquisition_thread(self) -> None:
         import numpy as np
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         server = _FakeRtlTcp()
         backend = self._backend(server)
         thread = sb.AcquisitionThread(backend, 300, max_queued=8)
@@ -672,7 +706,7 @@ class AsyncStreamTest(unittest.TestCase):
         from collections import deque
         from types import ModuleType, SimpleNamespace
         import numpy as np
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         backend = object.__new__(sb.RtlSdrBackend)
         backend._carry = np.empty(0, dtype=np.uint8)
         backend._io_diag = SimpleNamespace(record_read=lambda *a: None)
@@ -754,7 +788,7 @@ class AsyncStreamTest(unittest.TestCase):
         import sys
         from types import SimpleNamespace
         from unittest import mock
-        from falconsdr.sdr_backend import StreamFault
+        from alisdr.sdr_backend import StreamFault
         lib = self._crashing(rtlsdr_cancel_async=1)
         backend, modules = self._backend(lib)
         closed = []
@@ -770,7 +804,7 @@ class AsyncStreamTest(unittest.TestCase):
     def test_a_crash_inside_the_stream_thread_reaches_the_reader(self) -> None:
         import sys
         from unittest import mock
-        from falconsdr.sdr_backend import StreamFault
+        from alisdr.sdr_backend import StreamFault
         lib = self._crashing(rtlsdr_read_async=1)
         backend, modules = self._backend(lib)
         with mock.patch.dict(sys.modules, modules):
@@ -782,7 +816,7 @@ class AsyncStreamTest(unittest.TestCase):
     def test_a_crash_while_starting_the_stream_is_a_stream_fault(self) -> None:
         import sys
         from unittest import mock
-        from falconsdr.sdr_backend import StreamFault
+        from alisdr.sdr_backend import StreamFault
         backend, modules = self._backend(self._crashing(rtlsdr_reset_buffer=1))
         with mock.patch.dict(sys.modules, modules):
             for _ in range(8):
@@ -792,7 +826,7 @@ class AsyncStreamTest(unittest.TestCase):
 
     def test_without_the_stream_a_native_error_stays_what_it_was(self) -> None:
         """Only a receiver that was streaming gets the switch-off-and-reopen treatment."""
-        from falconsdr.sdr_backend import StreamFault
+        from alisdr.sdr_backend import StreamFault
         backend, _ = self._backend(self._lib(), async_read=False)
 
         def boom(_hz):
@@ -804,7 +838,7 @@ class AsyncStreamTest(unittest.TestCase):
 
     def test_a_marker_left_by_an_earlier_run_is_stale_and_ours_is_not(self) -> None:
         from unittest import mock
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         marker = Path(tempfile.mkdtemp(dir=_HOME)) / "rtlsdr_stream.active"
         with mock.patch.object(sb, "_STREAM_MARKER", marker):
             self.assertFalse(sb._stream_marker_stale())      # nothing there
@@ -816,9 +850,9 @@ class AsyncStreamTest(unittest.TestCase):
             self.assertFalse(marker.exists())
 
     def test_the_engine_switches_the_stream_off_and_reconnects_without_reconnecting_state(self) -> None:
-        from falconsdr.models import ScannerState
-        from falconsdr.scanner_engine import ScannerEngine
-        from falconsdr.sdr_backend import StreamFault
+        from alisdr.models import ScannerState
+        from alisdr.scanner_engine import ScannerEngine
+        from alisdr.sdr_backend import StreamFault
         cfg = AppConfig()
         cfg.debug_mode, cfg.device.driver = True, "simulated"
         engine = ScannerEngine(cfg, [], [])
@@ -900,7 +934,7 @@ class AsyncStreamTest(unittest.TestCase):
         import sys
         from types import SimpleNamespace
         from unittest import mock
-        from falconsdr import sdr_backend as sb
+        from alisdr import sdr_backend as sb
         lib = self._lib(ignore_cancel=True)
         backend, modules = self._backend(lib)
         closed = []
@@ -918,7 +952,7 @@ class AsyncStreamTest(unittest.TestCase):
             self.assertEqual(closed, [True])   # no stream: closed as usual
 
     def test_stats_tell_a_loss_from_a_late_callback(self) -> None:
-        from falconsdr.sdr_backend import _StreamStats
+        from alisdr.sdr_backend import _StreamStats
         step = 65536 / 2 / 2_400_000.0   # one 64 KiB transfer
         ok, late, lossy = _StreamStats(2_400_000.0), _StreamStats(2_400_000.0), _StreamStats(2_400_000.0)
         t = 0.0
@@ -937,8 +971,8 @@ class FixedLanguageTest(unittest.TestCase):
         import sys
         from types import ModuleType, SimpleNamespace
         from unittest import mock
-        from falconsdr.config import TranscriptionConfig
-        from falconsdr.playback import transcription_engine as te
+        from alisdr.config import TranscriptionConfig
+        from alisdr.playback import transcription_engine as te
         seen: dict = {"detect": 0, "language": None}
 
         def transcribe(audio, **kw):
@@ -964,8 +998,8 @@ class FixedLanguageTest(unittest.TestCase):
         self.assertEqual(self._run(" PL "), {"detect": 0, "language": "pl"})
 
     def test_a_language_change_does_not_reload_the_models(self) -> None:
-        from falconsdr.config import TranscriptionConfig
-        from falconsdr.playback import transcription_engine as te
+        from alisdr.config import TranscriptionConfig
+        from alisdr.playback import transcription_engine as te
         base = TranscriptionConfig()
         self.assertEqual(te._model_key(base), te._model_key(TranscriptionConfig(fixed_language="pl", min_duration_sec=2.0)))
         self.assertNotEqual(te._model_key(base), te._model_key(TranscriptionConfig(generic_model="small")))
@@ -976,8 +1010,8 @@ class NoSpeechPreCheckTest(unittest.TestCase):
         import sys
         from types import ModuleType, SimpleNamespace
         from unittest import mock
-        from falconsdr.config import TranscriptionConfig
-        from falconsdr.playback import transcription_engine as te
+        from alisdr.config import TranscriptionConfig
+        from alisdr.playback import transcription_engine as te
         calls: list[str] = []
 
         def transcribe(audio, **kw):
@@ -1021,8 +1055,8 @@ class SingleModelTranscriptionTest(unittest.TestCase):
         import sys
         from types import ModuleType, SimpleNamespace
         from unittest import mock
-        from falconsdr.config import TranscriptionConfig
-        from falconsdr.playback import transcription_engine as te
+        from alisdr.config import TranscriptionConfig
+        from alisdr.playback import transcription_engine as te
         used: list[str] = []
 
         def fake_load(model_id, config):
@@ -1045,7 +1079,7 @@ class SingleModelTranscriptionTest(unittest.TestCase):
         return used
 
     def test_default_is_one_model(self) -> None:
-        from falconsdr.config import TranscriptionConfig
+        from alisdr.config import TranscriptionConfig
         self.assertEqual(TranscriptionConfig().english_atc_model, "")
         self.assertEqual(self._run("", "en"), ["large-v3"])
         self.assertEqual(self._run("", "pl"), ["large-v3"])
@@ -1060,7 +1094,7 @@ class StaticJsTest(unittest.TestCase):
         """`stmt; // note io.disconnect(); clearInterval(t);` is valid JS and silently drops the rest
         (once left the Recordings page polling the server forever, ~3 requests/s after a few visits)."""
         import re
-        root = Path(__file__).resolve().parent.parent / "falconsdr" / "web" / "static"
+        root = Path(__file__).resolve().parent.parent / "alisdr" / "web" / "static"
         bad = []
         for path in root.rglob("*.js"):
             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -1076,7 +1110,7 @@ class IqUncoveredTimeTest(unittest.TestCase):
 
     def test_ignores_reads_while_the_backend_streams(self) -> None:
         import numpy as np
-        from falconsdr.sdr_backend import AcquisitionThread
+        from alisdr.sdr_backend import AcquisitionThread
 
         class Fake:
             sample_rate, label, gain_range_db, streaming = 100_000.0, "fake", (0.0, 50.0), True
@@ -1098,7 +1132,7 @@ class IqUncoveredTimeTest(unittest.TestCase):
 
     def test_counts_a_slow_cycle_but_not_a_retune(self) -> None:
         import numpy as np
-        from falconsdr.sdr_backend import AcquisitionThread
+        from alisdr.sdr_backend import AcquisitionThread
         calls, settle = [0], [False]
 
         class Fake:
@@ -1133,7 +1167,7 @@ class IqUncoveredTimeTest(unittest.TestCase):
 
 class DumpsChunkedTest(unittest.TestCase):
     def test_same_json_as_dumps_for_the_caches(self) -> None:
-        from falconsdr.config import dumps_chunked
+        from alisdr.config import dumps_chunked
         data = {"a|1|2": {"text": "zażółć gęślą", "n": 1.5, "ok": True, "x": None}, "b": {}, 'q"uote': {"t": "\n"}}
         for kwargs in ({}, {"ensure_ascii": False}):
             self.assertEqual(json.loads(dumps_chunked(data, **kwargs)), data)
@@ -1158,7 +1192,7 @@ class AudioAnalysisStreamingTest(unittest.TestCase):
 
     def test_block_size_does_not_change_the_result(self) -> None:
         from unittest import mock
-        from falconsdr.playback import audio_analysis as aa
+        from alisdr.playback import audio_analysis as aa
         for channels in (1, 2):
             path = self._wav(70_001, channels)
             whole = (aa.analyze_wav(path), aa.compute_waveform_peaks(path, 400))
@@ -1170,9 +1204,9 @@ class AudioAnalysisStreamingTest(unittest.TestCase):
             self.assertAlmostEqual(whole[0].duration_sec, 70_001 / 12500)
 
     def test_mp3_is_decoded_to_a_temp_file_that_is_removed(self) -> None:
-        from falconsdr.audio_transcode import ffmpeg_exe, transcode_to_mp3
-        from falconsdr.playback import audio_analysis as aa
-        from falconsdr.playback.config import APP_DATA_DIR
+        from alisdr.audio_transcode import ffmpeg_exe, transcode_to_mp3
+        from alisdr.playback import audio_analysis as aa
+        from alisdr.playback.config import APP_DATA_DIR
         if ffmpeg_exe() is None:
             self.skipTest("no ffmpeg")
         mp3 = transcode_to_mp3(self._wav(25_000))
@@ -1189,7 +1223,7 @@ class AudioAnalysisStreamingTest(unittest.TestCase):
 
     def test_only_one_block_is_in_memory(self) -> None:
         from unittest import mock
-        from falconsdr.playback import audio_analysis as aa
+        from alisdr.playback import audio_analysis as aa
         path = self._wav(70_001)
         with mock.patch.object(aa, "BLOCK_FRAMES", 1300):
             sizes = [len(block) for block, *_ in aa._stream_samples(path, aa.WINDOW_SEC)]
@@ -1202,9 +1236,9 @@ class SoftwareAgcTest(unittest.TestCase):
 
     def _run(self, peaks_db, seconds, gain=40.0):
         from unittest import mock
-        from falconsdr.agc import SoftwareAgc
+        from alisdr.agc import SoftwareAgc
         clock = [1000.0]
-        with mock.patch("falconsdr.agc.time.monotonic", lambda: clock[0]):
+        with mock.patch("alisdr.agc.time.monotonic", lambda: clock[0]):
             agc, steps = SoftwareAgc(gain), []
             for i in range(int(seconds / 0.03)):
                 clock[0] += 0.03
@@ -1235,9 +1269,9 @@ class LiveBandOverrideTest(unittest.TestCase):
         """merge_patch replaces config.bands with new objects; the window an
         open transmission sits on must still pick up the edited trigger."""
         from types import SimpleNamespace
-        from falconsdr.config import VfoRangeConfig
-        from falconsdr.controller import merge_patch
-        from falconsdr.scanner_engine import ScannerEngine
+        from alisdr.config import VfoRangeConfig
+        from alisdr.controller import merge_patch
+        from alisdr.scanner_engine import ScannerEngine
         cfg = AppConfig()
         cfg.bands = [VfoRangeConfig(id="b1", trigger_level_dbfs=-47.0)]
         engine = SimpleNamespace(config=cfg)
@@ -1250,7 +1284,7 @@ class LiveBandOverrideTest(unittest.TestCase):
 
     def test_power_of_a_dropped_frequency_does_not_raise(self) -> None:
         import numpy as np
-        from falconsdr.channelizer import channel_powers_from_spectrum
+        from alisdr.channelizer import channel_powers_from_spectrum
         bins = np.linspace(-1e6, 1e6, 2001)
         spectrum = (bins, np.concatenate(([0.0], np.cumsum(np.ones(2000)))))
         out = channel_powers_from_spectrum(spectrum, 100e6, [100_000_000, 100_050_000], {100_000_000: 12_500.0})
@@ -1264,8 +1298,8 @@ class AmBlockEdgeTest(unittest.TestCase):
 
     def test_blockwise_equals_whole(self):
         import numpy as np
-        from falconsdr.dsp import Demodulator
-        from falconsdr.models import Modulation
+        from alisdr.dsp import Demodulator
+        from alisdr.models import Modulation
         fs, chunk = 2_400_000, 72_000
         t = np.arange(fs) / fs
         iq = (0.3 * (1 + 0.5 * np.sin(2 * np.pi * 1000 * t))).astype(np.complex64)
@@ -1279,7 +1313,7 @@ class DigitalVoiceTest(unittest.TestCase):
     def test_stream_resampler_matches_one_call_on_the_whole_stream(self) -> None:
         import numpy as np
         from scipy.signal import resample_poly
-        from falconsdr.dsp import StreamResampler
+        from alisdr.dsp import StreamResampler
         rng = np.random.default_rng(1)
         for fs in (2_400_000, 2_048_000):
             x = (rng.standard_normal(fs // 4) + 1j * rng.standard_normal(fs // 4)).astype(np.complex64)
@@ -1297,7 +1331,7 @@ class DigitalVoiceTest(unittest.TestCase):
     def test_predecimation_gives_the_same_audio_for_a_fraction_of_the_work(self) -> None:
         import time
         import numpy as np
-        from falconsdr.dsp import StreamResampler
+        from alisdr.dsp import StreamResampler
         rng = np.random.default_rng(2)
         fs, to = 2_400_000, 12_500
         n = fs * 3 // 10
@@ -1353,7 +1387,7 @@ class DigitalVoiceTest(unittest.TestCase):
     @staticmethod
     def _discriminated(iq, fs=2_400_000):
         import numpy as np
-        from falconsdr.dsp import Demodulator
+        from alisdr.dsp import Demodulator
         demod, block = Demodulator(fs, 48000), int(fs * 0.03)
         return np.concatenate([demod.discriminate(iq[i:i + block], 0.0, 48000) for i in range(0, iq.size - block, block)])
 
@@ -1378,8 +1412,8 @@ class DigitalVoiceTest(unittest.TestCase):
     def test_digital_slot_ignores_squelch_analog_still_obeys(self) -> None:
         import numpy as np
         from types import SimpleNamespace
-        from falconsdr.models import Modulation
-        from falconsdr.scanner_engine import ScannerEngine
+        from alisdr.models import Modulation
+        from alisdr.scanner_engine import ScannerEngine
         played = []
         engine = SimpleNamespace(_play_and_record_slot=lambda slot, audio, squelched: played.append(squelched),
                                  signals=SimpleNamespace(log=SimpleNamespace(emit=lambda *a: None)))
@@ -1396,7 +1430,7 @@ class DigitalVoiceTest(unittest.TestCase):
 
     def test_decoder_parses_calls_and_keeps_its_timeline(self) -> None:
         import numpy as np
-        from falconsdr import digital_voice
+        from alisdr import digital_voice
         dec = digital_voice.DsdDecoder.__new__(digital_voice.DsdDecoder)  # no dsd-fme process
         dec.out_rate, dec._frac, dec._buf, dec._lock = 12500, 0.0, np.zeros(0, np.float32), threading.Lock()
         dec.talkgroup = dec.source = ""
@@ -1420,7 +1454,7 @@ class DigitalVoiceTest(unittest.TestCase):
         import ssl
         import urllib.error
         from unittest import mock
-        from falconsdr import digital_voice
+        from alisdr import digital_voice
         seen = []
 
         def fake(url, timeout, context):
@@ -1447,7 +1481,7 @@ class DigitalDownloadChecksumTest(unittest.TestCase):
     def _serve_bytes(self, data: bytes):
         import io
         from unittest import mock
-        from falconsdr import digital_voice
+        from alisdr import digital_voice
         return digital_voice, mock.patch.object(digital_voice, "_urlopen", lambda url: io.BytesIO(data))
 
     def test_a_download_that_is_not_the_tested_one_is_removed_and_refused(self) -> None:
@@ -1468,7 +1502,7 @@ class RtlSdrListTest(unittest.TestCase):
         import sys
         import types
         from unittest import mock
-        from falconsdr import sdr_backend
+        from alisdr import sdr_backend
         serials = ["SDR-A", "00000001", "00000001", None]  # None: in use / no WinUSB driver
 
         def read(_lib, i):
@@ -1496,7 +1530,7 @@ class BiasTeeTest(unittest.TestCase):
 
     def test_native_rtlsdr(self) -> None:
         from unittest import mock
-        from falconsdr import sdr_backend
+        from alisdr import sdr_backend
         calls = []
 
         class FakeRtl:
@@ -1542,7 +1576,7 @@ class BiasTeeTest(unittest.TestCase):
     def test_soapy(self) -> None:
         from types import SimpleNamespace
         from unittest import mock
-        from falconsdr import sdr_backend
+        from alisdr import sdr_backend
         writes = []
 
         class FakeDevice:
@@ -1600,7 +1634,7 @@ class SoapyRetuneTest(unittest.TestCase):
     def test_an_rtlsdr_gain_snaps_to_the_nearest_tuner_step_like_the_native_backend(self) -> None:
         from types import SimpleNamespace
         from unittest import mock
-        from falconsdr import sdr_backend
+        from alisdr import sdr_backend
         sent: list[float] = []
 
         class FakeDevice:
@@ -1631,7 +1665,7 @@ class SoapyRetuneTest(unittest.TestCase):
             self.assertEqual(sent, [30.4])  # no table for other hardware: passed on as is
 
     def test_stream_args_keep_small_transfers_and_about_220_ms_of_slack(self) -> None:
-        from falconsdr.sdr_backend import _soapy_stream_args
+        from alisdr.sdr_backend import _soapy_stream_args
         self.assertEqual(_soapy_stream_args(2_400_000), {"bufflen": "16384", "buffers": "64"})
         low = _soapy_stream_args(250_000)
         self.assertEqual(int(low["bufflen"]) % 512, 0)
@@ -1641,7 +1675,7 @@ class SoapyRetuneTest(unittest.TestCase):
     def test_a_retune_drops_what_the_driver_queued_and_two_transfers_more(self) -> None:
         from types import SimpleNamespace
         from unittest import mock
-        from falconsdr import sdr_backend
+        from alisdr import sdr_backend
         state = {"queued": 5, "blocking_samples": 0, "calls": 0}
 
         class FakeDevice:
@@ -1681,7 +1715,7 @@ class NativeSdrTest(unittest.TestCase):
     what a real board does (nobody has run it on one yet: `main.py --probe-sdr` is for that)."""
 
     def test_stream_drops_what_was_queued_before_a_retune_and_one_transfer_more(self) -> None:
-        from falconsdr.sdr_native import CallbackStream
+        from alisdr.sdr_native import CallbackStream
         st = CallbackStream(bytes_per_sample=2, sample_rate=1_000_000)     # a 1000-sample chunk lasts 1 ms
         chunk = bytes(2000)
         st.push(chunk, now=10.000)
@@ -1695,7 +1729,7 @@ class NativeSdrTest(unittest.TestCase):
         self.assertEqual(len(st.read(1000)), 2000)
 
     def test_stream_hands_out_exact_sizes_across_chunks_and_raises_when_starved(self) -> None:
-        from falconsdr.sdr_native import CallbackStream
+        from alisdr.sdr_native import CallbackStream
         st = CallbackStream(bytes_per_sample=2, sample_rate=1_000_000, timeout_s=0.05)
         st.push(bytes(range(200)), now=1.0)
         st.push(bytes(range(200, 256)) + bytes(144), now=1.1)
@@ -1708,7 +1742,7 @@ class NativeSdrTest(unittest.TestCase):
             st.read(1)
 
     def test_stream_counts_an_overflow_as_a_loss(self) -> None:
-        from falconsdr.sdr_native import CallbackStream
+        from alisdr.sdr_native import CallbackStream
         st = CallbackStream(bytes_per_sample=2, sample_rate=1000, max_buffer_s=1.0)     # holds 1 s = 2000 bytes
         for i in range(5):
             st.push(bytes(1000), now=10.0 + i)
@@ -1716,7 +1750,7 @@ class NativeSdrTest(unittest.TestCase):
         self.assertEqual((lost, received), (1.5, 2.5))              # 5 chunks of 0.5 s, room for 2
 
     def test_hackrf_gain_uses_the_real_steps_and_adds_up(self) -> None:
-        from falconsdr.sdr_native import hackrf_gain_split
+        from alisdr.sdr_native import hackrf_gain_split
         for gain in range(0, 117):
             lna, vga, amp = hackrf_gain_split(gain)
             self.assertEqual(lna % 8, 0)
@@ -1748,7 +1782,7 @@ class NativeSdrTest(unittest.TestCase):
     def test_hackrf_backend_opens_with_the_antenna_off_streams_and_closes_it_off_again(self) -> None:
         from unittest import mock
         import numpy as np
-        from falconsdr import sdr_native
+        from alisdr import sdr_native
         lib, calls, ctypes = self._fake_hackrf()
         with mock.patch.object(sdr_native, "hackrf_library", lambda: lib), \
                 mock.patch.object(sdr_native.SoapyBackend, "_wait_for_reopen_cooldown", staticmethod(lambda: None)), \
@@ -1777,7 +1811,7 @@ class NativeSdrTest(unittest.TestCase):
     def test_airspy_backend_snaps_to_a_rate_the_board_has_and_passes_float_iq_through(self) -> None:
         from unittest import mock
         import numpy as np
-        from falconsdr import sdr_native
+        from alisdr import sdr_native
         calls: list[tuple] = []
 
         class Lib:
@@ -1811,7 +1845,7 @@ class NativeSdrTest(unittest.TestCase):
             b.close()
 
     def test_every_way_to_open_a_receiver_is_grouped_and_rtl_defaults_to_librtlsdr(self) -> None:
-        from falconsdr.controller import Controller
+        from alisdr.controller import Controller
         native = Controller._device_entry("rtlsdr_native", {"serial": "00000001"}, "RTL-SDR (librtlsdr) SN 00000001")
         soapy = Controller._device_entry("rtlsdr", {"serial": "00000001", "label": "Generic RTL2832U OEM :: 00000001"}, "Generic RTL2832U OEM :: 00000001")
         self.assertEqual(native["group"], soapy["group"])
@@ -1825,7 +1859,7 @@ class NativeSdrTest(unittest.TestCase):
     def test_a_closed_soapy_backend_lets_go_of_the_device(self) -> None:
         from types import SimpleNamespace
         from unittest import mock
-        from falconsdr import sdr_backend
+        from alisdr import sdr_backend
         released: list[object] = []
 
         class FakeDevice:
@@ -1854,8 +1888,8 @@ class NativeSdrTest(unittest.TestCase):
 
     def test_a_saved_choice_replaces_its_twin_in_the_list_instead_of_doubling_it(self) -> None:
         from unittest import mock
-        from falconsdr import controller as ctl
-        from falconsdr.config import AppConfig
+        from alisdr import controller as ctl
+        from alisdr.config import AppConfig
         listed = [{"driver": "rtlsdr_native", "serial": "00000001", "label": "RTL-SDR (librtlsdr) SN 00000001"},
                   {"driver": "rtlsdr", "serial": "00000001", "label": "Generic RTL2832U OEM :: 00000001"}]
         cfg = AppConfig()
@@ -1869,8 +1903,8 @@ class NativeSdrTest(unittest.TestCase):
 
     def test_a_hackrf_shows_up_in_the_list_whatever_is_installed_and_defaults_to_the_way_that_works(self) -> None:
         from unittest import mock
-        from falconsdr import controller as ctl
-        from falconsdr.config import AppConfig
+        from alisdr import controller as ctl
+        from alisdr.config import AppConfig
         serial = "0000000000000000a1b2c3d4e5f60718"
         soapy_hackrf = {"driver": "hackrf", "serial": serial, "label": "HackRF One #0 " + serial}
         native_hackrf = {"driver": "hackrf_native", "serial": serial, "label": "HackRF One (libhackrf) SN e5f60718"}
@@ -1898,7 +1932,7 @@ class NativeSdrTest(unittest.TestCase):
         import subprocess
         from types import SimpleNamespace
         from unittest import mock
-        from falconsdr import sdr_native
+        from alisdr import sdr_native
         good = json.dumps({"hackrf": True, "airspy": False, "devices": [{"driver": "hackrf_native", "serial": "ab"}]})
         cases = [
             (SimpleNamespace(stdout="library noise\n" + good + "\n"), True),            # the answer is the last JSON line
@@ -1922,7 +1956,7 @@ class NativeSdrTest(unittest.TestCase):
 
     def test_open_real_backend_picks_the_way(self) -> None:
         from unittest import mock
-        from falconsdr import sdr_backend as sb, sdr_native
+        from alisdr import sdr_backend as sb, sdr_native
         made: list[str] = []
 
         def fake(name):
@@ -1964,14 +1998,14 @@ class CacheSavingTest(unittest.TestCase):
         import shutil
         import tempfile
         from unittest import mock
-        from falconsdr.playback import index
-        from falconsdr.playback.quality_cache import QualityCache, QualityMetrics
-        from falconsdr.playback.transcription_cache import TranscriptionCache
+        from alisdr.playback import index
+        from alisdr.playback.quality_cache import QualityCache, QualityMetrics
+        from alisdr.playback.transcription_cache import TranscriptionCache
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp, True)
         quality, transcripts = QualityCache(tmp / "q.json"), TranscriptionCache(tmp / "t.json")
         writes = []
-        from falconsdr.playback import quality_cache, transcription_cache
+        from alisdr.playback import quality_cache, transcription_cache
         for module in (quality_cache, transcription_cache):
             self.enterContext(mock.patch.object(module, "atomic_write_text", lambda path, text, w=writes: w.append(Path(path).name)))
         self.assertFalse(quality.changed)
@@ -2015,12 +2049,12 @@ class MixedReceiversPlanTest(unittest.TestCase):
     """Receivers of different capture widths share one scan plan (antenna_range.py)."""
 
     def _plan(self):
-        from falconsdr.channelizer import plan_windows
+        from alisdr.channelizer import plan_windows
         freqs = list(range(118_000_000, 137_000_000, 8_333))
         return freqs, plan_windows(freqs, 2_400_000, 8_333)
 
     def _shares(self, rates):
-        from falconsdr.antenna_range import OPEN_END_HZ, split_by_range, widen_windows
+        from alisdr.antenna_range import OPEN_END_HZ, split_by_range, widen_windows
         freqs, plan = self._plan()
         ranges = [(0, OPEN_END_HZ)] * len(rates)
         bw = {f: 8_333.0 for f in freqs}
@@ -2031,7 +2065,7 @@ class MixedReceiversPlanTest(unittest.TestCase):
         return freqs, shares
 
     def test_every_frequency_goes_to_exactly_one_receiver_and_windows_fit_each_width(self) -> None:
-        from falconsdr.channelizer import USABLE_FRACTION
+        from alisdr.channelizer import USABLE_FRACTION
         rates = [2_400_000.0, 10_000_000.0, 2_400_000.0]
         freqs, shares = self._shares(rates)
         owned = [sorted(f for w in share for f in w.freqs) for share in shares]
@@ -2046,7 +2080,7 @@ class MixedReceiversPlanTest(unittest.TestCase):
         self.assertLess(len(shares[1]) / len(owned[1]), len(shares[0]) / len(owned[0]) / 3)
 
     def test_equal_widths_split_exactly_like_before(self) -> None:
-        from falconsdr.antenna_range import OPEN_END_HZ, split_by_range
+        from alisdr.antenna_range import OPEN_END_HZ, split_by_range
         _freqs, plan = self._plan()
         ranges = [(0, 140_000_000), (0, OPEN_END_HZ), (120_000_000, OPEN_END_HZ)]
         old: dict[int, list[int]] = {}
@@ -2065,8 +2099,8 @@ class MixedReceiversPlanTest(unittest.TestCase):
             self.assertEqual(sorted(f for w in new for f in w.freqs), sorted(old.get(index, [])))
 
     def test_windows_of_other_bands_are_not_joined(self) -> None:
-        from falconsdr.antenna_range import widen_windows
-        from falconsdr.channelizer import ScanWindow
+        from alisdr.antenna_range import widen_windows
+        from alisdr.channelizer import ScanWindow
         a, b = object(), object()
         windows = [ScanWindow(100_000_000, [99_900_000, 100_000_000], band=a), ScanWindow(100_300_000, [100_300_000], band=b),
                    ScanWindow(100_600_000, [100_600_000], band=a)]
@@ -2077,14 +2111,14 @@ class MixedReceiversPlanTest(unittest.TestCase):
         self.assertEqual(same[0].freqs, [99_900_000, 100_000_000, 100_300_000])
 
     def test_device_rates_follow_the_engine_order_and_default_to_the_main_width(self) -> None:
-        from falconsdr.antenna_range import device_rates
+        from alisdr.antenna_range import device_rates
         cfg = AppConfig()
         cfg.device.sample_rate_hz = 2_400_000
         cfg.device.extra_devices = [{"driver": "hackrf", "sample_rate_hz": 10_000_000}, {"driver": "rtlsdr"}, {"nodriver": 1}]
         self.assertEqual(device_rates(cfg), [2_400_000.0, 10_000_000.0, 2_400_000.0])
 
     def test_the_engine_adopts_the_rate_the_receiver_really_has_and_tells_the_others(self) -> None:
-        from falconsdr.scanner_engine import ScannerEngine, SharedFrequencies
+        from alisdr.scanner_engine import ScannerEngine, SharedFrequencies
         cfg = AppConfig()
         cfg.device.sample_rate_hz = 2_400_000
         cfg.device.extra_devices = [{"driver": "airspy"}]
@@ -2101,7 +2135,7 @@ class MixedReceiversPlanTest(unittest.TestCase):
 
     def test_edge_roll_off_is_learned_per_kind_of_receiver(self) -> None:
         from types import SimpleNamespace
-        from falconsdr.scanner_engine import ScannerEngine
+        from alisdr.scanner_engine import ScannerEngine
         engine = ScannerEngine(AppConfig(), [], [])
         self.assertEqual(engine._calibration_key("sw_auto"), "sw_auto")            # nothing open yet: the old key
         engine._backend = SimpleNamespace(label="rtlsdr_native")
@@ -2114,8 +2148,8 @@ class MixedReceiversPlanTest(unittest.TestCase):
 
 class MultiDongleTest(unittest.TestCase):
     def test_scan_plan_is_split_without_overlap_and_lanes_keep_their_weight(self) -> None:
-        from falconsdr.channelizer import plan_windows
-        from falconsdr.scanner_engine import _Lane, _partition_windows
+        from alisdr.channelizer import plan_windows
+        from alisdr.scanner_engine import _Lane, _partition_windows
         freqs = list(range(118_000_000, 137_000_000, 25_000))
         default = plan_windows(freqs[:500], 2_400_000, 25_000)
         lane = _Lane(weight=2.0, windows=plan_windows(freqs[600:], 2_400_000, 25_000), is_range=True)
@@ -2130,7 +2164,7 @@ class MultiDongleTest(unittest.TestCase):
         self.assertEqual(_partition_windows(default[:1], [], 1, 2), ([], []))  # more dongles than windows: idle
 
     def test_one_transmission_is_claimed_by_one_dongle(self) -> None:
-        from falconsdr.scanner_engine import SharedFrequencies
+        from alisdr.scanner_engine import SharedFrequencies
         shared, a, b = SharedFrequencies(), object(), object()
         self.assertTrue(shared.claim(121_500_000, a))
         self.assertFalse(shared.claim(121_500_000, b))
@@ -2142,7 +2176,7 @@ class MultiDongleTest(unittest.TestCase):
         self.assertTrue(shared.claim(121_500_000, b))
 
     def test_live_status_merges_dongles_and_audio_follows_the_one_heard(self) -> None:
-        from falconsdr.controller import Controller
+        from alisdr.controller import Controller
         ctl = Controller(AppConfig())
         heard = []
         ctl._audio_subscribers = [type("Q", (), {"put_nowait": lambda self, pcm: heard.append(pcm)})()]
@@ -2169,11 +2203,11 @@ class MultiDongleTest(unittest.TestCase):
 
 class AntennaRangeTest(unittest.TestCase):
     def _plan(self, spans):
-        from falconsdr.channelizer import plan_windows
+        from alisdr.channelizer import plan_windows
         return [w for lo, hi in spans for w in plan_windows(list(range(lo, hi, 25_000)), 2_400_000, 25_000)]
 
     def test_no_limit_by_default_and_ends_are_normalised(self) -> None:
-        from falconsdr.antenna_range import OPEN_END_HZ, device_range_hz, device_ranges, is_limited
+        from alisdr.antenna_range import OPEN_END_HZ, device_range_hz, device_ranges, is_limited
         cfg = AppConfig()
         self.assertEqual(device_ranges(cfg), [(0, OPEN_END_HZ)])
         self.assertFalse(is_limited(device_ranges(cfg)))
@@ -2183,7 +2217,7 @@ class AntennaRangeTest(unittest.TestCase):
         self.assertEqual(len(device_ranges(cfg)), 2)  # same filter as Controller._devices()
 
     def test_each_dongle_scans_only_its_range_and_every_frequency_once(self) -> None:
-        from falconsdr.antenna_range import split_by_range
+        from alisdr.antenna_range import split_by_range
         m2, cm70 = (144_000_000, 146_000_000), (430_000_000, 440_000_000)
         plan = self._plan([(144_000_000, 146_000_000), (430_000_000, 440_000_000), (118_000_000, 120_000_000)])
         ranges = [m2, cm70]
@@ -2198,7 +2232,7 @@ class AntennaRangeTest(unittest.TestCase):
                 self.assertTrue(min(w.freqs) <= w.center_hz <= max(w.freqs))
 
     def test_overlapping_ranges_take_turns_and_unlimited_dongle_gets_the_rest(self) -> None:
-        from falconsdr.antenna_range import OPEN_END_HZ, split_by_range
+        from alisdr.antenna_range import OPEN_END_HZ, split_by_range
         plan = self._plan([(144_000_000, 150_000_000), (430_000_000, 432_000_000)])
         ranges = [(144_000_000, 150_000_000), (0, OPEN_END_HZ)]
         a = split_by_range(list(plan), [], 0, ranges)[0]
@@ -2211,8 +2245,8 @@ class AntennaRangeTest(unittest.TestCase):
         self.assertTrue(any(f < 150_000_000 for f in fb))  # the unlimited one helps inside the overlap
 
     def test_lane_keeps_weight_and_empty_lane_disappears(self) -> None:
-        from falconsdr.antenna_range import split_by_range
-        from falconsdr.scanner_engine import _Lane
+        from alisdr.antenna_range import split_by_range
+        from alisdr.scanner_engine import _Lane
         lane = _Lane(weight=3.0, windows=self._plan([(430_000_000, 431_000_000)]), is_range=True)
         _d, mine = split_by_range([], [lane], 1, [(144_000_000, 146_000_000), (430_000_000, 440_000_000)])
         _d, other = split_by_range([], [lane], 0, [(144_000_000, 146_000_000), (430_000_000, 440_000_000)])
@@ -2220,9 +2254,9 @@ class AntennaRangeTest(unittest.TestCase):
         self.assertEqual(other, [])
 
     def test_uncovered_is_reported_only_when_every_dongle_is_limited(self) -> None:
-        from falconsdr.antenna_range import uncovered
-        from falconsdr.config import VfoRangeConfig
-        from falconsdr.models import Channel
+        from alisdr.antenna_range import uncovered
+        from alisdr.config import VfoRangeConfig
+        from alisdr.models import Channel
         cfg = AppConfig()
         cfg.device.range_start_hz, cfg.device.range_stop_hz = 144_000_000, 146_000_000
         airband = VfoRangeConfig(label="Airband", start_hz=118_000_000, stop_hz=136_000_000)
@@ -2241,7 +2275,7 @@ class AntennaRangeTest(unittest.TestCase):
         self.assertEqual(uncovered(cfg, channels, [airband], True), [])
 
     def test_controller_puts_the_uncovered_list_in_the_live_status(self) -> None:
-        from falconsdr.controller import Controller
+        from alisdr.controller import Controller
         cfg = AppConfig()
         ctl = Controller(cfg)
         self.assertEqual(ctl.live()["uncovered"], [])
@@ -2252,9 +2286,9 @@ class AntennaRangeTest(unittest.TestCase):
 class ScheduleTest(unittest.TestCase):
     def test_active_entries_pick_bands_and_survive_a_config_patch(self) -> None:
         import datetime as dt
-        from falconsdr import schedule
-        from falconsdr.config import ScheduleEntry, VfoRangeConfig
-        from falconsdr.controller import merge_patch
+        from alisdr import schedule
+        from alisdr.config import ScheduleEntry, VfoRangeConfig
+        from alisdr.controller import merge_patch
         cfg = AppConfig()
         day, night = VfoRangeConfig(label="day", enabled=False), VfoRangeConfig(label="night")
         cfg.bands = [day, night]
@@ -2288,7 +2322,7 @@ class ScheduleTest(unittest.TestCase):
 
 class WorkerMirrorTest(unittest.TestCase):
     def test_reports_only_size_verified_copies(self) -> None:
-        from falconsdr.worker import Worker
+        from alisdr.worker import Worker
 
         class FakeApi:
             base = "http://x"
@@ -2314,7 +2348,7 @@ class WorkerMirrorTest(unittest.TestCase):
 
 class WorkerProgressTest(unittest.TestCase):
     def _worker(self):
-        from falconsdr.worker import Worker
+        from alisdr.worker import Worker
         return Worker("http://x", "", local_root=Path(tempfile.mkdtemp(dir=_HOME)))
 
     def test_a_status_change_asks_for_an_immediate_heartbeat_and_is_timed(self) -> None:
@@ -2333,8 +2367,8 @@ class WorkerProgressTest(unittest.TestCase):
 
     def test_a_missing_model_is_reported_as_downloading_until_it_is_on_disk(self) -> None:
         from unittest import mock
-        from falconsdr import worker as worker_mod
-        from falconsdr.config import TranscriptionConfig
+        from alisdr import worker as worker_mod
+        from alisdr.config import TranscriptionConfig
         w = self._worker()
         cached = {"large-v3": False}
         with mock.patch.object(worker_mod, "model_cached", lambda m: cached[m]), \
@@ -2349,7 +2383,7 @@ class WorkerProgressTest(unittest.TestCase):
             self.assertEqual((info["status"], info["download"]), ("idle", None))
 
     def test_a_double_click_queues_a_command_once(self) -> None:
-        from falconsdr import controller as controller_mod
+        from alisdr import controller as controller_mod
         cfg = AppConfig()
         cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
         ctl = controller_mod.Controller(cfg)
@@ -2359,7 +2393,7 @@ class WorkerProgressTest(unittest.TestCase):
         self.assertEqual(ctl.worker_commands["pc"], ["install", "restart"])
 
     def test_model_cache_probes(self) -> None:
-        from falconsdr.playback import transcription_install as ti
+        from alisdr.playback import transcription_install as ti
         cache = Path(tempfile.mkdtemp(dir=_HOME))
         old = os.environ.get("HF_HUB_CACHE")
         os.environ["HF_HUB_CACHE"] = str(cache)
@@ -2383,7 +2417,7 @@ class WorkerProgressTest(unittest.TestCase):
 
 class WorkerSafeRelTest(unittest.TestCase):
     def test_paths_that_leave_the_folder_are_refused(self) -> None:
-        from falconsdr.worker import safe_rel
+        from alisdr.worker import safe_rel
         self.assertTrue(safe_rel("2026-01-01/" + NAME.format(khz=131000)))
         self.assertFalse(safe_rel("../../x/" + NAME.format(khz=131000)))
         self.assertFalse(safe_rel("/etc/" + NAME.format(khz=131000)))
@@ -2394,7 +2428,7 @@ class WorkerSafeRelTest(unittest.TestCase):
             self.assertFalse(safe_rel("C:\\x\\" + NAME.format(khz=131000)))
 
     def test_mirror_skips_a_hostile_id_but_copies_the_rest(self) -> None:
-        from falconsdr.worker import Worker
+        from alisdr.worker import Worker
         good, evil = "d/" + NAME.format(khz=1), "../" + NAME.format(khz=2)
 
         class FakeApi:
@@ -2424,7 +2458,7 @@ class WorkerSafeRelTest(unittest.TestCase):
 
 class HttpTest(unittest.TestCase):
     def _serve(self, mode: str, token: str):
-        from falconsdr.web.server import App, make_handler
+        from alisdr.web.server import App, make_handler
         from http.server import ThreadingHTTPServer
 
         class Ctl:  # only what the tested routes touch
@@ -2460,7 +2494,7 @@ class HttpTest(unittest.TestCase):
     def test_installer_can_read_the_running_revision_with_access_locked(self) -> None:
         from unittest.mock import patch
 
-        with patch("falconsdr.web.server._INSTALLED_REVISION", "a" * 40):
+        with patch("alisdr.web.server._INSTALLED_REVISION", "a" * 40):
             locked = self._serve("server", "secret")
             with urlopen(locked + "/api/session", timeout=5) as response:
                 session = json.load(response)
@@ -2469,7 +2503,7 @@ class HttpTest(unittest.TestCase):
         self.assertFalse(session["authenticated"])
 
     def test_an_unexpected_error_is_answered_with_500(self) -> None:
-        from falconsdr.web.server import App, make_handler
+        from alisdr.web.server import App, make_handler
         from http.server import ThreadingHTTPServer
 
         class Ctl:
@@ -2488,7 +2522,7 @@ class HttpTest(unittest.TestCase):
         import shutil
         import tempfile
         import zipfile
-        from falconsdr.web.server import App, make_handler
+        from alisdr.web.server import App, make_handler
         from http.server import ThreadingHTTPServer
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp, True)
@@ -2514,7 +2548,7 @@ class HttpTest(unittest.TestCase):
 
         def post(ids):
             req = Request(url + "/api/library/zip", data=json.dumps({"ids": ids}).encode(), method="POST",
-                          headers={"X-FalconSDR": "1", "Content-Type": "application/json"})
+                          headers={"X-AliSDR": "1", "Content-Type": "application/json"})
             with urlopen(req, timeout=5) as r:
                 return json.loads(r.read())
         job = post(["a/x.mp3", "b/x.mp3", "a/y.wav", "gone.mp3"])        # the vanished one is skipped
@@ -2541,7 +2575,7 @@ class HttpTest(unittest.TestCase):
 
     def test_the_favorite_state_of_a_selection_is_counted_by_the_server(self) -> None:
         from types import SimpleNamespace
-        from falconsdr.playback.index import Library
+        from alisdr.playback.index import Library
         lib = object.__new__(Library)
         lib._lock = threading.Lock()
         lib._recs = {"a": SimpleNamespace(is_favorite=True), "b": SimpleNamespace(is_favorite=True), "c": SimpleNamespace(is_favorite=False)}
@@ -2551,12 +2585,12 @@ class HttpTest(unittest.TestCase):
 
     def test_a_wrong_password_is_answered_slowly(self) -> None:
         from unittest import mock
-        from falconsdr.web import server
+        from alisdr.web import server
         url = self._serve("server", "secret")
         def login(token: str) -> tuple[int, float]:
             began = time.monotonic()
             req = Request(url + "/api/login", data=json.dumps({"token": token}).encode(), method="POST",
-                          headers={"X-FalconSDR": "1", "Content-Type": "application/json"})
+                          headers={"X-AliSDR": "1", "Content-Type": "application/json"})
             try:
                 with urlopen(req) as r:
                     status = r.status
@@ -2572,6 +2606,7 @@ class HttpTest(unittest.TestCase):
     def test_csrf_and_dns_rebinding_are_refused(self) -> None:
         url = self._serve("local", "")
         self.assertEqual(self._status(url + "/api/scanner/stop", "POST"), 403)
+        self.assertEqual(self._status(url + "/api/scanner/stop", "POST", {"X-AliSDR": "1"}), 200)
         self.assertEqual(self._status(url + "/api/scanner/stop", "POST", {"X-FalconSDR": "1"}), 200)
         self.assertEqual(self._status(url + "/api/live", headers={"Host": "evil.example:80"}), 403)
 
@@ -2580,7 +2615,7 @@ class HttpTest(unittest.TestCase):
 class ControllerStartTest(unittest.TestCase):
     def test_two_simultaneous_starts_start_one_set_of_engines(self) -> None:
         from unittest import mock
-        from falconsdr import controller as controller_mod
+        from alisdr import controller as controller_mod
         cfg = AppConfig()
         cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
         ctl = controller_mod.Controller(cfg)
@@ -2601,7 +2636,7 @@ class ControllerStartTest(unittest.TestCase):
 
 class ManualTuningTest(unittest.TestCase):
     def test_analog_retunes_in_place_and_stays_idle(self) -> None:
-        from falconsdr.controller import Controller
+        from alisdr.controller import Controller
 
         cfg = AppConfig()
         cfg.device.driver = "simulated"
@@ -2640,7 +2675,7 @@ class ManualTuningTest(unittest.TestCase):
         self.assertFalse(ctl.running)
 
     def test_scan_and_manual_are_exclusive_across_receivers(self) -> None:
-        from falconsdr.controller import Controller
+        from alisdr.controller import Controller
 
         cfg = AppConfig()
         cfg.device.driver = "simulated"
@@ -2662,8 +2697,8 @@ class ManualTuningTest(unittest.TestCase):
     def test_manual_fm_recording_is_finalized_before_switching_audio_format(self) -> None:
         import wave
 
-        from falconsdr.controller import Controller
-        from falconsdr.scanner_engine import AUDIO_RATE
+        from alisdr.controller import Controller
+        from alisdr.scanner_engine import AUDIO_RATE
 
         cfg = AppConfig()
         cfg.device.driver = "simulated"
@@ -2711,10 +2746,10 @@ class ManualTuningTest(unittest.TestCase):
 
         import numpy as np
 
-        from falconsdr import manual_tuning
-        from falconsdr.controller import Controller
-        from falconsdr.sdr_backend import SimulatedBackend
-        from falconsdr.web.server import App, serve
+        from alisdr import manual_tuning
+        from alisdr.controller import Controller
+        from alisdr.sdr_backend import SimulatedBackend
+        from alisdr.web.server import App, serve
 
         class Library:
             def falcon_dab_open(self, station, audio, reception):
@@ -2749,7 +2784,7 @@ class ManualTuningTest(unittest.TestCase):
 
         cleanup = ExitStack()
         self.addCleanup(cleanup.close)
-        cleanup.enter_context(patch("falconsdr.controller.load_decoder", return_value=Library()))
+        cleanup.enter_context(patch("alisdr.controller.load_decoder", return_value=Library()))
         cleanup.enter_context(patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2_048_000)))
         cfg = AppConfig()
         cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
@@ -2758,7 +2793,7 @@ class ManualTuningTest(unittest.TestCase):
         web = cleanup.enter_context(serve(App(cfg, ctl, "secret", "server"), "127.0.0.1", 0))
         cleanup.callback(web.shutdown)
         url = f"http://127.0.0.1:{web.server_port}/api"
-        headers = {"Authorization": "Bearer secret", "X-FalconSDR": "1", "Content-Type": "application/json"}
+        headers = {"Authorization": "Bearer secret", "X-AliSDR": "1", "Content-Type": "application/json"}
         ctl.tune_manual({"mode": "DAB", "channel": "12A", "gain_mode": "manual"})
         deadline = time.monotonic() + 5
         while not ctl.manual_status()["stations"] and time.monotonic() < deadline:
@@ -2772,7 +2807,7 @@ class ManualTuningTest(unittest.TestCase):
         station_url = url + "/manual/dab-station"
         payload = b'{"sid":43981}'
         with self.assertRaises(HTTPError) as exc:
-            urlopen(Request(station_url, payload, {"X-FalconSDR": "1"}), timeout=5)
+            urlopen(Request(station_url, payload, {"X-AliSDR": "1"}), timeout=5)
         self.assertEqual(exc.exception.code, 401)
         with urlopen(Request(station_url, payload, headers), timeout=5) as response:
             self.assertEqual(json.load(response)["station"], 0xabcd)
@@ -2796,7 +2831,7 @@ class ManualTuningTest(unittest.TestCase):
             self.assertEqual(response.headers["Content-Type"], "image/png")
             self.assertEqual(response.read(), b"\x89PNG\r\n\x1a\nartwork")
         with self.assertRaises(HTTPError) as exc:
-            urlopen(Request(record_url, start_recording, {"X-FalconSDR": "1"}), timeout=5)
+            urlopen(Request(record_url, start_recording, {"X-AliSDR": "1"}), timeout=5)
         self.assertEqual(exc.exception.code, 401)
         with urlopen(Request(record_url, start_recording, headers), timeout=5) as response:
             self.assertTrue(json.load(response)["recording"])
@@ -2820,8 +2855,8 @@ class ManualTuningTest(unittest.TestCase):
     def test_broadcast_fm_stereo_separation_and_mono_fallback(self) -> None:
         import numpy as np
 
-        from falconsdr.broadcast_fm import AUDIO_RATE, BroadcastFM
-        from falconsdr.dsp import Demodulator
+        from alisdr.broadcast_fm import AUDIO_RATE, BroadcastFM
+        from alisdr.dsp import Demodulator
 
         rate = 250_000
         t = np.arange(rate) / rate
@@ -2851,7 +2886,7 @@ class ManualTuningTest(unittest.TestCase):
     def test_fm_rds_group_decoding(self) -> None:
         import numpy as np
 
-        from falconsdr.rds import RDSDecoder
+        from alisdr.rds import RDSDecoder
 
         def encode_block(payload, offset):
             word = payload << 10
@@ -2882,9 +2917,9 @@ class ManualTuningTest(unittest.TestCase):
     def test_empty_dab_channel_times_out_and_releases_receiver(self) -> None:
         from unittest.mock import Mock, patch
 
-        from falconsdr import manual_tuning
-        from falconsdr.controller import Controller
-        from falconsdr.sdr_backend import SimulatedBackend
+        from alisdr import manual_tuning
+        from alisdr.controller import Controller
+        from alisdr.sdr_backend import SimulatedBackend
 
         cfg = AppConfig()
         cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
@@ -2892,7 +2927,7 @@ class ManualTuningTest(unittest.TestCase):
         self.addCleanup(ctl.shutdown)
         decoder = Mock()
         decoder.drain_audio.return_value = ()
-        with patch("falconsdr.controller.load_decoder"), patch.object(manual_tuning, "Decoder", return_value=decoder), \
+        with patch("alisdr.controller.load_decoder"), patch.object(manual_tuning, "Decoder", return_value=decoder), \
                 patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2_048_000)), \
                 patch.object(manual_tuning, "DAB_DISCOVERY_TIMEOUT", 0.1):
             ctl.tune_manual({"mode": "DAB", "channel": "12A", "gain_mode": "manual"})
@@ -2906,7 +2941,7 @@ class ManualTuningTest(unittest.TestCase):
 
     def test_dab_input_rejects_dc_and_preserves_the_ensemble_at_airspy_rate(self) -> None:
         import numpy as np
-        from falconsdr.dab import ChannelInput, SAMPLE_RATE
+        from alisdr.dab import ChannelInput, SAMPLE_RATE
 
         rate = 2_500_000
         n = np.arange(150_000)
@@ -2924,7 +2959,7 @@ class ManualTuningTest(unittest.TestCase):
 @unittest.skipUnless(hasattr(time, "tzset"), "needs time.tzset (not Windows)")
 class FilenameTimeZoneTest(unittest.TestCase):
     def test_a_filename_is_local_time_of_this_computer_not_of_poland(self) -> None:
-        from falconsdr.playback.organizer import parse_filename
+        from alisdr.playback.organizer import parse_filename
         old = os.environ.get("TZ")
         try:
             os.environ["TZ"] = "America/New_York"
@@ -2944,7 +2979,7 @@ class FilenameTimeZoneTest(unittest.TestCase):
 
 class WorkerTokenTest(unittest.TestCase):
     def test_api_follows_a_password_changed_while_running(self) -> None:
-        from falconsdr.worker import Api
+        from alisdr.worker import Api
         holder = {"token": ""}
         api = Api("http://x", lambda: holder["token"])
         self.assertEqual(api.token, "")
@@ -2962,7 +2997,7 @@ class UploadAndRangeTest(_LibCase):
                 self.lib.upload_target(bad)
 
     def test_range_requests_are_answered_or_refused_cleanly(self) -> None:
-        from falconsdr.web.server import App, make_handler
+        from alisdr.web.server import App, make_handler
         from http.server import ThreadingHTTPServer
         rel = "2026-05-05/" + NAME.format(khz=131525)
         _wav(self.root, rel, size=100)
@@ -2994,7 +3029,7 @@ class UploadAndRangeTest(_LibCase):
 
 class MergePatchTest(unittest.TestCase):
     def _ctl(self):
-        from falconsdr import controller as controller_mod
+        from alisdr import controller as controller_mod
         cfg = AppConfig()
         cfg.recording.output_dir = tempfile.mkdtemp(dir=_HOME)
         return controller_mod.Controller(cfg)
@@ -3104,7 +3139,7 @@ class LibraryLockTest(_LibCase):
 class LibraryMaintenanceTest(_LibCase):
     def test_a_failing_step_does_not_end_the_maintenance_thread(self) -> None:
         from unittest import mock
-        from falconsdr.playback import index
+        from alisdr.playback import index
         calls = []
         def broken() -> None:
             calls.append(1)
@@ -3121,7 +3156,7 @@ class LibraryMaintenanceTest(_LibCase):
 
     def test_a_full_disk_while_saving_the_mirrored_list_is_not_fatal(self) -> None:
         from unittest import mock
-        from falconsdr.playback import index
+        from alisdr.playback import index
         self.lib._dirty = True
         with mock.patch.object(index, "atomic_write_text", side_effect=OSError(28, "No space left on device")):
             self.lib.save()
@@ -3129,8 +3164,8 @@ class LibraryMaintenanceTest(_LibCase):
 
 class RecorderTest(unittest.TestCase):
     def _recorder(self):
-        from falconsdr.config import RecordingConfig
-        from falconsdr.recorder import Recorder
+        from alisdr.config import RecordingConfig
+        from alisdr.recorder import Recorder
         root = Path(tempfile.mkdtemp(dir=_HOME))
         rec = Recorder(RecordingConfig(enabled=True, output_dir=str(root)), 12500)
         rec.start_session()
@@ -3178,7 +3213,7 @@ class LevelingTest(unittest.TestCase):
 
     def _out(self, mod, carrier_db, depth=0.6, dev=3000.0, secs=8, noise_db=-75.0, floor_db=-66.0):
         import numpy as np
-        from falconsdr.dsp import Demodulator
+        from alisdr.dsp import Demodulator
         rng = np.random.default_rng(1)
         n = int(self.FS * secs) // self.BLK * self.BLK
         t = np.arange(n) / self.FS
@@ -3203,13 +3238,13 @@ class LevelingTest(unittest.TestCase):
         return float(np.percentile(db[db > -55], 90))
 
     def test_am_level_does_not_depend_on_the_carrier(self) -> None:
-        from falconsdr.models import Modulation
+        from alisdr.models import Modulation
         # The recordings from the receiver differed by 27 dB inside the airband alone (distance).
         levels = [self._speech_db(self._out(Modulation.AM, db)[1], 1, 8) for db in (-60, -45, -30, -15)]
         self.assertLess(max(levels) - min(levels), 1.0, levels)
 
     def test_weak_and_strong_voices_end_up_equally_loud(self) -> None:
-        from falconsdr.models import Modulation
+        from alisdr.models import Modulation
         cases = [(Modulation.AM, dict(carrier_db=-50, depth=0.15)), (Modulation.AM, dict(carrier_db=-30, depth=0.9)),
                  (Modulation.NFM, dict(carrier_db=-40, dev=600.0)), (Modulation.NFM, dict(carrier_db=-20, dev=5000.0))]
         levels = [self._speech_db(self._out(mod, **kw)[1], 4, 8) for mod, kw in cases]
@@ -3217,15 +3252,15 @@ class LevelingTest(unittest.TestCase):
 
     def test_a_loud_burst_never_clips(self) -> None:
         import numpy as np
-        from falconsdr.models import Modulation
+        from alisdr.models import Modulation
         _, out = self._out(Modulation.NFM, -20, dev=9000.0, secs=3)
         self.assertLessEqual(float(np.abs(out).max()), 1.0)
 
     def test_pauses_are_not_pumped_up(self) -> None:
         """Speech, then a bare carrier (the noise between words): the gain must not climb and the noise stays quiet."""
         import numpy as np
-        from falconsdr.dsp import Demodulator
-        from falconsdr.models import Modulation
+        from alisdr.dsp import Demodulator
+        from alisdr.models import Modulation
         d, speech = self._out(Modulation.AM, -40, secs=3)
         gain = d._agc_gain
         n = int(self.FS * 3) // self.BLK * self.BLK
@@ -3244,7 +3279,7 @@ class LevelingTest(unittest.TestCase):
     def test_a_rf_gain_step_keeps_the_am_level(self) -> None:
         """SoftwareAgc steps the dongle's gain: the audio must not jump (notify_rf_gain_change)."""
         import numpy as np
-        from falconsdr.models import Modulation
+        from alisdr.models import Modulation
         d, _ = self._out(Modulation.AM, -40, secs=3)
         n = int(self.FS * 3) // self.BLK * self.BLK
         t = np.arange(n) / self.FS

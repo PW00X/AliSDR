@@ -6,7 +6,7 @@ What exists today is described in `AGENTS.md` (gotcha 58). This file is the long
 
 | | Built in (ACARS, APRS) | External program (rtl_433, VDL2) |
 |---|---|---|
-| Code | our own, `falconsdr/addons/` | the author's program, installed by the user |
+| Code | our own, `alisdr/addons/` | the author's program, installed by the user |
 | Signal | the audio of a scanner slot | the receiver itself (the scanner is paused) |
 | Cost | a few ms per 30 ms block, while a slot is open | the program's own |
 | Switching | none: it works while scanning | one receiver, one owner: Start/Stop on the Add-ons page |
@@ -40,10 +40,10 @@ channel (weight -1 in the primary choice).
 
 ## Licences
 
-FalconSDR is GPL-3.0-or-later. The rule is **separate programs, fetched by the user**:
+AliSDR is GPL-3.0-or-later. The rule is **separate programs, fetched by the user**:
 
-* A program FalconSDR only starts and reads (command line, stdin/stdout, JSON) is a separate work. Its
-  licence does not reach FalconSDR, and GPL-2.0-only programs are not a problem (the GPL FAQ treats pipes
+* A program AliSDR only starts and reads (command line, stdin/stdout, JSON) is a separate work. Its
+  licence does not reach AliSDR, and GPL-2.0-only programs are not a problem (the GPL FAQ treats pipes
   and command lines as communication between separate programs; read it again if the exchange ever
   becomes more intimate than JSON lines).
 * Obligations (licence text, source offer) start only when *we distribute* a program. Nothing is bundled.
@@ -78,7 +78,7 @@ dumpvdl2 v2.7.0 with libacars v2.2.1 were built and run (`--version`) by this in
 Windows and macOS paths of the installer are written but were not run on those systems. Pins: see
 `_VDL2_SOURCES` and `_RTL433_ASSETS`; update the SHA-256 together with the version.
 
-A copy FalconSDR installed (in `CONFIG_DIR/addons/bin/<id>`) is preferred to one on PATH; an explicit path in the
+A copy AliSDR installed (in `CONFIG_DIR/addons/bin/<id>`) is preferred to one on PATH; an explicit path in the
 Add-ons page wins over both.
 
 ## Roadmap

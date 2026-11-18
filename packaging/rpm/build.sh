@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Builds a self-contained ("fat") .rpm for FalconSDR: a PyInstaller
+# Builds a self-contained ("fat") .rpm for AliSDR: a PyInstaller
 # --onedir bundle (its own Python + numpy/scipy/pyrtlsdrlib + the web UI's
 # static files, all frozen in) wrapped in an RPM, so an end user needs
-# nothing beyond `sudo dnf install ./falconsdr-*.rpm` - no pip, no venv.
+# nothing beyond `sudo dnf install ./alisdr-*.rpm` - no pip, no venv.
 # The RPM counterpart of packaging/linux-deb/build.sh - same PyInstaller
 # flags and the same reasons for them (AGENTS.md gotcha 35).
 #
@@ -23,10 +23,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD="$SCRIPT_DIR/build"
 VENV="$SCRIPT_DIR/build-venv"
 ARCH="$(uname -m)"
-VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$REPO_ROOT/falconsdr/__init__.py")"
-PKG=falconsdr
+VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$REPO_ROOT/alisdr/__init__.py")"
+PKG=alisdr
 
-echo "== FalconSDR .rpm build =="
+echo "== AliSDR .rpm build =="
 echo "repo root: $REPO_ROOT"
 echo "version:   $VERSION"
 echo "arch:      $ARCH"
@@ -53,9 +53,9 @@ collect_native_libs soft
     --name "$PKG" \
     --onedir \
     --noconfirm \
-    --add-data "$REPO_ROOT/falconsdr/locale/pl.po:falconsdr/locale" \
-    --add-data "$REPO_ROOT/falconsdr/presets/band_presets.json:falconsdr/presets" \
-    --add-data "$REPO_ROOT/falconsdr/web/static:falconsdr/web/static" \
+    --add-data "$REPO_ROOT/alisdr/locale/pl.po:alisdr/locale" \
+    --add-data "$REPO_ROOT/alisdr/presets/band_presets.json:alisdr/presets" \
+    --add-data "$REPO_ROOT/alisdr/web/static:alisdr/web/static" \
     --collect-data tzdata \
     --collect-data pyrtlsdrlib \
     --collect-data imageio_ffmpeg \
@@ -68,7 +68,7 @@ collect_native_libs soft
 )
 
 # Fails the build if PyInstaller silently dropped something (tzdata,
-# librtlsdr...) - falconsdr/selftest.py; the .deb and Windows builds do the same.
+# librtlsdr...) - alisdr/selftest.py; the .deb and Windows builds do the same.
 "$BUILD/dist/$PKG/$PKG" --self-test
 
 echo "-- 3/4: assembling the RPM tree --"
@@ -90,9 +90,9 @@ exec /opt/$PKG/$PKG "\$@"
 WRAPPER
 chmod 755 "$ROOT/usr/bin/$PKG"
 
-cp "$REPO_ROOT/packaging/linux-deb/falconsdr.desktop" "$ROOT/usr/share/applications/"
-cp "$REPO_ROOT/falconsdr/web/static/icon.svg" \
-   "$ROOT/usr/share/icons/hicolor/scalable/apps/falconsdr.svg"
+cp "$REPO_ROOT/packaging/linux-deb/alisdr.desktop" "$ROOT/usr/share/applications/"
+cp "$REPO_ROOT/alisdr/web/static/icon.svg" \
+   "$ROOT/usr/share/icons/hicolor/scalable/apps/alisdr.svg"
 cp "$SCRIPT_DIR/README.md" "$ROOT/usr/share/doc/$PKG/packaging-README.md"
 cp "$REPO_ROOT/LICENSE" "$ROOT/usr/share/doc/$PKG/copyright"
 "$VENV/bin/python" "$REPO_ROOT/packaging/collect_licenses.py" "$ROOT/usr/share/doc/$PKG/THIRD-PARTY-LICENSES.txt"
@@ -111,9 +111,9 @@ Version:        $VERSION
 Release:        1
 Summary:        Wideband SDR ATC/radio scanner (self-contained build)
 License:        GPL-3.0-or-later
-URL:            https://github.com/rafafunt/FalconSDR
+URL:            https://github.com/PW00X/AliSDR
 BuildArch:      $ARCH
-# /opt/falconsdr ships its own bundled .so files (Python, numpy, ...):
+# /opt/alisdr ships its own bundled .so files (Python, numpy, ...):
 # rpm's automatic dependency scan would pick those up as system
 # requirements (e.g. libuuid-...so.1.3.0(UUID_1.0)) that no distro
 # provides, making the package uninstallable. The bundle needs nothing
@@ -123,6 +123,7 @@ AutoReqProv:    no
 # in udev - a package-name Require would only fit one of them.
 Requires:       /usr/bin/udevadm
 Recommends:     ffmpeg
+Obsoletes:      falconsdr
 
 %description
 Scans a radio band with an RTL-SDR (or a HackRF or Airspy, experimental)
@@ -133,8 +134,8 @@ SDRplay, USRP) needs a source install.
 %files
 /opt/$PKG/
 /usr/bin/$PKG
-/usr/share/applications/falconsdr.desktop
-/usr/share/icons/hicolor/scalable/apps/falconsdr.svg
+/usr/share/applications/alisdr.desktop
+/usr/share/icons/hicolor/scalable/apps/alisdr.svg
 /usr/share/doc/$PKG/
 /usr/lib/udev/rules.d/60-rtl-sdr.rules
 /etc/modprobe.d/blacklist-rtl-dvb.conf
@@ -149,7 +150,7 @@ if command -v rmmod >/dev/null 2>&1; then
 fi
 
 %changelog
-* Fri Oct 23 2026 FalconSDR - $VERSION-1
+* Fri Oct 23 2026 AliSDR - $VERSION-1
 - Self-contained RPM (mirrors the .deb).
 SPEC
 rpmbuild -bb --buildroot "$ROOT" --define "_topdir $TOP" "$TOP/SPECS/$PKG.spec"

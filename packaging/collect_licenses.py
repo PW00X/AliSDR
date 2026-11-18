@@ -27,7 +27,7 @@ def _section(title: str, body: str) -> str:
 
 def main(out: Path) -> None:
     parts = [
-        "FalconSDR is licensed under the GNU General Public License v3.0 or later\n"
+        "AliSDR is licensed under the GNU General Public License v3.0 or later\n"
         "(LICENSE.txt). This build also contains the third-party software below,\n"
         "each under its own license.\n\n"
     ]

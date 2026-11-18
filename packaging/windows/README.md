@@ -1,4 +1,4 @@
-# FalconSDR — Windows build (installer + portable ZIP)
+# AliSDR — Windows build (installer + portable ZIP)
 
 ## What this builds
 
@@ -9,23 +9,23 @@ two ways:
 
 | File (`out\`) | For |
 |---|---|
-| `FalconSDR-<date>-windows-x64-setup.exe` | most users: Start menu entry, uninstaller, optional desktop icon |
-| `FalconSDR-<date>-windows-x64-portable.zip` | unzip anywhere and run `FalconSDR\falconsdr.exe` — no install, no admin |
+| `AliSDR-<date>-windows-x64-setup.exe` | most users: Start menu entry, uninstaller, optional desktop icon |
+| `AliSDR-<date>-windows-x64-portable.zip` | unzip anywhere and run `AliSDR\alisdr.exe` — no install, no admin |
 | `SHA256SUMS.txt` | checksums to publish next to both |
 | `test-in-sandbox.wsb` | clean-machine test (below) |
 
 Both contain exactly the same program. Settings and recordings live in the
-user profile (`%USERPROFILE%\.config\FalconSDR`, `%USERPROFILE%\FalconSDR\recordings`),
+user profile (`%USERPROFILE%\.config\AliSDR`, `%USERPROFILE%\AliSDR\recordings`),
 so switching between the ZIP and the installer, upgrading or uninstalling
 never touches them.
 
-The installer (Inno Setup, `falconsdr.iss`):
-- installs **per user** by default (`%LOCALAPPDATA%\Programs\FalconSDR`, no
+The installer (Inno Setup, `alisdr.iss`):
+- installs **per user** by default (`%LOCALAPPDATA%\Programs\AliSDR`, no
   administrator prompt); "for all users" is offered on its first page;
 - English/Polish, shows the GPL license and, after installing, the RTL-SDR
   driver (Zadig) instructions (`DRIVER-en.txt` / `DRIVER-pl.txt`) with an
   optional "open the Zadig website" checkbox on the last page;
-- asks a running FalconSDR to quit through its own API before upgrading or
+- asks a running AliSDR to quit through its own API before upgrading or
   uninstalling (open recordings get closed properly), Restart Manager as
   fallback;
 - upgrades replace `_internal\` completely (no stale libraries); the
@@ -33,7 +33,7 @@ The installer (Inno Setup, `falconsdr.iss`):
 
 The exe is windowed (no console): the program runs in the background, its UI
 is the browser, **Quit** is in Settings → Advanced, and its log goes to
-`%USERPROFILE%\.config\FalconSDR\falconsdr.log`.
+`%USERPROFILE%\.config\AliSDR\alisdr.log`.
 
 ## Building
 
@@ -52,7 +52,7 @@ It always starts from a throwaway venv (`build-venv\`, never the project's
 `librtlsdr.dll` or this repo's own files on this machine can't make a broken
 bundle look fine:
 
-1. `falconsdr.exe --self-test` (`falconsdr/selftest.py`): numpy/scipy,
+1. `alisdr.exe --self-test` (`alisdr/selftest.py`): numpy/scipy,
    time zones, librtlsdr, UI files, translations, band presets, a demod.
 2. a smoke run: the UI, a script, `/api/settings` and the Polish catalog are
    served, then `/api/quit` must end the process cleanly.
@@ -71,7 +71,7 @@ Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM
 
 Then double-click `out\test-in-sandbox.wsb`: the sandbox opens with the
 `out\` folder on its desktop (read-only). Run the setup (or unzip the ZIP to
-the sandbox desktop), start FalconSDR, and the UI opens in the sandbox's
+the sandbox desktop), start AliSDR, and the UI opens in the sandbox's
 Edge. USB devices can't be passed into the sandbox, so test the scanner
 there with Settings → Advanced → Debug mode → device "Simulation"; test the
 real dongle (and the Zadig hint on the Listen page, shown while the scanner
@@ -83,8 +83,8 @@ can't open the dongle) on a normal Windows install.
   `imageio-ffmpeg` package (a system `ffmpeg` on PATH is preferred if present).
 - **Transcription** installs from the app like in a source install
   (Settings → Transcription & computers → Install). The exe has pip inside:
-  `falconsdr.exe --pip install ...` puts prebuilt wheels (faster-whisper,
-  ctranslate2, PyAV...) into `%USERPROFILE%\.local\share\FalconSDR\addons\cp312`,
+  `alisdr.exe --pip install ...` puts prebuilt wheels (faster-whisper,
+  ctranslate2, PyAV...) into `%USERPROFILE%\.local\share\AliSDR\addons\cp312`,
   which the app loads without a restart; models download on first use.
   Verified end to end in a clean profile with a stripped PATH (install from
   the UI, then a speech WAV transcribed). Two bundle details this needs, both

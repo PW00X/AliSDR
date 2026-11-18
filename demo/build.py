@@ -22,9 +22,9 @@ DIST = DEMO / "dist"
 os.environ["HOME"] = os.environ["USERPROFILE"] = tempfile.mkdtemp()
 sys.path.insert(0, str(ROOT))
 
-from falconsdr import __version__, i18n, military_presets  # noqa: E402
-from falconsdr.config import AppConfig  # noqa: E402
-from falconsdr.controller import channel_dict  # noqa: E402
+from alisdr import __version__, i18n, military_presets  # noqa: E402
+from alisdr.config import AppConfig  # noqa: E402
+from alisdr.controller import channel_dict  # noqa: E402
 
 sys.path.insert(0, str(DEMO))
 import audio  # noqa: E402
@@ -33,7 +33,7 @@ import audio  # noqa: E402
 def fixtures() -> dict:
     config = asdict(AppConfig())
     # The default points into this build's scratch HOME; show the demo's fake filesystem instead.
-    config["recording"]["output_dir"] = "/home/demo/FalconSDR/recordings"
+    config["recording"]["output_dir"] = "/home/demo/AliSDR/recordings"
     return {
         "version": __version__,
         "config": config,
@@ -49,7 +49,7 @@ def fixtures() -> dict:
 
 def main() -> None:
     shutil.rmtree(DIST, ignore_errors=True)
-    shutil.copytree(ROOT / "falconsdr" / "web" / "static", DIST)
+    shutil.copytree(ROOT / "alisdr" / "web" / "static", DIST)
     shutil.copytree(DEMO / "site", DIST, dirs_exist_ok=True)
     shutil.copy(ROOT / "LICENSE", DIST / "LICENSE.txt")  # GPL: the licence travels with the code we serve
     audio.build(DIST / "demo" / "audio")

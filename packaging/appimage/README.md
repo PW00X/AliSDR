@@ -1,4 +1,4 @@
-# FalconSDR — AppImage (test build)
+# AliSDR — AppImage (test build)
 
 ## What this is
 
@@ -6,8 +6,8 @@ One executable file that runs on most modern x86_64/aarch64 distributions
 with no install step, no root, no pip:
 
 ```
-chmod +x FalconSDR-<version>-x86_64.AppImage
-./FalconSDR-<version>-x86_64.AppImage
+chmod +x AliSDR-<version>-x86_64.AppImage
+./AliSDR-<version>-x86_64.AppImage
 ```
 
 Inside is the same self-contained
@@ -31,7 +31,7 @@ UI in the browser (http://127.0.0.1:8765) like every other build.
   to Simulation (AGENTS.md gotcha 8) - indistinguishable from missing
   hardware.
 - **RTL-SDR, plus HackRF and Airspy natively (experimental)** (`libhackrf`/`libairspy` are bundled), MP3 via the bundled `imageio-ffmpeg` binary or a system
-  `ffmpeg` on PATH, transcription via the bundled pip (`falconsdr --pip`) -
+  `ffmpeg` on PATH, transcription via the bundled pip (`alisdr --pip`) -
   the same tradeoff as the .deb/.rpm (see their READMEs).
 
 ## Building it
@@ -56,9 +56,9 @@ same glibc-floor trick as `packaging/linux-deb/build-in-docker.sh`.
 
 Builds in a **throwaway venv** (`packaging/appimage/build-venv/`,
 gitignored) - never the project's own `.venv`. Output:
-`packaging/appimage/out/FalconSDR-<version>-<arch>.AppImage`.
+`packaging/appimage/out/AliSDR-<version>-<arch>.AppImage`.
 
-`falconsdr --self-test` (`falconsdr/selftest.py`) runs on the bundle before
+`alisdr --self-test` (`alisdr/selftest.py`) runs on the bundle before
 it is packed, same as the .deb/.rpm/Windows builds.
 
 ## Testing without fooling yourself
@@ -68,8 +68,8 @@ cannot prop it up:
 
 ```
 cd /
-HOME=/tmp/falconsdr-appimage-test ./FalconSDR-*.AppImage --self-test
-HOME=/tmp/falconsdr-appimage-test ./FalconSDR-*.AppImage --no-browser --port 18810
+HOME=/tmp/alisdr-appimage-test ./AliSDR-*.AppImage --self-test
+HOME=/tmp/alisdr-appimage-test ./AliSDR-*.AppImage --no-browser --port 18810
 ```
 
 then open `http://127.0.0.1:18810/`, pick Simulation (Debug mode) or the

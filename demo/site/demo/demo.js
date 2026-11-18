@@ -5,63 +5,63 @@ import { h, icon, lang, modal, mount, t } from '../js/core.js';
 import { liveAudio } from '../js/live-audio.js';
 import { S, cfg, confirmRecording, emit, on, patchConfig } from '../js/state.js';
 
-const DOWNLOAD = 'https://github.com/rafafunt/FalconSDR/releases/latest';
-const SOURCE = 'https://github.com/rafafunt/FalconSDR';
+const DOWNLOAD = 'https://github.com/PW00X/AliSDR/releases/latest';
+const SOURCE = 'https://github.com/PW00X/AliSDR';
 
 const TEXT = {
   en: {
-    long: 'Online demo on a simulated receiver - every signal and sound here is synthetic. To listen to real radio, download FalconSDR and connect an RTL-SDR receiver.',
+    long: 'Online demo on a simulated receiver - every signal and sound here is synthetic. To listen to real radio, download AliSDR and connect an RTL-SDR receiver.',
     short: 'Simulated receiver',
-    download: 'Download FalconSDR',
+    download: 'Download AliSDR',
     downloadShort: 'Get the app',
     about: 'About the demo',
-    title: 'FalconSDR demo',
-    intro: 'The real FalconSDR interface on a virtual receiver in your browser. Signals, voices and music here are synthetic.',
+    title: 'AliSDR demo',
+    intro: 'The real AliSDR interface on a virtual receiver in your browser. Signals, voices and music here are synthetic.',
     tips: [
       'Press Start - the scanner stops only on transmissions.',
       'Stuck on a steady whistle? That is a birdie - the demo shows how to get rid of it.',
       'Try other bands (FM radio, marine, military…), a lower Trigger level, or the 10 MHz receiver in “SDR device”.',
       'Turn on “Auto-record transmissions”, then look at Recordings and Statistics.',
     ],
-    real: 'For real radio: download FalconSDR (Windows, macOS, Linux) and plug in an RTL-SDR receiver. Changes made here stay in this browser.',
+    real: 'For real radio: download AliSDR (Windows, macOS, Linux) and plug in an RTL-SDR receiver. Changes made here stay in this browser.',
     start: 'Start the demo',
     reset: 'Reset the demo',
     resetAsk: 'Bring back the starting settings and sample recordings? Everything you changed in the demo is lost.',
     cancel: 'Cancel',
-    unsupported: 'This browser can\'t run the demo. Open the link in Chrome, Safari, Edge or Firefox - or download FalconSDR.',
+    unsupported: 'This browser can\'t run the demo. Open the link in Chrome, Safari, Edge or Firefox - or download AliSDR.',
     recOff: 'Auto-recording is off, so new transmissions aren\'t saved - the list holds sample recordings. With it on, every transmission the scanner stops on lands here, transcribed.',
     recOn: 'Turn on auto-recording',
     credits: 'Voices: Piper TTS with the VCTK (University of Edinburgh) and LibriTTS-R (Google) voices, both CC BY 4.0, and Polish voices under CC0. Music generated for the demo.',
-    license: 'FalconSDR is free software (GNU GPL v3 or later), and so is this demo.',
+    license: 'AliSDR is free software (GNU GPL v3 or later), and so is this demo.',
     source: 'Source code',
     licenseText: 'Licence text',
     privacy: 'Privacy',
     birdie: '{freq} MHz is most likely a birdie: interference made by the receiver itself, a steady carrier with nothing on it. The scanner would sit on it forever. “{skip}” only moves on - it comes back on the next pass. “{bl}” gets rid of it for good (undo in Channels → Blacklist).',
   },
   pl: {
-    long: 'Demo online na symulowanym odbiorniku - wszystkie sygnały i dźwięki są tu sztuczne. Żeby słuchać prawdziwego radia, pobierz FalconSDR i podłącz odbiornik RTL-SDR.',
+    long: 'Demo online na symulowanym odbiorniku - wszystkie sygnały i dźwięki są tu sztuczne. Żeby słuchać prawdziwego radia, pobierz AliSDR i podłącz odbiornik RTL-SDR.',
     short: 'Symulowany odbiornik',
-    download: 'Pobierz FalconSDR',
+    download: 'Pobierz AliSDR',
     downloadShort: 'Pobierz',
     about: 'O demo',
-    title: 'Demo FalconSDR',
-    intro: 'Prawdziwy interfejs FalconSDR na wirtualnym odbiorniku w Twojej przeglądarce. Sygnały, głosy i muzyka są tu sztuczne.',
+    title: 'Demo AliSDR',
+    intro: 'Prawdziwy interfejs AliSDR na wirtualnym odbiorniku w Twojej przeglądarce. Sygnały, głosy i muzyka są tu sztuczne.',
     tips: [
       'Naciśnij Start - skaner zatrzymuje się tylko na transmisjach.',
       'Utknął na stałym gwizdzie? To birdie - demo pokaże, jak się go pozbyć.',
       'Wypróbuj inne pasma (radio FM, morskie, wojskowe…), niższy próg wyzwalania albo odbiornik 10 MHz w „Urządzenie SDR”.',
       'Włącz „Automatycznie nagrywaj transmisje”, a potem zajrzyj do Nagrań i Statystyk.',
     ],
-    real: 'Do prawdziwego radia: pobierz FalconSDR (Windows, macOS, Linux) i podłącz odbiornik RTL-SDR. Zmiany zrobione tutaj zostają w tej przeglądarce.',
+    real: 'Do prawdziwego radia: pobierz AliSDR (Windows, macOS, Linux) i podłącz odbiornik RTL-SDR. Zmiany zrobione tutaj zostają w tej przeglądarce.',
     start: 'Uruchom demo',
     reset: 'Zresetuj demo',
     resetAsk: 'Przywrócić początkowe ustawienia i przykładowe nagrania? Wszystko, co zmieniłeś w demo, zniknie.',
     cancel: 'Anuluj',
-    unsupported: 'Ta przeglądarka nie uruchomi demo. Otwórz link w Chrome, Safari, Edge lub Firefoksie - albo pobierz FalconSDR.',
+    unsupported: 'Ta przeglądarka nie uruchomi demo. Otwórz link w Chrome, Safari, Edge lub Firefoksie - albo pobierz AliSDR.',
     recOff: 'Automatyczne nagrywanie jest wyłączone, więc nowe transmisje się nie zapisują - na liście są przykładowe nagrania. Po włączeniu trafia tu każda transmisja, na której zatrzyma się skaner, razem z transkrypcją.',
     recOn: 'Włącz automatyczne nagrywanie',
     credits: 'Głosy: Piper TTS z głosami VCTK (University of Edinburgh) i LibriTTS-R (Google), oba na licencji CC BY 4.0, oraz polskimi głosami na CC0. Muzyka wygenerowana na potrzeby demo.',
-    license: 'FalconSDR to wolne oprogramowanie (GNU GPL v3 lub nowsza), tak samo jak to demo.',
+    license: 'AliSDR to wolne oprogramowanie (GNU GPL v3 lub nowsza), tak samo jak to demo.',
     source: 'Kod źródłowy',
     licenseText: 'Tekst licencji',
     privacy: 'Prywatność',
@@ -96,7 +96,7 @@ async function welcome(fromBanner = false) {
   try { localStorage.setItem('demo-welcome', '1'); } catch { /* private mode */ }
   if (res === 'download') window.open(DOWNLOAD, '_blank', 'noopener');
   if (res === 'reset' && (await modal(x.reset, x.resetAsk, [[x.cancel, false, 'ghost'], [x.reset, true, 'danger solid']]))) {
-    await fetch('/api/demo/reset', { method: 'POST', headers: { 'X-FalconSDR': '1' } });
+    await fetch('/api/demo/reset', { method: 'POST', headers: { 'X-AliSDR': '1' } });
     location.reload();
   }
 }
@@ -217,7 +217,7 @@ async function start() {
   renderBanner();
   try { await useServiceWorker(); } catch {
     try { await inPage(); } catch {
-      mount(document.getElementById('app'), h('div.center-page', h('div.card.login', h('h2', 'FalconSDR'), h('p', L().unsupported),
+      mount(document.getElementById('app'), h('div.center-page', h('div.card.login', h('h2', 'AliSDR'), h('p', L().unsupported),
         h('a.btn.primary', { href: DOWNLOAD }, L().download))));
       return;
     }

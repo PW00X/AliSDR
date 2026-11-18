@@ -1,0 +1,4029 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: pl\n"
+
+# --- gui/panels/location_panel.py ---
+
+msgid "Location"
+msgstr "Lokalizacja"
+
+msgid "Approximate coordinates of the receiver - used only to build "
+"the FlightRadar24/ADSBExchange playback links in Playback "
+"(“what was flying near here at this recording's time”). "
+"Nothing is sent anywhere else; this never leaves your machine "
+"except when you click one of those two buttons, which opens "
+"your browser at that flight-tracker site. A nearby town/city is "
+"plenty precise - you don't need your exact address."
+msgstr "Przybliżone współrzędne odbiornika - używane wyłącznie do zbudowania "
+"linków playbacku FlightRadar24/ADSBExchange w Odtwarzaczu "
+"(“co leciało tędy w czasie tego nagrania”). "
+"Nic nigdzie indziej nie jest wysyłane; to nigdy nie opuszcza Twojego komputera "
+"poza chwilą kliknięcia jednego z tych dwóch przycisków, co otwiera "
+"przeglądarkę na stronie danego serwisu. Pobliskie miasto/miejscowość jest "
+"wystarczająco dokładne - nie musisz podawać dokładnego adresu."
+
+msgid "(not set)"
+msgstr "(nie ustawiono)"
+
+msgid "Latitude:"
+msgstr "Szerokość geograficzna:"
+
+msgid "Longitude:"
+msgstr "Długość geograficzna:"
+
+# --- gui/panels/language_panel.py ---
+
+msgid "Language"
+msgstr "Język"
+
+msgid "Language:"
+msgstr "Język:"
+
+msgid "Takes effect after restarting the app. Missing your language? "
+"Adding one is just a text file - no programming needed, see "
+"alisdr/locale/README.md in the source for the three-step "
+"guide."
+msgstr "Zaczyna działać po ponownym uruchomieniu programu. Brakuje Twojego "
+"języka? Dodanie go to tylko plik tekstowy - bez programowania, zobacz "
+"alisdr/locale/README.md w źródłach programu, gdzie jest trzykrokowa "
+"instrukcja."
+
+# --- gui/panels/recording_panel.py ---
+
+msgid "Recording"
+msgstr "Nagrywanie"
+
+msgid "Record Only On Signal (only record while a signal is detected)"
+msgstr "Nagrywaj tylko przy sygnale (nagrywaj tylko, gdy wykryto sygnał)"
+
+msgid "Max simultaneous recordings (0 = unlimited):"
+msgstr "Maks. jednoczesnych nagrań (0 = bez limitu):"
+
+msgid "Caps how many transmissions can be recorded at the same time. Once this many recordings are already active, a newly detected transmission is simply not recorded until one of them ends - useful if a busy band (or one strong signal leaking into tightly-spaced neighbour channels) opens far more simultaneous recordings than you actually want. 0 = unlimited. Live scanning/listening is never capped by this, only recording."
+msgstr "Ogranicza liczbę transmisji nagrywanych jednocześnie. Gdy tyle nagrań jest już aktywnych, nowo wykryta transmisja po prostu nie zostanie nagrana, dopóki jedno z nich się nie zakończy - przydatne, gdy zatłoczone pasmo (albo jeden silny sygnał przeciekający do ciasno rozstawionych sąsiednich kanałów) otwiera znacznie więcej jednoczesnych nagrań niż chcesz. 0 = bez limitu. To nigdy nie ogranicza samego skanowania/nasłuchu na żywo, tylko nagrywanie."
+
+msgid "Choose folder..."
+msgstr "Wybierz katalog..."
+
+msgid "Output folder:"
+msgstr "Katalog docelowy:"
+
+msgid "Recordings output folder"
+msgstr "Katalog docelowy nagrań"
+
+# --- gui/panels/recency_boost_panel.py ---
+
+msgid "Recency boost (more frequent revisits after a transmission)"
+msgstr "Recency boost (częstsze powroty po transmisji)"
+
+msgid "After a transmission ends naturally (not via a manual Skip), its "
+"window is visited more often than usual for a while - in case "
+"another message follows within the next several/dozens of "
+"seconds on the same frequency. The scanner still keeps circling "
+"the other channels normally the whole time, so a conversation "
+"moving to a different frequency is still detected - unlike "
+"simply raising the linger time."
+msgstr "Po naturalnym zakończeniu transmisji (nie przez ręczny Skip) jej okno "
+"jest przez chwilę odwiedzane częściej niż zwykle - w razie gdyby za "
+"kilkanaście/kilkadziesiąt sekund pojawił się kolejny komunikat na tej "
+"samej częstotliwości. Skaner nadal normalnie krąży po innych kanałach "
+"przez cały ten czas, więc przejście rozmowy na inną częstotliwość "
+"wciąż zostanie wykryte - w odróżnieniu od zwykłego wydłużania czasu lingera."
+
+msgid "Enable recency boost"
+msgstr "Włącz recency boost"
+
+msgid "How long to boost after a transmission:"
+msgstr "Jak długo wzmagać po transmisji:"
+
+msgid "How often to revisit during the boost:"
+msgstr "Jak często odwiedzać w trakcie wzmożenia:"
+
+# --- gui/panels/transcription_panel.py ---
+
+msgid "Transcription"
+msgstr "Transkrypcja"
+
+msgid "Automatically transcribe recordings"
+msgstr "Automatycznie transkrybuj nagrania"
+
+msgid "Turns off the background transcription queue. Re-enabling it "
+"also processes recordings that piled up while it was off."
+msgstr "Wyłącza kolejkę transkrypcji w tle. Po ponownym włączeniu "
+"program przetworzy też nagrania, które nazbierały się w tym czasie."
+
+msgid "Once enabled, any backlog of recordings with no transcription "
+"result yet will be queued."
+msgstr "Po włączeniu zaległe nagrania bez wyniku transkrypcji zostaną "
+"dodane do kolejki."
+
+# --- gui/panels/playback_panel.py ---
+
+msgid "Save frequency"
+msgstr "Zapisz częstotliwość"
+
+msgid "Frequency:"
+msgstr "Częstotliwość:"
+
+msgid "e.g. Downtown Tower"
+msgstr "np. Rzeszów Wieża"
+
+msgid "Name:"
+msgstr "Nazwa:"
+
+msgid "Folder in the Memory List. Pick an existing one or type a new "
+"name to create it right away."
+msgstr "Folder w Liście pamięci. Wybierz istniejący albo wpisz nową nazwę, "
+"żeby go od razu utworzyć."
+
+msgid "(no folder)"
+msgstr "(brak folderu)"
+
+msgid "Folder:"
+msgstr "Folder:"
+
+msgid "⟳ Refresh"
+msgstr "⟳ Odśwież"
+
+msgid "Sort new recordings and refresh the list (F5)"
+msgstr "Posegreguj nowe nagrania i odśwież listę (F5)"
+
+msgid "UTC time"
+msgstr "Czas UTC"
+
+msgid "Toggle displayed time: local / UTC"
+msgstr "Przełącz wyświetlanie czasu: polski (lokalny) / UTC"
+
+msgid "Date:"
+msgstr "Data:"
+
+msgid "All"
+msgstr "Wszystkie"
+
+msgid "Today"
+msgstr "Dzisiaj"
+
+msgid "Last 24h"
+msgstr "Ostatnie 24h"
+
+msgid "Last 7 days"
+msgstr "Ostatnie 7 dni"
+
+msgid "Last 30 days"
+msgstr "Ostatnie 30 dni"
+
+msgid "Min. quality:"
+msgstr "Min. jakość:"
+
+msgid "Auto-transcribe"
+msgstr "Transkrypcja auto"
+
+msgid "Automatic background transcription of recordings (Whisper, "
+"pilot-ATC). The main switch is also in the Options tab; "
+"re-enabling it processes any backlog."
+msgstr "Automatyczna transkrypcja nagrań w tle (Whisper, pilot-ATC). "
+"Główny przełącznik jest też w zakładce Opcje; po ponownym włączeniu "
+"przetwarzane są zaległe nagrania."
+
+msgid "Search (frequency, date, file, transcript)… [Ctrl+F]"
+msgstr "Szukaj (częstotliwość, data, plik, transkrypcja)… [Ctrl+F]"
+
+msgid "Newest"
+msgstr "Najnowsze"
+
+msgid "Best quality"
+msgstr "Najlepsza jakość"
+
+msgid "Transcript: select a recording from the list…"
+msgstr "Transkrypcja: wybierz nagranie z listy…"
+
+msgid "Open FlightRadar24 playback in your browser, at this recording's "
+"time (UTC), around the configured receiver location"
+msgstr "Otwórz playback FlightRadar24 w przeglądarce, o godzinie tego "
+"nagrania (UTC), w okolicy skonfigurowanej lokalizacji odbiornika"
+
+msgid "Open ADSBExchange playback in your browser, at this recording's "
+"time (UTC), around the configured receiver location"
+msgstr "Otwórz playback ADSBExchange w przeglądarce, o godzinie tego "
+"nagrania (UTC), w okolicy skonfigurowanej lokalizacji odbiornika"
+
+msgid "Save this frequency to the Memory List (Listen → Channels), "
+"with a name and optional folder - if it's already saved, this "
+"overwrites its name/folder instead of creating a duplicate."
+msgstr "Zapisz tę częstotliwość w Liście pamięci (Nasłuch → Kanały), "
+"z nazwą i opcjonalnym folderem - jeśli jest już tam zapisana, nadpisuje "
+"jej nazwę/folder zamiast tworzyć duplikat."
+
+msgid "☆ Add to favorites"
+msgstr "☆ Dodaj do ulubionych"
+
+msgid "Mark this recording as a favorite (shows up under "
+"“★ Favorites” in the frequency panel on the left)"
+msgstr "Oznacz to nagranie jako ulubione (widoczne potem pod "
+"“★ Ulubione” w panelu częstotliwości po lewej)"
+
+msgid "Language used for the next “Re-transcribe” click on "
+"this recording. “Auto (detect)” is the normal behavior "
+"(and what the background auto-transcription queue always uses "
+"- this setting doesn't affect it). Useful when weak audio "
+"confuses language detection and Whisper picks an exotic "
+"language instead of the real one - you can also type any other "
+"ISO code (e.g. \"de\")."
+msgstr "Język użyty przy następnym kliknięciu “Transkrybuj ponownie” "
+"dla tego nagrania. “Auto (wykryj)” to zwykłe zachowanie (i to, "
+"czego zawsze używa automatyczna transkrypcja w tle - to ustawienie jej "
+"nie dotyczy). Przydatne, gdy słabe audio myli detekcję języka i "
+"Whisper wybiera egzotyczny język zamiast polskiego/angielskiego - "
+"można też wpisać dowolny inny kod ISO (np. \"de\")."
+
+msgid "Auto (detect)"
+msgstr "Auto (wykryj)"
+
+msgid "Polish"
+msgstr "Polski"
+
+msgid "Re-transcribe"
+msgstr "Transkrybuj ponownie"
+
+msgid "Force re-transcription of the selected recording (bypasses the "
+"cache), with the language selected on the left. Also overwrites "
+"any manually typed text below, if there is any."
+msgstr "Wymuś ponowną transkrypcję zaznaczonego nagrania (pomija cache), z "
+"językiem wybranym po lewej. Nadpisuje też ręcznie wpisany tekst poniżej, "
+"jeśli jakiś jest."
+
+msgid "(no transcript - you can also type text by hand)"
+msgstr "(brak transkrypcji - można też wpisać tekst ręcznie)"
+
+msgid "You can edit this directly - a change is saved automatically "
+"when you move to another recording. “Re-transcribe” "
+"overwrites whatever's typed here with a fresh Whisper result."
+msgstr "Można edytować bezpośrednio - zmiana zapisuje się automatycznie po "
+"przejściu do innego nagrania. “Transkrybuj ponownie” nadpisze to, "
+"co tu wpisano, świeżym wynikiem Whisper."
+
+msgid "Select a recording from the list…"
+msgstr "Wybierz nagranie z listy…"
+
+msgid "Auto-play next"
+msgstr "Auto-odtwarzanie kolejnych"
+
+msgid "Automatically play the next recording in the list when one "
+"finishes - for quickly reviewing traffic"
+msgstr "Po zakończeniu nagrania automatycznie odtwórz następne z listy - "
+"do szybkiego przeglądu ruchu"
+
+msgid "Sorting new recordings and analyzing quality…"
+msgstr "Segregowanie nowych nagrań i analiza jakości…"
+
+msgid "Loaded {count} recordings"
+msgstr "Załadowano {count} nagrań"
+
+msgid "({count} new, sorted)"
+msgstr "(posegregowano {count} nowych)"
+
+msgid "Refresh failed"
+msgstr "Błąd odświeżania"
+
+msgid "disabled"
+msgstr "wyłączona"
+
+msgid "done"
+msgstr "gotowe"
+
+msgid "★ In favorites"
+msgstr "★ W ulubionych"
+
+msgid "Transcript:"
+msgstr "Transkrypcja:"
+
+msgid "waiting in the queue…"
+msgstr "oczekuje w kolejce…"
+
+msgid "disabled (click “Re-transcribe” to try manually)"
+msgstr "wyłączona (kliknij “Transkrybuj ponownie”, by spróbować ręcznie)"
+
+msgid "Transcript: recording too short, skipped"
+msgstr "Transkrypcja: nagranie zbyt krótkie, pominięte"
+
+msgid "Transcript: no speech detected (just noise/squelch crackle)"
+msgstr "Transkrypcja: nie wykryto mowy (sam szum/trzask squelchu)"
+
+msgid "Transcript: error (try again)"
+msgstr "Transkrypcja: błąd (spróbuj ponownie)"
+
+msgid "Transcript (manually edited):"
+msgstr "Transkrypcja (edytowana ręcznie):"
+
+msgid "— low confidence, take with a grain of salt"
+msgstr "— niska pewność, traktuj z rezerwą"
+
+msgid "Transcript"
+msgstr "Transkrypcja"
+
+msgid "Transcript: re-processing…"
+msgstr "Transkrypcja: trwa ponowne przetwarzanie…"
+
+msgid "Permanently delete this file?"
+msgstr "Trwale usunąć plik?"
+
+msgid "… and {count} more"
+msgstr "… i {count} więcej"
+
+msgid "Permanently delete {count} files?"
+msgstr "Trwale usunąć {count} plików?"
+
+msgid "Delete recordings"
+msgstr "Usuń nagrania"
+
+msgid "Delete recording"
+msgstr "Usuń nagranie"
+
+msgid "Deleted: {name}"
+msgstr "Usunięto: {name}"
+
+msgid "Deleted {count} file(s)"
+msgstr "Usunięto {count} plik(ów)"
+
+msgid "Delete failed"
+msgstr "Błąd usuwania"
+
+msgid "Failed to delete:"
+msgstr "Nie udało się usunąć:"
+
+msgid "Location not set"
+msgstr "Nie ustawiono lokalizacji"
+
+msgid "Set your receiver's approximate location in Options first "
+"- FlightRadar24/ADSBExchange need it to know where on the "
+"map to jump to."
+msgstr "Ustaw najpierw przybliżoną lokalizację odbiornika w Opcjach "
+"- FlightRadar24/ADSBExchange potrzebują jej, żeby wiedzieć, dokąd "
+"przeskoczyć na mapie."
+
+msgid "▶ Play"
+msgstr "▶ Odtwórz"
+
+msgid "Show in file manager"
+msgstr "Pokaż w folderze"
+
+msgid "Copy file path"
+msgstr "Kopiuj ścieżkę pliku"
+
+msgid "★ Remove from favorites"
+msgstr "★ Usuń z ulubionych"
+
+msgid "Save frequency…"
+msgstr "Zapisz częstotliwość…"
+
+msgid "Delete"
+msgstr "Usuń"
+
+msgid "Copy file paths ({count})"
+msgstr "Kopiuj ścieżki plików ({count})"
+
+msgid "Delete selected ({count})"
+msgstr "Usuń zaznaczone ({count})"
+
+msgid "Copied file path"
+msgstr "Skopiowano ścieżkę pliku"
+
+msgid "Copied {count} file paths"
+msgstr "Skopiowano {count} ścieżek plików"
+
+# --- gui/main_window.py ---
+
+msgid "Listen"
+msgstr "Nasłuch"
+
+msgid "Playback"
+msgstr "Odtwarzacz"
+
+msgid "Channels"
+msgstr "Kanały"
+
+msgid "Statistics"
+msgstr "Statystyki"
+
+msgid "Options"
+msgstr "Opcje"
+
+msgid "Ready."
+msgstr "Gotowy."
+
+msgid " as “{name}”."
+msgstr " jako “{name}”."
+
+msgid "Saved {freq:.4f} MHz to the Memory List"
+msgstr "Zapisano {freq:.4f} MHz w Liście pamięci"
+
+msgid "Blacklisted {freq:.4f} MHz (lockout)."
+msgstr "Zablokowano {freq:.4f} MHz (lockout)."
+
+# --- gui/panels/scanner_panel.py ---
+
+msgid "Enable/disable this band without removing it from the list."
+msgstr "Włącz/wyłącz to pasmo bez usuwania go z listy."
+
+msgid "Name"
+msgstr "Nazwa"
+
+msgid "1 channel"
+msgstr "1 kanał"
+
+msgid "A single frequency instead of a range, e.g. 121.500 MHz (guard)\nalongside the scanned band."
+msgstr "Pojedyncza częstotliwość zamiast zakresu, np. 121.500 MHz (guard)\nobok skanowanego pasma."
+
+msgid " kHz step"
+msgstr " kHz krok"
+
+msgid "Modulation for this band: AM (aviation), NFM (PMR/ham/marine),\nWFM (FM broadcast radio)."
+msgstr "Modulacja dla tego pasma: AM (lotnictwo), NFM (PMR/amatorskie/morskie),\nWFM (radio FM)."
+
+msgid "Scan priority weight (0 = default, no special treatment). The higher it is relative to other weighted bands/frequencies, the more often the scanner returns to it - e.g. 1 and 2 means \"twice as often\". Setting a weight on a single frequency from the Memory List (below), alongside a weight on the whole band, lets you return to it more often without giving up on the rest of the band."
+msgstr "Waga priorytetu skanowania (0 = domyślna, bez wyróżnienia). Im wyższa względem innych ważonych pasm/częstotliwości, tym częściej skaner do niego wraca - np. 1 i 2 znaczy \"dwa razy częściej\". Ustawienie wagi na pojedynczej częstotliwości z Listy pamięci (poniżej) obok wagi całego pasma pozwala częściej wracać do niej, nie rezygnując z reszty pasma."
+
+msgid "Advanced - a trigger level, tuning/linger time, gain and noise\nreduction of its own for just this band, independent of the\nrest of the scanned bands/channels (see the sliders below once clicked)."
+msgstr "Zaawansowane - własny trigger level, tuning/linger time, gain i\nredukcja szumów tylko dla tego pasma, niezależne od reszty\nskanowanych pasm/kanałów (patrz suwaki poniżej po kliknięciu)."
+
+msgid "Remove this band from the list."
+msgstr "Usuń to pasmo z listy."
+
+msgid "Enable/disable the whole Memory List at once - behaves like a band's checkbox.\nDisabling it here disables scanning of every channel, even ones\nindividually marked enabled in the Channels tab."
+msgstr "Włącz/wyłącz całą Listę pamięci naraz - działa jak checkbox pasma.\nWyłączenie tu wyłącza skanowanie wszystkich kanałów, nawet tych\noznaczonych jako włączone pojedynczo w zakładce Kanały."
+
+msgid "Expand/collapse the list of enabled channels and their weights."
+msgstr "Rozwiń/zwiń listę włączonych kanałów i ich wag."
+
+msgid "Memory List (channels)"
+msgstr "Lista pamięci (kanały)"
+
+msgid "Name / Folder"
+msgstr "Nazwa / Folder"
+
+msgid "Frequency (MHz)"
+msgstr "Częstotliwość (MHz)"
+
+msgid "Modulation"
+msgstr "Modulacja"
+
+msgid "Weight"
+msgstr "Waga"
+
+msgid "{count} enabled"
+msgstr "{count} włączonych"
+
+msgid "no channels enabled"
+msgstr "brak włączonych kanałów"
+
+msgid "(unnamed)"
+msgstr "(bez nazwy)"
+
+msgid "Priority weight for this frequency (0 = default, no special\ntreatment). Competes with whole-band weights - see the weight\ntooltip above."
+msgstr "Waga priorytetu tej częstotliwości (0 = domyślna, bez wyróżnienia).\nKonkuruje z wagami całych pasm - patrz podpowiedź przy wadze pasma\npowyżej."
+
+msgid "Scanner"
+msgstr "Skaner"
+
+msgid "SDR device:"
+msgstr "Urządzenie SDR:"
+
+msgid " MHz capture"
+msgstr " MHz przechwytu"
+
+msgid "Bandwidth captured by the SDR in one shot (e.g. 2.4 MHz for RTL-SDR,\nup to tens of MHz for HackRF/LimeSDR/Airspy/SDRplay/USRP).\nThe scanner groups the whole range/channel list into as few such windows\nas possible instead of retuning channel by channel.\nLocked while the scanner is running - it needs a Stop first."
+msgstr "Szerokość pasma jednorazowo przechwytywanego przez SDR (np. 2.4 MHz dla RTL-SDR,\naż do kilkudziesięciu MHz dla HackRF/LimeSDR/Airspy/SDRplay/USRP).\nSkaner grupuje cały zakres/listę kanałów w jak najmniej takich okien zamiast\nprzestrajać się kanał-po-kanale.\nZablokowane podczas pracy skanera - wymaga najpierw Stop."
+
+msgid "Locked while the scanner is running - switching hardware means closing and reopening the SDR stream, which needs a Stop first."
+msgstr "Zablokowane podczas pracy skanera - zmiana sprzętu oznacza zamknięcie i ponowne otwarcie strumienia SDR, co wymaga najpierw Stop."
+
+msgid "Tuning Time:"
+msgstr "Tuning Time:"
+
+msgid "Linger Time:"
+msgstr "Linger Time:"
+
+msgid "Trigger Level:"
+msgstr "Trigger Level:"
+
+msgid "Squelch (mute noise):"
+msgstr "Squelch (wyciszanie szumu):"
+
+msgid "Gain:"
+msgstr "Gain:"
+
+msgid "Noise reduction:"
+msgstr "Redukcja szumów:"
+
+msgid "Stereo (FM WFM)"
+msgstr "Stereo (FM WFM)"
+
+msgid "Decodes stereo (19 kHz pilot) for live monitoring of FM broadcast\nradio (WFM) - has no effect on AM/NFM. Recordings always stay mono."
+msgstr "Dekoduje stereo (pilot 19 kHz) przy nasłuchu na żywo pasma radia\nFM (WFM) - nie ma znaczenia dla AM/NFM. Nagrania zawsze zostają mono."
+
+msgid "Save"
+msgstr "Zapisz"
+
+msgid "Saves the current settings (trigger/timing/gain/noise reduction)\nas this band's own and returns to normal editing."
+msgstr "Zapisuje bieżące ustawienia (trigger/timing/gain/redukcja szumów)\njako własne dla edytowanego pasma i wraca do zwykłej edycji."
+
+msgid "Reset to defaults"
+msgstr "Przywróć domyślne"
+
+msgid "Removes every advanced setting from this band (reverts to the\nglobal ones) and saves right away."
+msgstr "Usuwa wszystkie zaawansowane ustawienia tego pasma (wraca do\nglobalnych) i od razu zapisuje."
+
+msgid "START"
+msgstr "START"
+
+msgid "SKIP"
+msgstr "SKIP"
+
+msgid "Moves on to the next frequency/channel immediately, without\nwaiting for the transmission/linger to end. Does NOT add it to\nthe blacklist - this frequency will be visited again on the\nnext scan pass. Use this when something interesting is\nhappening on the current channel and you want to leave it alone\nfor later, but move on."
+msgstr "Przechodzi natychmiast do kolejnej częstotliwości/kanału, bez\nczekania na koniec transmisji/linger. NIE dodaje do czarnej listy -\nta częstotliwość zostanie odwiedzona ponownie w kolejnym przebiegu\nskanowania. Użyj tego, gdy coś ciekawego dzieje się na bieżącym\nkanale i chcesz go zostawić w spokoju na przyszłość, ale iść dalej."
+
+msgid "SKIP + BLACKLIST"
+msgstr "SKIP + BLACKLIST"
+
+msgid "Like SKIP, but also permanently blocks the current frequency\n(adds it to the blacklist) - the scanner won't visit it again.\nTakes effect immediately, with no confirmation; undo it by\ndeleting the entry in the Blacklist tab."
+msgstr "Jak SKIP, ale dodatkowo trwale blokuje bieżącą częstotliwość\n(dodaje do czarnej listy) - skaner już jej nie odwiedzi. Działa od\nrazu, bez potwierdzenia; cofniesz to kasując wpis w zakładce\nCzarna lista."
+
+msgid "MUTE"
+msgstr "WYCISZ"
+
+msgid "Mutes only the live audio in your headphones/speakers -\nrecording to disk (if enabled) keeps running in the background,\nso you can catch up later by listening to recordings from the\nRecordings tab while the scanner keeps working quietly."
+msgstr "Wycisza tylko dźwięk na żywo w słuchawkach/głośnikach - nagrywanie na\ndysk (jeśli włączone) działa dalej w tle, więc można nadrobić zaległości\nodsłuchując nagrania z zakładki Nagrania podczas gdy skaner pracuje po cichu."
+
+msgid "Auto (AGC)"
+msgstr "Auto (AGC)"
+
+msgid "Enable"
+msgstr "Włącz"
+
+msgid "Mutes the live audio AND skips writing to the recording, once the\nlevel drops at least this offset BELOW Trigger Level - only\nduring LINGER (after the transmission ends, before the channel\ncloses). Fixes the typical \"ear-blasting\" burst after releasing\nPTT on NFM: once the carrier disappears, the FM demodulator gets\npure receiver noise, and noise without a carrier sounds very\nloud despite low RF power (the FM threshold effect) - this isn't\na bug. Thanks to this, a recording ends where the signal actually\nended, without a loud noise \"tail\". The offset always stays\nbelow the trigger (never above it), so it can never mute/cut\naudio while the scanner considers the channel active\n(SIGNAL_DETECTED). Leave a margin (e.g. -6 dB) so whatever's\nstill audible/recorded during LINGER below the trigger (thanks\nto it) isn't cut off immediately."
+msgstr "Wycisza dźwięk na żywo ORAZ pomija zapis do nagrania, gdy poziom\nspadnie o co najmniej ten offset PONIŻEJ Trigger Level - wyłącznie\nw LINGER (po zakończeniu transmisji, przed zamknięciem kanału).\nNaprawia typowe \"wybuchające uszy\" po puszczeniu PTT przy NFM: gdy\nnośna znika, demodulator FM dostaje sam szum odbiornika, a szum bez\nnośnej brzmi bardzo głośno mimo niskiej mocy RF (efekt progowy FM) -\nto nie jest usterka. Dzięki temu nagranie kończy się tam, gdzie\nfaktycznie skończył się sygnał, bez głośnego \"ogona\" szumu.\nOffset zostaje ZAWSZE poniżej triggera (nigdy nad nim), więc nigdy\nnie wyciszy/nie utnie dźwięku, gdy skaner uznaje kanał za aktywny\n(SIGNAL_DETECTED). Zostaw margines (np. -6 dB), żeby to co jeszcze\nsłychać/nagrywa się w LINGER poniżej triggera (dzięki niemu właśnie)\nnie zostało od razu ucinane."
+
+msgid "dB from trigger"
+msgstr "dB od triggera"
+
+msgid "Enable (adaptive, intelligent)"
+msgstr "Włącz (inteligentna, adaptacyjna)"
+
+msgid "Continuously tracks the background noise level in the audio\nspectrum and attenuates bands close to that level (spectral\ngating), leaving speech bands relatively untouched. Helps with a\nweak antenna/low SNR, but at very high noise levels costs a\nslightly \"digital\" sound."
+msgstr "Śledzi na bieżąco poziom szumu tła w widmie dźwięku i wycisza pasma\nbliskie temu poziomowi (spectral gating), zostawiając pasma z mową\nwzględnie nietknięte. Pomaga przy słabej antenie/niskim SNR, ale przy\nbardzo silnym szumie kosztem lekko \"cyfrowego\" brzmienia audio."
+
+msgid "Sources to scan - add presets, custom ranges (with your own start/stop/step) or single frequencies, e.g. 121.500 MHz alongside the scanned band. Every entry enabled below is scanned together, in one session, along with every enabled channel from the Memory List below - no need to switch between them."
+msgstr "Źródła do skanowania - dodawaj presety, własne zakresy (z własnym start/stop/step) lub pojedyncze częstotliwości, np. 121.500 MHz obok skanowanego pasma. Wszystkie włączone pozycje poniżej są skanowane razem, w jednej sesji, wraz z każdym włączonym kanałem z Listy pamięci poniżej - nie trzeba między nimi przełączać."
+
+msgid "Add preset"
+msgstr "Dodaj preset"
+
+msgid "Add custom range"
+msgstr "Dodaj własny zakres"
+
+msgid "Memory list (channels)"
+msgstr "Lista pamięci (kanały)"
+
+msgid "Switch to the Channels tab, where individual\nfrequencies/folders can be managed. They're always scanned\ntogether with the bands above, in one session."
+msgstr "Przełącz na zakładkę Kanały, gdzie można zarządzać pojedynczymi\nczęstotliwościami/folderami. Są one zawsze skanowane razem z\npasmami powyżej, w jednej sesji."
+
+msgid "Quick-add a frequency:"
+msgstr "Szybkie dodanie częstotliwości:"
+
+msgid "Add"
+msgstr "Dodaj"
+
+msgid "Adds a single channel to the list, e.g. 121.500 MHz (guard)\nalongside the scanned band."
+msgstr "Dodaje pojedynczy kanał do listy, np. 121.500 MHz (guard)\nobok skanowanego pasma."
+
+msgid "Automatic (first detected)"
+msgstr "Automatycznie (pierwsze wykryte)"
+
+msgid "Simulation (no hardware)"
+msgstr "Symulacja (brak sprzętu)"
+
+msgid "Custom range"
+msgstr "Własny zakres"
+
+msgid "STOP"
+msgstr "STOP"
+
+msgid "MUTED"
+msgstr "WYCISZONE"
+
+msgid "(+{count} more)"
+msgstr "(+{count} więcej)"
+
+msgid "Back to this window: {seconds:.2f}s ago"
+msgstr "Powrót do tego okna: {seconds:.2f}s temu"
+
+
+# --- gui/panels/frequency_manager.py ---
+
+msgid "Channel"
+msgstr "Kanał"
+
+msgid "Frequency:"
+msgstr "Częstotliwość:"
+
+msgid "Name:"
+msgstr "Nazwa:"
+
+msgid "Modulation:"
+msgstr "Modulacja:"
+
+msgid "Folder in the Memory List (for organizing/bulk enable-disable).\nPick an existing one or type a new name to create it right away."
+msgstr "Folder w Liście pamięci (do organizacji/grupowego włączania-wyłączania).\nWybierz istniejący albo wpisz nową nazwę, żeby go od razu utworzyć."
+
+msgid "(no folder)"
+msgstr "(brak folderu)"
+
+msgid "Folder:"
+msgstr "Folder:"
+
+msgid "Scan priority weight (0 = default, no special treatment). You can\nalso set/preview it more conveniently in the Scanner tab, in the\nexpandable Memory List next to each channel."
+msgstr "Waga priorytetu skanowania (0 = domyślna, bez wyróżnienia). Można ją\nteż ustawić/podejrzeć wygodniej w zakładce Skaner, w rozwijanej\nLiście pamięci obok każdego kanału."
+
+msgid "Weight:"
+msgstr "Waga:"
+
+msgid "Add to blacklist"
+msgstr "Dodaj do czarnej listy"
+
+msgid "Margin (+/-):"
+msgstr "Margines (+/-):"
+
+msgid "Description:"
+msgstr "Opis:"
+
+msgid "Search (frequency, name, modulation, folder)... [Ctrl+F]"
+msgstr "Szukaj (częstotliwość, nazwa, modulacja, folder)... [Ctrl+F]"
+
+msgid "Enabled"
+msgstr "Włączony"
+
+msgid "Add"
+msgstr "Dodaj"
+
+msgid "Edit"
+msgstr "Edytuj"
+
+msgid "Edit the selected channel, or rename the selected folder."
+msgstr "Edytuj zaznaczony kanał, albo zmień nazwę zaznaczonego folderu."
+
+msgid "Delete"
+msgstr "Usuń"
+
+msgid "New folder"
+msgstr "Nowy folder"
+
+msgid "Creates an empty folder, to which frequencies can be dragged\nright away from the list below (or picked when adding/editing a channel)."
+msgstr "Tworzy pusty folder, do którego można od razu przeciągać częstotliwości\nz listy poniżej (albo wybrać go przy dodawaniu/edycji kanału)."
+
+msgid "Load Polish military frequencies"
+msgstr "Wczytaj polskie częstotliwości wojskowe"
+
+msgid "Appends verified, publicly known military frequencies: guard,\nair-to-air refueling (tankers), Warsaw OAT sectors, and\ntower/approach frequencies of QRA/Baltic Air Policing bases\n(Malbork, Łask, Mińsk Mazowiecki, Powidz, Świdwin, Mirosławiec).\nPoland-specific - doesn't overwrite the existing list."
+msgstr "Dopisuje sprawdzone, publicznie znane częstotliwości wojskowe: guard,\ntankowanie w powietrzu (cysterny), sektory OAT Warszawa oraz wieże/\npodejścia baz QRA/Baltic Air Policing (Malbork, Łask, Mińsk Mazowiecki,\nPowidz, Świdwin, Mirosławiec). Specyficzne dla Polski - nie nadpisuje istniejącej listy."
+
+msgid "Load Polish fire brigade frequencies"
+msgstr "Wczytaj polskie częstotliwości straży pożarnej"
+
+msgid "Appends the nationwide PSP rescue-firefighting channels (KRG 1-8)\nand OSP siren-alerting frequencies (148.6625-149.3375 MHz, NFM).\nMany volunteer fire brigades still operate on analog despite PSP's\nmigration to DMR. Poland-specific - doesn't overwrite the existing list."
+msgstr "Dopisuje ogólnopolskie kanały ratowniczo-gaśnicze PSP (KRG 1-8) oraz\nczęstotliwości alarmowania syren OSP (148.6625-149.3375 MHz, NFM).\nWiele OSP nadal pracuje analogowo mimo migracji PSP do DMR. Specyficzne dla Polski - nie nadpisuje istniejącej listy."
+
+msgid "Channels (Memory List)"
+msgstr "Kanały (Memory List)"
+
+msgid "Rename folder"
+msgstr "Zmień nazwę folderu"
+
+msgid "Folder name:"
+msgstr "Nazwa folderu:"
+
+msgid "Folder “{name}” already exists."
+msgstr "Folder „{name}” już istnieje."
+
+msgid "Margin (kHz)"
+msgstr "Margines (kHz)"
+
+msgid "Description"
+msgstr "Opis"
+
+msgid "Added"
+msgstr "Dodano"
+
+msgid "Add manually"
+msgstr "Dodaj ręcznie"
+
+msgid "Blacklist"
+msgstr "Czarna lista (Blacklist)"
+
+
+# --- gui/widgets.py ---
+
+msgid "pyqtgraph unavailable - spectrum preview disabled"
+msgstr "pyqtgraph niedostępny - podgląd widma wyłączony"
+
+msgid "Click/drag to seek. Bar height = loudness at that point in the recording."
+msgstr "Klik/przeciągnięcie - przewijanie. Wysokość słupków = głośność w tym miejscu nagrania."
+
+
+# --- playback/freq_panel.py, stats_tab.py, stats.py ---
+
+msgid "Frequencies"
+msgstr "Częstotliwości"
+
+msgid "Languages"
+msgstr "Języki"
+
+msgid "Search frequencies..."
+msgstr "Szukaj częstotliwości..."
+
+msgid "Sort: transmission count"
+msgstr "Sortuj: liczba transmisji"
+
+msgid "Sort: frequency"
+msgstr "Sortuj: częstotliwość"
+
+msgid "Sort: quality"
+msgstr "Sortuj: jakość"
+
+msgid "Sort: language"
+msgstr "Sortuj: język"
+
+msgid "Search languages..."
+msgstr "Szukaj języka..."
+
+msgid "All"
+msgstr "Wszystkie"
+
+msgid "★ Favorites"
+msgstr "★ Ulubione"
+
+msgid "avg. quality"
+msgstr "śr. jakość"
+
+msgid "Recordings"
+msgstr "Nagrania"
+
+msgid "Total time"
+msgstr "Łączny czas"
+
+msgid "Date range"
+msgstr "Zakres dat"
+
+msgid "Avg. quality"
+msgstr "Śr. jakość"
+
+msgid "Busiest"
+msgstr "Najaktywniejsza"
+
+msgid "Summary"
+msgstr "Podsumowanie"
+
+msgid "Frequency"
+msgstr "Częstotliwość"
+
+msgid "Count"
+msgstr "Liczba"
+
+msgid "Last heard"
+msgstr "Ostatnio słyszana"
+
+msgid "Click: show this frequency's details on the side (hours/weekdays).\nDouble-click: jump to it in the Playback tab."
+msgstr "Klik: pokaż specyfikę tej częstotliwości obok (godziny/dni tygodnia).\nPodwójny klik: przejdź do niej w zakładce Odtwarzacz."
+
+msgid "Recordings per day"
+msgstr "Liczba nagrań dziennie"
+
+msgid "Traffic by hour of day (local time)"
+msgstr "Ruch wg godziny doby (czas lokalny)"
+
+msgid "← Overview"
+msgstr "← Widok ogólny"
+
+msgid "Deselect the chosen frequency and go back to the whole library's stats"
+msgstr "Odznacz wybraną częstotliwość i wróć do statystyk całej biblioteki"
+
+msgid "By hour of day (local time)"
+msgstr "Wg godziny doby (czas lokalny)"
+
+msgid "By day of week"
+msgstr "Wg dnia tygodnia"
+
+msgid "{count} recordings • avg. quality {quality:.0f}/100 • {minutes:.1f} min total • last heard {last_heard}"
+msgstr "{count} nagrań • śr. jakość {quality:.0f}/100 • łącznie {minutes:.1f} min • ostatnio słyszana {last_heard}"
+
+msgid "UTC"
+msgstr "UTC"
+
+msgid "local"
+msgstr "polski"
+
+msgid "Traffic by hour of day ({tz} time)"
+msgstr "Ruch wg godziny doby (czas {tz})"
+
+msgid "By hour of day ({tz} time)"
+msgstr "Wg godziny doby (czas {tz})"
+
+msgid "(no transcript)"
+msgstr "(bez transkrypcji)"
+
+msgid "Mon"
+msgstr "Pon"
+
+msgid "Tue"
+msgstr "Wt"
+
+msgid "Wed"
+msgstr "Śr"
+
+msgid "Thu"
+msgstr "Czw"
+
+msgid "Fri"
+msgstr "Pt"
+
+msgid "Sat"
+msgstr "Sob"
+
+msgid "Sun"
+msgstr "Nd"
+
+
+# --- playback/models_qt.py ---
+
+msgid "Date"
+msgstr "Data"
+
+msgid "Time"
+msgstr "Godzina"
+
+msgid "Frequency"
+msgstr "Częstotliwość"
+
+msgid "Duration"
+msgstr "Czas trwania"
+
+msgid "SNR (dB)"
+msgstr "SNR (dB)"
+
+msgid "Quality"
+msgstr "Jakość"
+
+msgid "Size"
+msgstr "Rozmiar"
+
+msgid "Transcript"
+msgstr "Transkrypcja"
+
+msgid "⏳ queued"
+msgstr "⏳ w kolejce"
+
+msgid "– too short"
+msgstr "– za krótkie"
+
+msgid "🔇 no speech"
+msgstr "🔇 brak mowy"
+
+msgid "⚠ transcription error"
+msgstr "⚠ błąd transkrypcji"
+
+msgid "corrupt"
+msgstr "uszkodzony"
+
+msgid "⚠ corrupt"
+msgstr "⚠ uszkodzony"
+
+msgid "Not transcribed yet."
+msgstr "Nie transkrybowano jeszcze."
+
+msgid "Status: {status}\nLanguage: {language} ({probability:.0f}%)\nEngine: {engine}"
+msgstr "Status: {status}\nJęzyk: {language} ({probability:.0f}%)\nSilnik: {engine}"
+
+msgid "⚠ File is corrupt or unreadable - couldn't analyze the audio."
+msgstr "⚠ Plik uszkodzony lub nieczytelny - nie udało się przeanalizować audio."
+
+msgid "\nNoise floor: {noise_floor:.0f}\nSignal level: {signal_level:.0f}\nClipping: {clipping:.1f}%"
+msgstr "\nSzum tła: {noise_floor:.0f}\nPoziom sygnału: {signal_level:.0f}\nPrzesterowanie: {clipping:.1f}%"
+
+
+# --- scanner_engine.py ---
+
+msgid "SDR connection lost: {error}"
+msgstr "Połączenie z SDR przerwane: {error}"
+
+msgid "No audio output (PyAudio) - live monitoring disabled."
+msgstr "Brak wyjścia audio (PyAudio) - monitorowanie na żywo wyłączone."
+
+msgid "Edge roll-off compensation: active ({count} data buckets from listening history)."
+msgstr "Kompensacja opadania sygnału na krawędziach okna: aktywna ({count} kubełków danych z historii nasłuchu)."
+
+msgid "SoapySDR not found/configured - running in SIMULATION mode."
+msgstr "Nie znaleziono/nie skonfigurowano SoapySDR - działam w trybie SYMULACJI."
+
+msgid "fits in one readStream() call"
+msgstr "mieści się w jednym readStream()"
+
+msgid "STILL needs multiple calls per tick"
+msgstr "NADAL wymaga wielu wywołań na takt"
+
+msgid "SDR stream MTU: {mtu} samples/call (tick = {chunk} samples - {fits})."
+msgstr "SDR stream MTU: {mtu} próbek/wywołanie (takt = {chunk} próbek - {fits})."
+
+msgid "Reconnected to the SDR - resuming scanning."
+msgstr "Połączono ponownie z SDR - wznawiam skanowanie."
+
+msgid "Failed to connect to the SDR ({error}) - retrying in {backoff}s (attempt {attempt})..."
+msgstr "Nie udało się połączyć z SDR ({error}) - ponowna próba za {backoff}s (próba {attempt})..."
+
+msgid "Too many channels in band \"{label}\" ({count}) - thinned every {every}."
+msgstr "Zbyt wiele kanałów pasma \"{label}\" ({count}) - przerzedzono co {every}."
+
+msgid "({count} priority-weighted entries)"
+msgstr "({count} pozycji z wagą priorytetu)"
+
+msgid "Wideband scanning: {channels} channels in {windows} capture window(s) ({mhz:.2f} MHz each){extra}."
+msgstr "Skanowanie szerokopasmowe: {channels} kanałów w {windows} oknie/oknach przechwytu ({mhz:.2f} MHz każde){extra}."
+
+
+# --- military_presets.py (BAND_PRESETS labels/tooltips) ---
+
+msgid "Civil aviation (118-137 MHz)"
+msgstr "Lotnictwo cywilne (118-137 MHz)"
+
+msgid "Standard civil aviation band: towers, approach, area control."
+msgstr "Standardowe pasmo lotnictwa cywilnego: wieże, zbliżanie, kontrola obszaru."
+
+msgid "Military VHF (137-144 MHz)"
+msgstr "Wojskowe VHF (137-144 MHz)"
+
+msgid "Military VHF band adjacent to civil aviation."
+msgstr "Wojskowe pasmo VHF sąsiadujące z lotnictwem cywilnym."
+
+msgid "Military UHF NATO (225-400 MHz)"
+msgstr "Wojskowe UHF NATO (225-400 MHz)"
+
+msgid "Harmonized NATO UHF band: air-to-air refueling,\nQRA/Baltic Air Policing, exercises."
+msgstr "Zharmonizowane pasmo NATO UHF: tankowanie w powietrzu,\nQRA/Baltic Air Policing, ćwiczenia."
+
+msgid "PMR446 (446.00625-446.19375 MHz)"
+msgstr "PMR446 (446.00625-446.19375 MHz)"
+
+msgid "License-free PMR446 walkie-talkies (16 analog channels, NFM).\nVery good chance of catching something nearby - popular on\ntrips, construction sites, at hotels/campsites."
+msgstr "Bezlicencyjne krótkofalówki PMR446 (16 kanałów analogowych, NFM).\nBardzo duża szansa złapania czegoś w pobliżu - popularne na\nwycieczkach, budowach, w hotelach/kampingach."
+
+msgid "Ham 2m (144-146 MHz)"
+msgstr "Amatorskie 2m (144-146 MHz)"
+
+msgid "2m amateur radio band (VHF, NFM): repeaters and simplex."
+msgstr "Pasmo radioamatorskie 2m (VHF, NFM): przemienniki i łączność bezpośrednia."
+
+msgid "Ham 70cm (430-440 MHz)"
+msgstr "Amatorskie 70cm (430-440 MHz)"
+
+msgid "70cm amateur radio band (UHF, NFM): repeaters and simplex."
+msgstr "Pasmo radioamatorskie 70cm (UHF, NFM): przemienniki i łączność bezpośrednia."
+
+msgid "Marine VHF (156-162 MHz)"
+msgstr "Morskie VHF (156-162 MHz)"
+
+msgid "Marine VHF band (channels 1-88, including channel 16 - calling/\ndistress, NFM). Useful near a coast, harbor, or a lake with shipping traffic."
+msgstr "Morskie pasmo VHF (kanały 1-88, w tym kanał 16 - wywoławczy/ratunkowy, NFM).\nPrzydatne w pobliżu wybrzeża, portu lub jeziora ze szlakiem żeglugowym."
+
+msgid "FM broadcast radio (87.5-108 MHz)"
+msgstr "Radio FM (87.5-108 MHz)"
+
+msgid "FM broadcast band (WFM). Not ATC, but strong, always-on stations\nmake it easy to quickly check the antenna/receiver works correctly."
+msgstr "Nadawcze pasmo FM (WFM). Nie ATC, ale silne, stale obecne stacje\nułatwiają szybkie sprawdzenie czy antena/odbiornik działa poprawnie."
+
+
+
+# --- language_panel.py / main_window.py - live restart + auto locale ---
+
+msgid "Automatic (system language)"
+msgstr "Automatyczny (język systemu)"
+
+msgid "Missing your language? Adding one is just a text file - no programming needed, see alisdr/locale/README.md in the source for the three-step guide."
+msgstr "Brakuje Twojego języka? Dodanie go to tylko plik tekstowy - bez programowania, zobacz alisdr/locale/README.md w źródłach programu, gdzie jest trzykrokowa instrukcja."
+
+msgid "Restart to apply changes"
+msgstr "Uruchom ponownie, aby zastosować zmiany"
+
+msgid "Restart AliSDR now to switch the interface language? Any recording in progress will be stopped first, same as a normal Stop."
+msgstr "Zrestartować AliSDR teraz, aby zmienić język interfejsu? Trwające nagrywanie zostanie najpierw zatrzymane, tak jak zwykłym Stop."
+
+msgid "Restart failed"
+msgstr "Restart nie powiódł się"
+
+msgid "Couldn't restart automatically ({error}). Please close and reopen the app by hand."
+msgstr "Nie udało się zrestartować automatycznie ({error}). Zamknij i otwórz program ponownie ręcznie."
+
+
+# --- manual recording feature (scanner_panel/recording_panel/playback_panel) ---
+
+msgid "Auto-recording (record automatically while a signal is detected)"
+msgstr "Auto-nagrywanie (nagrywaj automatycznie, gdy wykryto sygnał)"
+
+msgid "Off by default - a fresh install doesn't write anything to disk until you turn this on. The same toggle is also available in the Listen tab, right next to the manual Record button."
+msgstr "Domyślnie wyłączone - świeża instalacja nic nie zapisuje na dysk, dopóki tego nie włączysz. Ten sam przełącznik jest też dostępny w zakładce Nasłuch, tuż obok ręcznego przycisku Record."
+
+msgid "● Record"
+msgstr "● Record"
+
+msgid "■ Stop recording"
+msgstr "■ Zatrzymaj nagrywanie"
+
+msgid "Continuously records everything audible on the current live\nchannel - silence included - independent of whether the scanner\ncurrently considers a signal detected. Starts a new file now,\nstops it when you click again (or when the scanner itself stops)."
+msgstr "Nagrywa w sposób ciągły wszystko, co słychać na bieżącym kanale na żywo - łącznie z ciszą - niezależnie od tego, czy skaner uznaje aktualnie sygnał za wykryty. Rozpoczyna nowy plik od razu, kończy go po ponownym kliknięciu (albo gdy sam skaner się zatrzyma)."
+
+msgid "Auto-recording"
+msgstr "Auto-nagrywanie"
+
+msgid "Automatically records every transmission the scanner detects -\nthe same setting as in the Options tab. Off by default."
+msgstr "Automatycznie nagrywa każdą transmisję wykrytą przez skaner - to samo ustawienie co w zakładce Opcje. Domyślnie wyłączone."
+
+msgid "Auto-recording is currently off - the scanner is listening but not saving anything to disk. Turn it on from the Listen tab or Options to start building this library."
+msgstr "Auto-nagrywanie jest obecnie wyłączone - skaner nasłuchuje, ale nic nie zapisuje na dysk. Włącz je w zakładce Nasłuch albo w Opcjach, żeby zacząć budować tę bibliotekę."
+
+
+
+# --- mp3 recording output format (recording_panel/audio_transcode) ---
+
+msgid "WAV (uncompressed)"
+msgstr "WAV (bez kompresji)"
+
+msgid "MP3 (compressed, requires ffmpeg)"
+msgstr "MP3 (skompresowany, wymaga ffmpeg)"
+
+msgid "ffmpeg was not found on this system - recordings will be saved as WAV until it's installed."
+msgstr "Nie znaleziono ffmpeg w systemie - nagrania będą zapisywane jako WAV, dopóki nie zostanie zainstalowany."
+
+
+# --- raw IQ recording (recording_panel/iq_recorder, technical/advanced) ---
+
+msgid "Record raw IQ"
+msgstr "Nagraj surowy sygnał IQ"
+
+msgid "Advanced/technical: records the actual wideband complex samples this app demodulates from, in the SigMF format (readable by GNU Radio, Inspectrum, SDR++, ...) - independent of any specific channel or trigger. Saved to a 'raw_iq' subfolder, separate from the Playback library. Warning: uncompressed IQ is large - roughly sample_rate x 8 bytes/second (~19 MB/s at this app's default 2.4 MSPS capture bandwidth)."
+msgstr "Zaawansowane/techniczne: nagrywa faktyczne szerokopasmowe próbki zespolone, z których program demoduluje sygnał, w formacie SigMF (odczytywalnym przez GNU Radio, Inspectrum, SDR++...) - niezależnie od konkretnego kanału czy triggera. Zapisywane w podfolderze 'raw_iq', osobno od biblioteki Odtwarzacza. Uwaga: nieskompresowany IQ zajmuje dużo miejsca - w przybliżeniu sample_rate x 8 bajtów/sekundę (~19 MB/s przy domyślnym paśmie przechwytywania 2,4 MSPS tego programu)."
+
+msgid "■ Stop recording IQ"
+msgstr "■ Zatrzymaj nagrywanie IQ"
+
+msgid "Recording raw IQ..."
+msgstr "Nagrywanie surowego IQ..."
+
+
+# --- optional transcription install flow (transcription_panel/playback_panel/transcription_install) ---
+
+msgid "Optional: automatic speech-to-text for recordings (Whisper), shown in the Playback tab. Not installed - it's a large, separate download (models + engine), so it's opt-in rather than bundled with the app."
+msgstr "Opcjonalnie: automatyczna transkrypcja mowy na tekst dla nagrań (Whisper), widoczna w zakładce Odtwarzacz. Niezainstalowane - to duży, osobny download (modele + silnik), więc jest opcjonalne, a nie dołączone do programu."
+
+msgid "Also install GPU (NVIDIA/CUDA) support"
+msgstr "Zainstaluj też wsparcie GPU (NVIDIA/CUDA)"
+
+msgid "Optional and heavier still - only useful if you have an NVIDIA GPU. Transcription works on CPU either way, just slower."
+msgstr "Opcjonalne i jeszcze cięższe - przydatne tylko jeśli masz kartę NVIDIA. Transkrypcja i tak działa na CPU, tylko wolniej."
+
+msgid "Install transcription"
+msgstr "Zainstaluj transkrypcję"
+
+msgid "Installing… this can take a few minutes."
+msgstr "Instalowanie… to może potrwać kilka minut."
+
+msgid "Installed."
+msgstr "Zainstalowano."
+
+msgid "Installation failed - see the log above for details. You can try again."
+msgstr "Instalacja nie powiodła się - szczegóły w logu powyżej. Możesz spróbować ponownie."
+
+msgid "Installed. Restart AliSDR to start using it."
+msgstr "Zainstalowano. Uruchom ponownie AliSDR, żeby zacząć z tego korzystać."
+
+msgid "Transcription isn't installed - it's an optional, separate download. Install it from the Options tab to get automatic speech-to-text for recordings."
+msgstr "Transkrypcja nie jest zainstalowana - to opcjonalny, osobny download. Zainstaluj ją w zakładce Opcje, żeby uzyskać automatyczną transkrypcję mowy na tekst dla nagrań."
+
+msgid "Transcription was just installed into a separate environment - restart AliSDR now to start using it? Any recording in progress will be stopped first, same as a normal Stop."
+msgstr "Transkrypcja została właśnie zainstalowana w osobnym środowisku - uruchomić AliSDR ponownie, żeby zacząć z niej korzystać? Trwające nagrywanie zostanie najpierw zatrzymane, tak samo jak zwykły Stop."
+
+
+# --- manual/"Single File" recordings now visible in Odtwarzacz (models/organizer/stats) ---
+
+msgid "Manual recording"
+msgstr "Nagranie ręczne"
+
+# --- legal disclaimers (gui/legal_disclaimer.py) ---
+
+msgid "Before you start"
+msgstr "Zanim zaczniesz"
+
+msgid "AliSDR can tune to a wide range of radio frequencies, some of which may be restricted or illegal to listen to or record where you live.\n\nUsing this software does not authorize you to listen to or record any transmission. Radio monitoring and recording laws vary significantly between countries - some places allow listening to most frequencies but restrict recording or sharing what you hear; others restrict listening to non-public or certain public-safety/aviation communications entirely.\n\nYou are solely responsible for knowing and following the laws that apply to you. If you're unsure, check your local telecommunications regulations before using the scanning or recording features."
+msgstr "AliSDR może przestrajać się na szeroki zakres częstotliwości radiowych, z których część może być objęta ograniczeniami albo nielegalna do słuchania lub nagrywania w Twoim kraju.\n\nKorzystanie z tego programu nie upoważnia Cię do słuchania ani nagrywania żadnej transmisji. Przepisy dotyczące nasłuchu i nagrywania radiowego znacząco różnią się między krajami - w niektórych miejscach wolno słuchać większości częstotliwości, ale nagrywanie lub udostępnianie tego, co usłyszysz, jest ograniczone; w innych zabroniony jest sam nasłuch łączności niepublicznej lub niektórych służb (bezpieczeństwa publicznego, lotnictwa).\n\nPonosisz wyłączną odpowiedzialność za znajomość i przestrzeganie przepisów, które Cię obowiązują. Jeśli nie masz pewności, sprawdź lokalne przepisy telekomunikacyjne, zanim zaczniesz korzystać z funkcji skanowania lub nagrywania."
+
+msgid "Before you record"
+msgstr "Zanim zaczniesz nagrywać"
+
+msgid "You're about to record for the first time.\n\nRecording radio transmissions can be more restricted than simply listening to them, depending on your country's laws - even where monitoring itself is legal. Make sure you've checked the rules that apply where you live before continuing."
+msgstr "Zaraz nagrasz coś po raz pierwszy.\n\nNagrywanie transmisji radiowych może podlegać większym ograniczeniom niż sam nasłuch, w zależności od przepisów Twojego kraju - nawet tam, gdzie sam nasłuch jest legalny. Upewnij się, że sprawdziłeś zasady obowiązujące w miejscu, w którym mieszkasz, zanim będziesz kontynuować."
+
+msgid "I understand, continue"
+msgstr "Rozumiem, kontynuuj"
+
+msgid "Cancel"
+msgstr "Anuluj"
+
+
+# --- preset manager panel (Options -> Band presets) ---
+
+msgid "Label:"
+msgstr "Etykieta:"
+
+msgid "Description (tooltip):"
+msgstr "Opis (dymek):"
+
+msgid "Start:"
+msgstr "Początek:"
+
+msgid "Stop:"
+msgstr "Koniec:"
+
+msgid "Step:"
+msgstr "Krok:"
+
+msgid "Band presets"
+msgstr "Presety pasm"
+
+msgid "Editing or deleting a built-in preset makes it yours from then on - it won't be reset back by an app update. Your own presets are plain JSON, easy to back up or share - see Export/Import below."
+msgstr "Edycja albo usunięcie wbudowanego presetu sprawia, że staje się on Twój od tego momentu - aktualizacja programu już go nie przywróci. Twoje własne presety to zwykły JSON, łatwy do zbackupowania albo udostępnienia - zobacz Eksportuj/Importuj poniżej."
+
+msgid "Add…"
+msgstr "Dodaj…"
+
+msgid "Edit…"
+msgstr "Edytuj…"
+
+msgid "Export…"
+msgstr "Eksportuj…"
+
+msgid "Import…"
+msgstr "Importuj…"
+
+msgid "Delete preset"
+msgstr "Usuń preset"
+
+msgid "Export presets"
+msgstr "Eksportuj presety"
+
+msgid "Import presets"
+msgstr "Importuj presety"
+
+msgid "Edit preset"
+msgstr "Edytuj preset"
+
+msgid "You don't have any custom presets to export yet."
+msgstr "Nie masz jeszcze żadnych własnych presetów do wyeksportowania."
+
+msgid "Delete preset “{label}”? This only removes it from the dropdown - any band you already added from it stays as it is."
+msgstr "Usunąć preset „{label}”? To tylko usuwa go z listy rozwijanej - pasmo, które już z niego dodałeś/aś, zostaje bez zmian."
+
+msgid "Export failed"
+msgstr "Eksport nie powiódł się"
+
+msgid "Import failed"
+msgstr "Import nie powiódł się"
+
+msgid "Imported {count} preset(s)."
+msgstr "Zaimportowano presetów: {count}."
+
+msgid "built-in"
+msgstr "wbudowany"
+
+
+
+# --- Options: Reset to defaults (main_window.py) ---
+
+msgid "Reset to defaults…"
+msgstr "Przywróć domyślne…"
+
+msgid "Resets all settings, the Memory List, blacklist, and any custom/hidden band presets back to a fresh install. Recordings themselves are never touched."
+msgstr "Przywraca wszystkie ustawienia, listę pamięci, czarną listę i wszelkie własne/ukryte presety pasm do stanu świeżej instalacji. Same nagrania nigdy nie są ruszane."
+
+msgid "This resets every setting, the Memory List, the blacklist, and any custom or hidden band presets back to a fresh install. Your recordings themselves are never touched. This cannot be undone."
+msgstr "To przywraca każde ustawienie, listę pamięci, czarną listę i wszelkie własne lub ukryte presety pasm do stanu świeżej instalacji. Twoje nagrania nigdy nie są ruszane. Tej operacji nie da się cofnąć."
+
+
+# --- Options: Debug mode (main_window.py) ---
+
+msgid "Debug mode (shows the Simulation device)"
+msgstr "Tryb debug (pokazuje urządzenie Symulacja)"
+
+msgid "Adds a \"Simulation (no hardware)\" entry to the SDR device list in the Listen tab, for testing without a real receiver. Hidden by default so it can't be picked by accident instead of your actual hardware."
+msgstr "Dodaje pozycję \"Symulacja (brak sprzętu)\" do listy urządzeń SDR w zakładce Nasłuch, do testowania bez prawdziwego odbiornika. Domyślnie ukryte, żeby nie dało się jej wybrać przez pomyłkę zamiast prawdziwego sprzętu."
+
+msgid "Bands"
+msgstr "Pasma"
+
+msgid "Search bands..."
+msgstr "Szukaj pasm..."
+
+msgid "Manual"
+msgstr "Ręczny"
+
+msgid "Auto (hardware AGC)"
+msgstr "Auto (sprzętowe AGC)"
+
+msgid "Auto (software AGC)"
+msgstr "Auto (programowe AGC)"
+
+
+# --- Options: Remote receiver (remote_receiver_panel.py) ---
+
+msgid "Remote RTL-SDR receiver"
+msgstr "Zdalny odbiornik RTL-SDR"
+
+msgid "Use the always-on receiver for scanning and recording. Finished recordings are copied here for playback and local transcription."
+msgstr "Używa stale działającego odbiornika do skanowania i nagrywania. Zakończone nagrania są kopiowane tutaj do odsłuchu i lokalnej transkrypcji."
+
+msgid "Use remote receiver"
+msgstr "Użyj zdalnego odbiornika"
+
+msgid "Server address:"
+msgstr "Adres serwera:"
+
+msgid "Access token:"
+msgstr "Token dostępu:"
+
+msgid "Test connection"
+msgstr "Testuj połączenie"
+
+msgid "Download recordings"
+msgstr "Pobierz nagrania"
+
+msgid "Connected — {state}"
+msgstr "Połączono — {state}"
+
+msgid "Downloading recordings…"
+msgstr "Pobieranie nagrań…"
+
+msgid "Downloaded {count} recordings"
+msgstr "Pobrano nagrania: {count}"
+
+# ---- web UI ----
+
+msgid "Close"
+msgstr "Zamknij"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "just now"
+msgstr "przed chwilą"
+
+msgid "{n} min ago"
+msgstr "{n} min temu"
+
+msgid "{n} h ago"
+msgstr "{n} godz. temu"
+
+msgid "{n} days ago"
+msgstr "{n} dni temu"
+
+msgid "Settings"
+msgstr "Ustawienia"
+
+msgid "Password"
+msgstr "Hasło"
+
+msgid "Wrong password"
+msgstr "Błędne hasło"
+
+msgid "Enter the password of this receiver."
+msgstr "Podaj hasło tego odbiornika."
+
+msgid "Log in"
+msgstr "Zaloguj"
+
+msgid "The password was set in Settings → Access. To remove it, delete \"access_token\" from config.json on the receiver."
+msgstr "Hasło ustawiono w Ustawieniach → Dostęp. Aby je usunąć, skasuj „access_token” z config.json na odbiorniku."
+
+msgid "This computer works for a AliSDR server"
+msgstr "Ten komputer pracuje dla serwera AliSDR"
+
+msgid "Connected"
+msgstr "Połączono"
+
+msgid "Not connected"
+msgstr "Brak połączenia"
+
+msgid "Transcription and copying are set up per computer in the server's Settings → Transcription & computers."
+msgstr "Transkrypcję i kopiowanie ustawia się dla każdego komputera w panelu serwera: Ustawienia → Transkrypcja i komputery."
+
+msgid "Open the server panel"
+msgstr "Otwórz panel serwera"
+
+msgid "Disconnect from the server?"
+msgstr "Odłączyć od serwera?"
+
+msgid "This computer goes back to scanning on its own. Recordings stay on the server."
+msgstr "Ten komputer wróci do samodzielnego skanowania. Nagrania zostają na serwerze."
+
+msgid "Disconnect"
+msgstr "Odłącz"
+
+msgid "Switching to local mode…"
+msgstr "Przełączam na tryb lokalny…"
+
+msgid "server"
+msgstr "serwer"
+
+msgid "Stopping…"
+msgstr "Zatrzymywanie…"
+
+msgid "Signal"
+msgstr "Sygnał"
+
+msgid "Scanning"
+msgstr "Skanowanie"
+
+msgid "Stopped"
+msgstr "Zatrzymany"
+
+msgid "Stop listening"
+msgstr "Przestań słuchać"
+
+msgid "Listen live"
+msgstr "Słuchaj na żywo"
+
+msgid "I understand"
+msgstr "Rozumiem"
+
+msgid "Linger"
+msgstr "Podtrzymanie"
+
+msgid "Reconnecting"
+msgstr "Ponowne łączenie"
+
+msgid "Volume"
+msgstr "Głośność"
+
+msgid "Even out volume"
+msgstr "Wyrównaj głośność"
+
+msgid "Boost"
+msgstr "Podbicie"
+
+msgid "No boost"
+msgstr "Bez podbicia"
+
+msgid "Louder quiet voices on a phone or a weak speaker - loud peaks are still held back"
+msgstr "Głośniej na telefonie lub słabym głośniku - głośne szczyty nadal są tłumione"
+
+msgid "Leave this frequency for now"
+msgstr "Zostaw tę częstotliwość na razie"
+
+msgid "Skip"
+msgstr "Pomiń"
+
+msgid "Leave it and never stop on it again (adds it to the blacklist)"
+msgstr "Pomiń i nigdy więcej się na niej nie zatrzymuj (dodaje do czarnej listy)"
+
+msgid "Skip + blacklist"
+msgstr "Pomiń + czarna lista"
+
+msgid "Continuous recording of what you hear, including silence"
+msgstr "Ciągłe nagrywanie tego, co słychać, razem z ciszą"
+
+msgid "Hold"
+msgstr "Trzymaj"
+
+msgid "Resume scanning"
+msgstr "Wznów skanowanie"
+
+msgid "Stay on this frequency - the scanner stops moving on"
+msgstr "Zostań na tej częstotliwości - skaner przestaje przechodzić dalej"
+
+msgid "Record"
+msgstr "Nagrywaj"
+
+msgid "Raw wideband IQ (SigMF) - about 19 MB per second"
+msgstr "Surowe szerokopasmowe IQ (SigMF) - ok. 19 MB na sekundę"
+
+msgid "Raw IQ"
+msgstr "Surowe IQ"
+
+msgid "Auto-record transmissions"
+msgstr "Automatycznie nagrywaj transmisje"
+
+msgid "Spectrum"
+msgstr "Widmo"
+
+msgid "Yellow line: trigger level"
+msgstr "Żółta linia: próg wyzwalania"
+
+msgid "What to scan"
+msgstr "Co skanować"
+
+msgid "Activity"
+msgstr "Zdarzenia"
+
+msgid "Press Start to begin scanning"
+msgstr "Naciśnij Start, aby rozpocząć skanowanie"
+
+msgid "Back to this window: {s} s ago"
+msgstr "Powrót do tego okna: {s} s temu"
+
+msgid "Stop"
+msgstr "Stop"
+
+msgid "Start"
+msgstr "Start"
+
+msgid "Stop recording"
+msgstr "Zatrzymaj nagrywanie"
+
+msgid "Stop raw IQ"
+msgstr "Zatrzymaj IQ"
+
+msgid "Listening"
+msgstr "Słuchasz"
+
+msgid "Starting gain"
+msgstr "Wzmocnienie początkowe"
+
+msgid "Gain"
+msgstr "Wzmocnienie"
+
+msgid "Squelch below trigger"
+msgstr "Blokada szumów (squelch) poniżej progu"
+
+msgid "Noise reduction strength"
+msgstr "Siła redukcji szumów"
+
+msgid "Receiver"
+msgstr "Odbiornik"
+
+msgid "Changes apply live"
+msgstr "Zmiany działają od razu"
+
+msgid "Trigger level"
+msgstr "Próg wyzwalania"
+
+msgid "Squelch"
+msgstr "Blokada szumów (squelch)"
+
+msgid "Mutes the noise tail after a transmission ends"
+msgstr "Wycisza szum po zakończeniu transmisji"
+
+msgid "Auto (hardware)"
+msgstr "Auto (sprzętowe)"
+
+msgid "Auto (software)"
+msgstr "Auto (programowe)"
+
+msgid "The tuner sets its own gain. Can overload on very strong stations - try software auto then."
+msgstr "Tuner sam ustawia wzmocnienie. Przy bardzo silnych stacjach może się przesterować - wtedy spróbuj trybu programowego."
+
+msgid "Tuning time"
+msgstr "Czas strojenia"
+
+msgid "Hold after a transmission"
+msgstr "Podtrzymanie po transmisji"
+
+msgid "Noise reduction"
+msgstr "Redukcja szumów"
+
+msgid "Adaptive filter for weak, noisy voice"
+msgstr "Adaptacyjny filtr dla słabej, zaszumionej mowy"
+
+msgid "SDR device"
+msgstr "Urządzenie SDR"
+
+msgid "Device"
+msgstr "Urządzenie"
+
+msgid "Capture width (MHz)"
+msgstr "Szerokość przechwytu (MHz)"
+
+msgid "Stop the scanner to change the device or capture width."
+msgstr "Zatrzymaj skaner, aby zmienić urządzenie albo szerokość przechwytu."
+
+msgid "Add a band preset…"
+msgstr "Dodaj gotowe pasmo…"
+
+msgid "Nothing to scan yet - add a band preset or a frequency below."
+msgstr "Na razie nie ma czego skanować - dodaj pasmo albo częstotliwość poniżej."
+
+msgid "Single frequency"
+msgstr "Pojedyncza częstotliwość"
+
+msgid "Memory List"
+msgstr "Lista pamięci"
+
+msgid "{n} enabled channels"
+msgstr "włączone kanały: {n}"
+
+msgid "Edit channels →"
+msgstr "Edytuj kanały →"
+
+msgid "Start (MHz)"
+msgstr "Od (MHz)"
+
+msgid "Stop (MHz)"
+msgstr "Do (MHz)"
+
+msgid "Step (kHz)"
+msgstr "Krok (kHz)"
+
+msgid "Watched alongside the bands, e.g. 121.500 MHz guard"
+msgstr "Obserwowana razem z pasmami, np. 121,500 MHz (guard)"
+
+msgid "Scan this band"
+msgstr "Skanuj to pasmo"
+
+msgid "own settings"
+msgstr "własne ustawienia"
+
+msgid "Back to scanning everything"
+msgstr "Wróć do skanowania wszystkiego"
+
+msgid "Scan only this band for now"
+msgstr "Skanuj na razie tylko to pasmo"
+
+msgid "Remove"
+msgstr "Usuń"
+
+msgid "Remove band"
+msgstr "Usuń pasmo"
+
+msgid "Remove “{name}” from the scan list?"
+msgstr "Usunąć „{name}” z listy skanowania?"
+
+msgid "Priority weight"
+msgstr "Waga priorytetu"
+
+msgid "0 = normal. Higher = visited more often than other weighted bands (1 vs 2 = twice as often)."
+msgstr "0 = normalnie. Więcej = odwiedzane częściej niż inne ważone pasma (1 i 2 = dwa razy częściej)."
+
+msgid "Global: {v}"
+msgstr "Globalnie: {v}"
+
+msgid "Gain mode"
+msgstr "Tryb wzmocnienia"
+
+msgid "On"
+msgstr "Wł."
+
+msgid "Off"
+msgstr "Wył."
+
+msgid "Own settings for this band"
+msgstr "Własne ustawienia tego pasma"
+
+msgid "No data - start the scanner"
+msgstr "Brak danych - uruchom skaner"
+
+msgid "Loading…"
+msgstr "Wczytywanie…"
+
+msgid "No recordings yet - statistics appear once something has been recorded."
+msgstr "Brak nagrań - statystyki pojawią się, gdy coś zostanie nagrane."
+
+msgid "Average quality"
+msgstr "Średnia jakość"
+
+msgid "By hour of day"
+msgstr "Wg godziny"
+
+msgid "Per day (last {n} days)"
+msgstr "Dziennie (ostatnie {n} dni)"
+
+msgid "Click a row to open its recordings"
+msgstr "Kliknij wiersz, aby otworzyć nagrania"
+
+msgid "MHz"
+msgstr "MHz"
+
+msgid "Add channel"
+msgstr "Dodaj kanał"
+
+msgid "Edit channel"
+msgstr "Edytuj kanał"
+
+msgid "Folder"
+msgstr "Folder"
+
+msgid "0 = normal. Higher = checked more often."
+msgstr "0 = normalnie. Więcej = sprawdzany częściej."
+
+msgid "{f} MHz is already in the list"
+msgstr "{f} MHz już jest na liście"
+
+msgid "Folder name"
+msgstr "Nazwa folderu"
+
+msgid "Create"
+msgstr "Utwórz"
+
+msgid "Rename"
+msgstr "Zmień nazwę"
+
+msgid "Delete folder"
+msgstr "Usuń folder"
+
+msgid "Delete “{name}” and its {n} channels?"
+msgstr "Usunąć „{name}” i jego kanały ({n})?"
+
+msgid "Delete the empty folder “{name}”?"
+msgstr "Usunąć pusty folder „{name}”?"
+
+msgid "Military"
+msgstr "Wojsko"
+
+msgid "Fire brigade"
+msgstr "Straż pożarna"
+
+msgid "All of these are already in the list."
+msgstr "Wszystkie już są na liście."
+
+msgid "Added {n} channels"
+msgstr "Dodano kanały: {n}"
+
+msgid "Scan this channel"
+msgstr "Skanuj ten kanał"
+
+msgid "Delete channel"
+msgstr "Usuń kanał"
+
+msgid "Delete {f} MHz {name}?"
+msgstr "Usunąć {f} MHz {name}?"
+
+msgid "Search frequency, name, folder…"
+msgstr "Szukaj częstotliwości, nazwy, folderu…"
+
+msgid "{n} channels, {e} scanned"
+msgstr "kanałów: {n}, skanowanych: {e}"
+
+msgid "The Memory List is switched off on the Scan page"
+msgstr "Lista pamięci jest wyłączona na stronie Skanowanie"
+
+msgid "Add Polish military frequencies"
+msgstr "Dodaj polskie częstotliwości wojskowe"
+
+msgid "Add Polish fire brigade frequencies"
+msgstr "Dodaj polskie częstotliwości straży"
+
+msgid "Mode"
+msgstr "Emisja"
+
+msgid "No saved channels yet. Add one, or save a frequency straight from a recording."
+msgstr "Brak zapisanych kanałów. Dodaj kanał albo zapisz częstotliwość prosto z nagrania."
+
+msgid "Margin ± (kHz)"
+msgstr "Margines ± (kHz)"
+
+msgid "Search blacklist…"
+msgstr "Szukaj na czarnej liście…"
+
+msgid "The scanner never stops on these frequencies. “Skip + blacklist” on the Scan page adds them here."
+msgstr "Skaner nigdy nie zatrzymuje się na tych częstotliwościach. „Pomiń + czarna lista” na stronie Skanowanie dodaje je tutaj."
+
+msgid "Margin"
+msgstr "Margines"
+
+msgid "Skipped from the Scan page"
+msgstr "Pominięta na stronie Skanowanie"
+
+msgid "Remove from blacklist"
+msgstr "Usuń z czarnej listy"
+
+msgid "The blacklist is empty."
+msgstr "Czarna lista jest pusta."
+
+msgid "Disk & retention"
+msgstr "Dysk i przechowywanie"
+
+msgid "Transcription & computers"
+msgstr "Transkrypcja i komputery"
+
+msgid "Connect to a server"
+msgstr "Połączenie z serwerem"
+
+msgid "Access"
+msgstr "Dostęp"
+
+msgid "Recency boost"
+msgstr "Recency boost"
+
+msgid "Appearance & language"
+msgstr "Wygląd i język"
+
+msgid "Advanced"
+msgstr "Zaawansowane"
+
+msgid "Every transmission the scanner stops on is saved as its own file."
+msgstr "Każda transmisja, na której zatrzyma się skaner, trafia do osobnego pliku."
+
+msgid "Simultaneous recordings"
+msgstr "Jednoczesne nagrania"
+
+msgid "How many transmissions may be recorded at the same time. 0 = no limit."
+msgstr "Ile transmisji może być nagrywanych naraz. 0 = bez limitu."
+
+msgid "File format"
+msgstr "Format pliku"
+
+msgid "MP3 takes about 10× less space."
+msgstr "MP3 zajmuje ok. 10× mniej miejsca."
+
+msgid "MP3 needs ffmpeg installed on this machine."
+msgstr "MP3 wymaga zainstalowanego ffmpeg na tej maszynie."
+
+msgid "MP3 (compressed)"
+msgstr "MP3 (skompresowany)"
+
+msgid "Recordings folder"
+msgstr "Folder nagrań"
+
+msgid "On the machine that scans. Existing recordings are not moved."
+msgstr "Na maszynie, która skanuje. Istniejące nagrania nie są przenoszone."
+
+msgid "{n} recordings ({size}) are past these limits"
+msgstr "Nagrania poza tymi limitami: {n} ({size})"
+
+msgid "Clean up now"
+msgstr "Wyczyść teraz"
+
+msgid "Delete {n} recordings now?"
+msgstr "Usunąć teraz {n} nagrań?"
+
+msgid "Deleted {n}"
+msgstr "Usunięto: {n}"
+
+msgid "Nothing to clean up right now."
+msgstr "Na razie nie ma czego czyścić."
+
+msgid "Automatic clean-up is off - recordings are kept forever."
+msgstr "Automatyczne czyszczenie jest wyłączone - nagrania są trzymane bez końca."
+
+msgid "Recordings: {size}"
+msgstr "Nagrania: {size}"
+
+msgid "Free: {size} of {total}"
+msgstr "Wolne: {size} z {total}"
+
+msgid "{n} files"
+msgstr "plików: {n}"
+
+msgid "oldest from {d}"
+msgstr "najstarsze z {d}"
+
+msgid "{n} copied to another computer"
+msgstr "skopiowane na inny komputer: {n}"
+
+msgid "Automatic clean-up"
+msgstr "Automatyczne czyszczenie"
+
+msgid "Delete recordings older than"
+msgstr "Usuwaj nagrania starsze niż"
+
+msgid "Days. 0 = never."
+msgstr "Dni. 0 = nigdy."
+
+msgid "days"
+msgstr "dni"
+
+msgid "Keep the library under"
+msgstr "Utrzymuj bibliotekę poniżej"
+
+msgid "When it grows bigger, the oldest recordings go first. 0 = no limit."
+msgstr "Po przekroczeniu najpierw znikają najstarsze nagrania. 0 = bez limitu."
+
+msgid "Never delete favorites"
+msgstr "Nigdy nie usuwaj ulubionych"
+
+msgid "Only delete what another computer has copied"
+msgstr "Usuwaj tylko to, co skopiował inny komputer"
+
+msgid "Safe mode for hybrid setups: a recording is only removed from here once a connected computer holds a verified copy."
+msgstr "Tryb bezpieczny dla układu hybrydowego: nagranie znika stąd dopiero, gdy podłączony komputer ma jego sprawdzoną kopię."
+
+msgid "Clean-up runs every 10 minutes. You can also delete any selection by hand on the Recordings page."
+msgstr "Czyszczenie działa co 10 minut. Dowolny wybór możesz też usunąć ręcznie na stronie Nagrania."
+
+msgid "Main model"
+msgstr "Model główny"
+
+msgid "English model (optional)"
+msgstr "Model angielski (opcjonalny)"
+
+msgid "Run on"
+msgstr "Uruchamiaj na"
+
+msgid "Automatic (GPU if available)"
+msgstr "Automatycznie (GPU, jeśli jest)"
+
+msgid "Expected languages"
+msgstr "Spodziewane języki"
+
+msgid "ISO codes, e.g. en, pl. Detection picks between these."
+msgstr "Kody ISO, np. en, pl. Wykrywanie wybiera spośród nich."
+
+msgid "Skip recordings shorter than"
+msgstr "Pomijaj nagrania krótsze niż"
+
+msgid "Seconds - a squelch crackle is not worth transcribing."
+msgstr "Sekundy - trzask blokady szumów nie jest wart transkrypcji."
+
+msgid "Transcribe new recordings automatically"
+msgstr "Automatycznie transkrybuj nowe nagrania"
+
+msgid "Transcription runs on whichever computers below have it switched on - the server itself, or your PC with a GPU."
+msgstr "Transkrypcja działa na tych komputerach poniżej, które mają ją włączoną - na samym serwerze albo na Twoim PC z GPU."
+
+msgid "Computers"
+msgstr "Komputery"
+
+msgid "Add another computer (e.g. your PC with a GPU)"
+msgstr "Dodaj kolejny komputer (np. PC z kartą graficzną)"
+
+msgid "On that computer start AliSDR, open Settings → Connect to a server and enter:"
+msgstr "Na tamtym komputerze uruchom AliSDR, otwórz Ustawienia → Połączenie z serwerem i wpisz:"
+
+msgid "…and this server's password."
+msgstr "…oraz hasło tego serwera."
+
+msgid "It then shows up here. Turn on transcription or local copies for it, and if it already has recordings of its own, send them here with one click."
+msgstr "Pojawi się wtedy tutaj. Włącz mu transkrypcję lub kopie lokalne, a jeśli ma własne nagrania, prześlij je tu jednym kliknięciem."
+
+msgid "No computers connected yet."
+msgstr "Brak podłączonych komputerów."
+
+msgid "idle"
+msgstr "bezczynny"
+
+msgid "transcribing"
+msgstr "transkrybuje"
+
+msgid "copying recordings"
+msgstr "kopiuje nagrania"
+
+msgid "uploading recordings"
+msgstr "wysyła nagrania"
+
+msgid "installing transcription…"
+msgstr "instaluje transkrypcję…"
+
+msgid "its own recordings folder"
+msgstr "jego własny folder nagrań"
+
+msgid "this server"
+msgstr "ten serwer"
+
+msgid "offline"
+msgstr "offline"
+
+msgid "Forget"
+msgstr "Zapomnij"
+
+msgid "Last seen {ago}"
+msgstr "Ostatnio widziany {ago}"
+
+msgid "Transcribe here"
+msgstr "Transkrybuj tutaj"
+
+msgid "Whisper isn't installed on this computer yet."
+msgstr "Whisper nie jest jeszcze zainstalowany na tym komputerze."
+
+msgid "{n} recordings waiting"
+msgstr "czeka nagrań: {n}"
+
+msgid "Install"
+msgstr "Zainstaluj"
+
+msgid "Install with GPU support"
+msgstr "Zainstaluj z obsługą GPU"
+
+msgid "Keep a copy of every recording"
+msgstr "Trzymaj kopię każdego nagrania"
+
+msgid "Copied to this folder on that computer (verified by size)."
+msgstr "Kopiowane do tego folderu na tamtym komputerze (sprawdzane po rozmiarze)."
+
+msgid "{n} recordings exist only on that computer"
+msgstr "Nagrania tylko na tamtym komputerze: {n}"
+
+msgid "Send recordings to the server"
+msgstr "Prześlij nagrania na serwer"
+
+msgid "Upload {n} recordings (with their transcripts and favorites) from {name} to this server? They stay on that computer too."
+msgstr "Przesłać {n} nagrań (z transkrypcjami i ulubionymi) z {name} na ten serwer? Na tamtym komputerze też zostaną."
+
+msgid "Upload"
+msgstr "Prześlij"
+
+msgid "Send them here"
+msgstr "Prześlij tutaj"
+
+msgid "Disconnect computer"
+msgstr "Odłącz komputer"
+
+msgid "{name} stops working for this server and goes back to its own local mode."
+msgstr "{name} przestanie pracować dla tego serwera i wróci do własnego trybu lokalnego."
+
+msgid "Password (if the server has one)"
+msgstr "Hasło (jeśli serwer je ma)"
+
+msgid "Connected - opening the server…"
+msgstr "Połączono - otwieram serwer…"
+
+msgid "Connect"
+msgstr "Połącz"
+
+msgid "Have a AliSDR server elsewhere (e.g. an always-on receiver)? Connect this computer to it: it stops scanning on its own and instead transcribes and/or keeps copies of the server's recordings. You can come back to local mode any time."
+msgstr "Masz serwer AliSDR gdzie indziej (np. stale działający odbiornik)? Połącz z nim ten komputer: przestanie sam skanować, a zamiast tego będzie transkrybował i/lub trzymał kopie nagrań z serwera. Do trybu lokalnego możesz wrócić w każdej chwili."
+
+msgid "New password"
+msgstr "Nowe hasło"
+
+msgid "A password is set - everyone (including helper computers) needs it."
+msgstr "Hasło jest ustawione - potrzebuje go każdy (także komputery pomocnicze)."
+
+msgid "No password: anyone who can reach this address on your network can use it. Set one to keep other people on the network out."
+msgstr "Bez hasła: każdy, kto dotrze do tego adresu w Twojej sieci, może z niego korzystać. Ustaw hasło, aby inni użytkownicy sieci nie mieli dostępu."
+
+msgid "Password set. Helper computers need it too - reconnect them."
+msgstr "Hasło ustawione. Komputery pomocnicze też go potrzebują - połącz je ponownie."
+
+msgid "Change password"
+msgstr "Zmień hasło"
+
+msgid "Set password"
+msgstr "Ustaw hasło"
+
+msgid "Remove password"
+msgstr "Usuń hasło"
+
+msgid "Anyone on the network will be able to use the receiver again."
+msgstr "Każdy w sieci znów będzie mógł korzystać z odbiornika."
+
+msgid "Log out"
+msgstr "Wyloguj"
+
+msgid "Used for the FlightRadar24 / ADSBExchange flight replay buttons next to aviation recordings (118-138 MHz and military UHF 225-400 MHz). Approximate is fine."
+msgstr "Do przycisków odtwarzania lotów FlightRadar24 / ADSBExchange przy nagraniach lotniczych (118-138 MHz i wojskowe UHF 225-400 MHz). Wystarczy przybliżona."
+
+msgid "Latitude"
+msgstr "Szerokość geograficzna"
+
+msgid "Longitude"
+msgstr "Długość geograficzna"
+
+msgid "The browser did not share a location."
+msgstr "Przeglądarka nie udostępniła lokalizacji."
+
+msgid "Use this device's location"
+msgstr "Użyj lokalizacji tego urządzenia"
+
+msgid "Come back sooner after a transmission"
+msgstr "Wracaj szybciej po transmisji"
+
+
+msgid "For how long"
+msgstr "Jak długo"
+
+
+msgid "Extra visit every"
+msgstr "Dodatkowa wizyta co"
+
+
+msgid "Default blacklist margin"
+msgstr "Domyślny margines czarnej listy"
+
+msgid "± kHz around a frequency added with “Skip + blacklist”."
+msgstr "± kHz wokół częstotliwości dodanej przez „Pomiń + czarna lista”."
+
+msgid "Imported {n} presets"
+msgstr "Zaimportowano presety: {n}"
+
+msgid "The ready-made bands offered on the Scan page. Removing one doesn't touch bands you already added."
+msgstr "Gotowe pasma proponowane na stronie Skanowanie. Usunięcie presetu nie zmienia pasm już dodanych."
+
+msgid "custom"
+msgstr "własny"
+
+msgid "Delete preset “{label}”?"
+msgstr "Usunąć preset „{label}”?"
+
+msgid "Export"
+msgstr "Eksportuj"
+
+msgid "Theme"
+msgstr "Motyw"
+
+msgid "Stored in this browser."
+msgstr "Zapamiętywane w tej przeglądarce."
+
+msgid "Like the system"
+msgstr "Jak w systemie"
+
+msgid "Dark"
+msgstr "Ciemny"
+
+msgid "Light"
+msgstr "Jasny"
+
+msgid "“Automatic” follows each browser's language."
+msgstr "„Automatycznie” = język przeglądarki."
+
+msgid "Automatic"
+msgstr "Automatycznie"
+
+msgid "Start listening when the scanner starts"
+msgstr "Włączaj odsłuch razem ze skanerem"
+
+msgid "Debug mode"
+msgstr "Tryb debugowania"
+
+msgid "Adds a “Simulation (no hardware)” device for testing without a receiver."
+msgstr "Dodaje urządzenie „Symulacja (brak sprzętu)” do testów bez odbiornika."
+
+msgid "Settings, Memory List, blacklist and custom presets back to a fresh install. Recordings, the password and connected computers are kept."
+msgstr "Ustawienia, lista pamięci, czarna lista i własne presety jak po świeżej instalacji. Nagrania, hasło i podłączone komputery zostają."
+
+msgid "Reset all settings, the Memory List and the blacklist?"
+msgstr "Przywrócić wszystkie ustawienia, listę pamięci i czarną listę?"
+
+msgid "Reset"
+msgstr "Przywróć"
+
+msgid "Done"
+msgstr "Gotowe"
+
+msgid "Reset…"
+msgstr "Przywróć…"
+
+msgid "Waiting for transcription…"
+msgstr "Czeka na transkrypcję…"
+
+msgid "Not transcribed yet"
+msgstr "Jeszcze bez transkrypcji"
+
+msgid "No speech detected (just noise)"
+msgstr "Nie wykryto mowy (sam szum)"
+
+msgid "Too short to transcribe"
+msgstr "Za krótkie na transkrypcję"
+
+msgid "Transcription failed - try again"
+msgstr "Transkrypcja nie powiodła się - spróbuj ponownie"
+
+msgid "Filter…"
+msgstr "Filtruj…"
+
+msgid "Most"
+msgstr "Najwięcej"
+
+msgid "Latest"
+msgstr "Najnowsze"
+
+msgid "A–Z"
+msgstr "A–Z"
+
+msgid "Best"
+msgstr "Najlepsze"
+
+msgid "Search frequency, name, date or transcript…"
+msgstr "Szukaj częstotliwości, nazwy, daty lub treści…"
+
+msgid "Any time"
+msgstr "Kiedykolwiek"
+
+msgid "Last 24 h"
+msgstr "Ostatnie 24 h"
+
+msgid "Any quality"
+msgstr "Dowolna jakość"
+
+msgid "Quality 40+"
+msgstr "Jakość 40+"
+
+msgid "Quality 60+"
+msgstr "Jakość 60+"
+
+msgid "Quality 80+"
+msgstr "Jakość 80+"
+
+msgid "Newest first"
+msgstr "Najnowsze"
+
+msgid "Oldest first"
+msgstr "Najstarsze"
+
+msgid "Longest"
+msgstr "Najdłuższe"
+
+msgid "Load more"
+msgstr "Wczytaj więcej"
+
+msgid "Nothing matches these filters."
+msgstr "Nic nie pasuje do tych filtrów."
+
+msgid "No recordings yet. They appear here as soon as a transmission ends."
+msgstr "Brak nagrań. Pojawią się tu, gdy tylko skończy się jakaś transmisja."
+
+msgid "{n} recordings"
+msgstr "nagrań: {n}"
+
+msgid "{n} waiting for transcription"
+msgstr "czeka na transkrypcję: {n}"
+
+msgid "Ctrl+click to pick several"
+msgstr "Ctrl+klik, aby wybrać kilka"
+
+msgid "All recordings"
+msgstr "Wszystkie nagrania"
+
+msgid "Favorites"
+msgstr "Ulubione"
+
+msgid "Favorite"
+msgstr "Ulubione"
+
+msgid "{n} selected"
+msgstr "zaznaczono: {n}"
+
+msgid "Select all {n}"
+msgstr "Zaznacz wszystkie ({n})"
+
+msgid "Transcribe"
+msgstr "Transkrybuj"
+
+msgid "Clear"
+msgstr "Odznacz"
+
+msgid "Queued for transcription"
+msgstr "Dodano do kolejki transkrypcji"
+
+msgid "{n} recordings queued for transcription"
+msgstr "Dodano do kolejki transkrypcji: {n}"
+
+msgid "Permanently delete this recording?"
+msgstr "Trwale usunąć to nagranie?"
+
+msgid "Permanently delete {n} recordings?"
+msgstr "Trwale usunąć {n} nagrań?"
+
+msgid "Set your receiver location in Settings first."
+msgstr "Najpierw ustaw lokalizację odbiornika w Ustawieniach."
+
+msgid "Detect language"
+msgstr "Wykryj język"
+
+msgid "Previous"
+msgstr "Poprzednie"
+
+msgid "Next"
+msgstr "Następne"
+
+msgid "Add this frequency to the Memory List"
+msgstr "Dodaj tę częstotliwość do listy pamięci"
+
+msgid "Flight replay at this moment"
+msgstr "Odtworzenie lotów z tej chwili"
+
+msgid "Download"
+msgstr "Pobierz"
+
+msgid "low confidence"
+msgstr "niska pewność"
+
+msgid "edited"
+msgstr "edytowane"
+
+msgid "Edit transcript"
+msgstr "Edytuj transkrypcję"
+
+msgid "Save {f} MHz"
+msgstr "Zapisz {f} MHz"
+
+msgid "Saved to the Memory List"
+msgstr "Zapisano na liście pamięci"
+
+msgid "Scanner is still stopping - try again"
+msgstr "Skaner jeszcze się zatrzymuje - spróbuj ponownie"
+
+msgid "Scanner is not running"
+msgstr "Skaner nie działa"
+
+msgid "Enter the server address, e.g. http://192.168.1.10:8765"
+msgstr "Podaj adres serwera, np. http://192.168.1.10:8765"
+
+msgid "Can't connect: {error}"
+msgstr "Nie można połączyć: {error}"
+
+msgid "{count} channels in window"
+msgstr "kanałów w oknie: {count}"
+
+msgid "{weak:.4f} MHz looks like a reflection of {strong:.4f} MHz - discarding."
+msgstr "{weak:.4f} MHz wygląda na odbicie {strong:.4f} MHz - odrzucam."
+
+msgid "Working for the server {url} - press Ctrl+C to stop."
+msgstr "Pracuję dla serwera {url} - Ctrl+C kończy."
+
+msgid "Quit AliSDR"
+msgstr "Zamknij AliSDR"
+
+msgid "Stops the scanner and closes the program running in the background. Start it again from the menu or with the same command."
+msgstr "Zatrzymuje skaner i zamyka program działający w tle. Uruchomisz go ponownie z menu albo tą samą komendą."
+
+msgid "Stop scanning and close the program?"
+msgstr "Zatrzymać skanowanie i zamknąć program?"
+
+msgid "Quit"
+msgstr "Zamknij"
+
+msgid "Closed. You can close this tab."
+msgstr "Zamknięto. Możesz zamknąć tę kartę."
+
+msgid "Folder on that computer"
+msgstr "Folder na tamtym komputerze"
+
+msgid "Automatic transcription is off above - this computer only gets recordings you queue by hand."
+msgstr "Automatyczna transkrypcja jest wyłączona (przełącznik wyżej) - ten komputer dostaje tylko nagrania zlecone ręcznie."
+
+msgid "{n} of {total} bands use their own settings instead of the Receiver panel."
+msgstr "Pasma z własnymi ustawieniami zamiast panelu Odbiornik: {n} z {total}."
+
+msgid "Use the general settings everywhere"
+msgstr "Ustawienia ogólne wszędzie"
+
+msgid "Remove the own settings (trigger, times, gain, noise reduction) of all {n} bands? From then on every band follows the Receiver panel."
+msgstr "Usunąć własne ustawienia (próg, czasy, wzmocnienie, redukcja szumów) wszystkich pasm ({n})? Od tej chwili każde pasmo korzysta z panelu Odbiornik."
+
+msgid "Use general settings"
+msgstr "Użyj ustawień ogólnych"
+
+msgid "Use general settings in all bands"
+msgstr "Ustawienia ogólne we wszystkich pasmach"
+
+msgid "Restore general settings"
+msgstr "Przywróć ustawienia ogólne"
+
+msgid "Own value for this band"
+msgstr "Własna wartość dla tego pasma"
+
+msgid "Select"
+msgstr "Zaznacz"
+
+msgid "Language & listening"
+msgstr "Język i odsłuch"
+
+msgid "Play or pause (Space)"
+msgstr "Odtwórz / wstrzymaj (spacja)"
+
+msgid "{freq:.4f} MHz: nothing above the squelch level - recording discarded"
+msgstr "{freq:.4f} MHz: nic powyżej blokady szumów - nagranie odrzucone"
+
+msgid "Limit of {n} simultaneous recordings reached - {freq:.4f} MHz not recorded"
+msgstr "Osiągnięto limit {n} jednoczesnych nagrań - {freq:.4f} MHz nie zostanie nagrana"
+
+msgid "Recording now"
+msgstr "Trwa nagrywanie"
+
+msgid "appears in the list when the transmission ends"
+msgstr "pojawi się na liście po zakończeniu transmisji"
+
+msgid "8.33 channel {c}"
+msgstr "nazwa w siatce 8,33: {c}"
+
+msgid "Airband: type the channel as published, e.g. 126.805"
+msgstr "Pasmo lotnicze: wpisz kanał tak jak w AIP, np. 126.805"
+
+msgid "This computer can't keep up with the SDR - {n} blocks of radio data lost (gaps in audio and recordings)."
+msgstr "Komputer nie nadąża za odbiornikiem - utracono {n} paczek danych radiowych (przerwy w dźwięku i nagraniach)."
+
+msgid "Delete {n} selected channels?"
+msgstr "Usunąć {n} zaznaczonych kanałów?"
+
+msgid "Browse…"
+msgstr "Przeglądaj…"
+
+msgid "No subfolders"
+msgstr "Brak podfolderów"
+
+msgid "Choose this folder"
+msgstr "Wybierz ten folder"
+
+msgid "Start with the system"
+msgstr "Uruchamiaj razem z systemem"
+
+msgid "Starts AliSDR in the background when you log in to this computer, without opening the browser."
+msgstr "Uruchamia AliSDR w tle po zalogowaniu się na tym komputerze, bez otwierania przeglądarki."
+
+msgid "RTL-SDR driver for Windows"
+msgstr "Sterownik RTL-SDR dla Windows"
+
+msgid "Windows only talks to an RTL-SDR dongle through the WinUSB driver, installed once with the free Zadig tool. If SDR++, SDR# or another SDR program already works with this dongle, the driver is already there."
+msgstr "Windows obsługuje odbiornik RTL-SDR tylko przez sterownik WinUSB, który instaluje się raz darmowym programem Zadig. Jeśli SDR++, SDR# lub inny program SDR już działa z tym odbiornikiem, sterownik jest już zainstalowany."
+
+msgid "Plug in the dongle (skip the driver Windows offers to install)."
+msgstr "Podłącz odbiornik (sterownika proponowanego przez Windows nie instaluj)."
+
+msgid "Download Zadig from "
+msgstr "Pobierz Zadig ze strony "
+
+msgid " and run it (allow the administrator prompt)."
+msgstr " i uruchom go (zezwól na uprawnienia administratora)."
+
+msgid "Menu Options → List All Devices."
+msgstr "Menu Options → List All Devices."
+
+msgid "Pick “Bulk-In, Interface (Interface 0)” or “RTL2838UHIDIR” from the list - not Interface 1, and not your keyboard, mouse or headset."
+msgstr "Wybierz z listy „Bulk-In, Interface (Interface 0)” lub „RTL2838UHIDIR” - nie Interface 1 i nie klawiaturę, mysz czy słuchawki."
+
+msgid "Make sure the target driver on the right is WinUSB, then click Replace Driver (or Install Driver) and wait."
+msgstr "Upewnij się, że po prawej stronie wybrany jest sterownik WinUSB, kliknij Replace Driver (lub Install Driver) i poczekaj."
+
+msgid "Unplug the dongle, plug it back in and press Start here."
+msgstr "Odłącz odbiornik, podłącz go ponownie i naciśnij tutaj Start."
+
+msgid "The driver is tied to the USB port - plugging the dongle into a different port may need the same steps again."
+msgstr "Sterownik jest przypisany do portu USB - po podłączeniu odbiornika do innego portu może być potrzebne powtórzenie tych kroków."
+
+msgid "Is the dongle connected? On Windows it needs the WinUSB driver."
+msgstr "Czy odbiornik jest podłączony? W Windows potrzebuje sterownika WinUSB."
+
+msgid "How to install it"
+msgstr "Jak go zainstalować"
+
+msgid "Dongle not detected? Driver (Zadig) instructions"
+msgstr "Odbiornik niewykryty? Instrukcja sterownika (Zadig)"
+
+msgid "uninstalling transcription…"
+msgstr "odinstalowywanie transkrypcji…"
+
+msgid "Uninstall"
+msgstr "Odinstaluj"
+
+msgid "Uninstall transcription"
+msgstr "Odinstaluj transkrypcję"
+
+msgid "Removes the transcription software from {name}. Recordings and the transcripts made so far stay."
+msgstr "Usuwa oprogramowanie do transkrypcji z komputera {name}. Nagrania i dotychczasowe transkrypcje zostają."
+
+msgid "Also delete the downloaded Whisper models (several GB)"
+msgstr "Usuń też pobrane modele Whisper (kilka GB)"
+
+msgid "Other programs using the same models would download them again."
+msgstr "Inne programy korzystające z tych samych modeli pobiorą je ponownie."
+
+# --- schedule ---
+msgid "Schedule"
+msgstr "Harmonogram"
+
+msgid "Schedule mode is on - the schedule decides what is scanned."
+msgstr "Tryb harmonogramu jest włączony - o tym, co jest skanowane, decyduje harmonogram."
+
+msgid "Open the schedule →"
+msgstr "Otwórz harmonogram →"
+
+msgid "Edit band presets →"
+msgstr "Edytuj presety pasm →"
+
+msgid "Schedule mode is on"
+msgstr "Tryb harmonogramu jest włączony"
+
+msgid "Scan by schedule"
+msgstr "Skanuj według harmonogramu"
+
+
+msgid "Receiver time: {time}"
+msgstr "Czas odbiornika: {time}"
+
+msgid "Now: {names}"
+msgstr "Teraz: {names}"
+
+
+msgid "No time ranges yet."
+msgstr "Nie ma jeszcze żadnych przedziałów."
+
+msgid "Add time range"
+msgstr "Dodaj przedział godzin"
+
+msgid "From"
+msgstr "Od"
+
+msgid "To"
+msgstr "Do"
+
+msgid "Name (optional)"
+msgstr "Nazwa (opcjonalnie)"
+
+msgid "Now"
+msgstr "Teraz"
+
+msgid "Remove time range"
+msgstr "Usuń przedział"
+
+msgid "Remove “{name}” from the schedule?"
+msgstr "Usunąć „{name}” z harmonogramu?"
+
+msgid "Schedule: now {names}."
+msgstr "Harmonogram: teraz {names}."
+
+msgid "Schedule: nothing planned right now - scanning paused."
+msgstr "Harmonogram: teraz nic nie jest zaplanowane - skanowanie wstrzymane."
+
+msgid "When on, the time ranges below decide what is scanned instead of the switches in Listen → What to scan."
+msgstr "Gdy włączone, o tym, co jest skanowane, decydują przedziały godzin poniżej zamiast przełączników w Nasłuch → Co skanować."
+
+msgid "Outside the time ranges"
+msgstr "Poza przedziałami"
+
+msgid "Pause scanning"
+msgstr "Wstrzymaj skanowanie"
+
+msgid "Scan as usual"
+msgstr "Skanuj jak zwykle"
+
+msgid "Between the ranges the scanner scans what is switched on in Listen → What to scan."
+msgstr "Między przedziałami skaner skanuje to, co jest włączone w Nasłuch → Co skanować."
+
+msgid "Between the ranges the scanner waits and scans nothing."
+msgstr "Między przedziałami skaner czeka i nic nie skanuje."
+
+msgid "No time range right now - scanning as usual"
+msgstr "Teraz nie trwa żaden przedział - skanowanie jak zwykle"
+
+msgid "No time range right now - scanning paused"
+msgstr "Teraz nie trwa żaden przedział - skanowanie wstrzymane"
+
+msgid "Every day"
+msgstr "Codziennie"
+
+msgid "Weekdays"
+msgstr "Dni robocze"
+
+msgid "Weekend"
+msgstr "Weekend"
+
+msgid "No days selected - this time range never runs."
+msgstr "Nie wybrano żadnego dnia - ten przedział nigdy się nie włączy."
+
+msgid "Overlaps with {names} - while both run, everything selected in either is scanned."
+msgstr "Nakłada się z: {names} - gdy działają jednocześnie, skanowane jest wszystko, co zaznaczono w którymkolwiek z nich."
+
+msgid "Changes apply to this band everywhere, not only in this time range."
+msgstr "Zmiany dotyczą tego pasma wszędzie, nie tylko w tym przedziale."
+
+msgid "Schedule mode is on - these switches apply only outside its time ranges."
+msgstr "Tryb harmonogramu jest włączony - te przełączniki działają tylko poza jego przedziałami."
+
+msgid "Schedule: outside the time ranges - scanning as usual."
+msgstr "Harmonogram: poza przedziałami - skanowanie jak zwykle."
+
+msgid "{mod} {freq:.4f} MHz: to {tg} from {src}"
+msgstr "{mod} {freq:.4f} MHz: do {tg} od {src}"
+
+msgid "Digital voice is not available ({error}) - playing {mod} channels as NFM"
+msgstr "Głos cyfrowy niedostępny ({error}) - kanały {mod} odtwarzane jako NFM"
+
+msgid "{freq:.4f} MHz: encrypted - not decoded"
+msgstr "{freq:.4f} MHz: szyfrowane - nie dekodowane"
+
+msgid "Stop the scanner first"
+msgstr "Najpierw zatrzymaj skaner"
+
+msgid "optional download"
+msgstr "do pobrania"
+
+msgid "Digital voice (DMR, C4FM)"
+msgstr "Głos cyfrowy (DMR, C4FM)"
+
+msgid "Install digital voice"
+msgstr "Instalacja głosu cyfrowego"
+
+msgid "Experimental"
+msgstr "Eksperymentalne"
+
+msgid "Digital voice is new in AliSDR and hasn't been tested with every system and receiver yet."
+msgstr "Głos cyfrowy to nowość w AliSDR i nie był jeszcze sprawdzony na każdym systemie i odbiorniku."
+
+msgid "If something doesn't work, please report it - it helps a lot:"
+msgstr "Jeśli coś nie działa, zgłoś to - to bardzo pomaga:"
+
+msgid "Downloads the dsd-fme decoder (about 40 MB) from its authors."
+msgstr "Pobiera dekoder dsd-fme (ok. 40 MB) od jego autorów."
+
+msgid "Downloads the dsd-fme decoder from its authors and compiles it on this machine - a few minutes."
+msgstr "Pobiera dekoder dsd-fme od jego autorów i kompiluje go na tym komputerze - kilka minut."
+
+msgid "Uninstall digital voice"
+msgstr "Odinstaluj głos cyfrowy"
+
+msgid "Removes the dsd-fme decoder. DMR and C4FM channels then play as plain NFM."
+msgstr "Usuwa dekoder dsd-fme. Kanały DMR i C4FM będą wtedy odtwarzane jako zwykłe NFM."
+
+msgid "Digital voice installed - pick DMR or C4FM as a band's or channel's modulation."
+msgstr "Głos cyfrowy zainstalowany - wybierz DMR lub C4FM jako modulację pasma albo kanału."
+
+msgid "Optional add-on: listens to DMR and Yaesu System Fusion (C4FM) voice using dsd-fme, an independent open-source decoder that AliSDR downloads from its authors. It runs on the machine that scans. Encrypted calls stay muted - nothing is ever decrypted."
+msgstr "Opcjonalny dodatek: odsłuch głosu DMR i Yaesu System Fusion (C4FM) przez dsd-fme - niezależny dekoder open source, który AliSDR pobiera od jego autorów. Działa na komputerze, który skanuje. Rozmowy szyfrowane pozostają wyciszone - nic nie jest odszyfrowywane."
+
+msgid "Decoder"
+msgstr "Dekoder"
+
+msgid "Installed. Choose DMR or C4FM as the modulation of a band or a Memory List channel."
+msgstr "Zainstalowany. Wybierz DMR lub C4FM jako modulację pasma albo kanału z Listy pamięci."
+
+msgid "Installing…"
+msgstr "Instalowanie…"
+
+msgid "Not installed."
+msgstr "Nie zainstalowany."
+
+msgid "installed"
+msgstr "zainstalowany"
+
+msgid "Installation failed: {error}"
+msgstr "Instalacja nie powiodła się: {error}"
+
+msgid "It needs a compiler and a few libraries. Install them with this command (in a terminal on this machine), then press Install again:"
+msgstr "Potrzebny jest kompilator i kilka bibliotek. Zainstaluj je tym poleceniem (w terminalu na tym komputerze), a potem ponownie naciśnij Zainstaluj:"
+
+msgid "{freq:.4f} MHz: no digital voice decoded - recording discarded"
+msgstr "{freq:.4f} MHz: nie zdekodowano głosu cyfrowego - nagranie odrzucone"
+
+msgid "RTL-SDR #{n} (librtlsdr) SN {serial} - same serial as another dongle"
+msgstr "RTL-SDR #{n} (librtlsdr) SN {serial} - ten sam numer co inny dongle"
+
+msgid "RTL-SDR #{n} (librtlsdr) - in use or no WinUSB driver"
+msgstr "RTL-SDR #{n} (librtlsdr) - zajęty lub bez sterownika WinUSB"
+
+msgid "Some dongles share a serial number (often 00000001) and are told apart only by USB order, which can change after replugging. To keep your choice for good, give each one its own serial with rtl_eeprom -s."
+msgstr "Niektóre dongle mają ten sam numer seryjny (często 00000001) i rozróżnia je tylko kolejność USB, która może się zmienić po przełożeniu. Żeby wybór był stały, nadaj każdemu własny numer poleceniem rtl_eeprom -s."
+
+msgid "(not connected)"
+msgstr "(niepodłączony)"
+
+msgid "Dongle {n}"
+msgstr "Dongle {n}"
+
+msgid "No other SDR device found - plug it in, then reload this page."
+msgstr "Nie znaleziono innego urządzenia SDR - podłącz je i odśwież stronę."
+
+msgid "Scan with another dongle (experimental)"
+msgstr "Skanuj kolejnym donglem (eksperymentalne)"
+
+msgid "The scan plan is split between all dongles - each scans its own share of the windows, so a full cycle is that much shorter. You hear one dongle at a time; the others keep recording."
+msgstr "Plan skanowania dzielony jest między wszystkie dongle - każdy skanuje swoją część okien, więc pełny cykl jest odpowiednio krótszy. Słychać jeden dongle naraz, pozostałe w tym czasie nagrywają."
+
+msgid "Bias-T is on: the dongle powers its antenna input (until scanning stops)."
+msgstr "Bias-T włączony: dongle zasila wejście antenowe (do zatrzymania skanowania)."
+
+msgid "Bias-T (antenna power)"
+msgstr "Bias-T (zasilanie anteny)"
+
+msgid "On while scanning - powers an LNA or active antenna"
+msgstr "Włączony podczas skanowania - zasila LNA lub antenę aktywną"
+
+msgid "Turn on Bias-T?"
+msgstr "Włączyć Bias-T?"
+
+msgid "Bias-T sends about 4.5 V DC up the antenna cable to power an LNA or an active antenna."
+msgstr "Bias-T podaje ok. 4,5 V napięcia stałego na kabel antenowy, żeby zasilić LNA albo antenę aktywną."
+
+msgid "Turn it on only when such a device is connected and your dongle supports it (e.g. RTL-SDR Blog V3/V4). A DC-shorted antenna, a splitter or other equipment on the cable can be damaged - and so can the dongle."
+msgstr "Włącz tylko wtedy, gdy takie urządzenie jest podłączone, a Twój dongle to obsługuje (np. RTL-SDR Blog V3/V4). Antena zwierająca DC, rozgałęźnik lub inny sprzęt na kablu może się uszkodzić - podobnie jak sam dongle."
+
+msgid "Turn on"
+msgstr "Włącz"
+
+msgid "AliSDR switches it off whenever scanning stops."
+msgstr "AliSDR wyłącza je zawsze, gdy skanowanie się zatrzymuje."
+
+msgid "Transcription is uninstalled - restart AliSDR on this computer to remove its files."
+msgstr "Transkrypcja odinstalowana - uruchom ponownie AliSDR na tym komputerze, żeby usunąć jej pliki."
+
+msgid "Restart now"
+msgstr "Uruchom ponownie teraz"
+
+msgid "Live spectrum and waterfall of the scanned band. The frequency and state are shown in text above."
+msgstr "Widmo i waterfall skanowanego pasma na żywo. Częstotliwość i stan są podane tekstem powyżej."
+
+msgid "Bands with their own trigger level ignore this slider: {names}."
+msgstr "Pasma z własnym progiem wyzwalania ignorują ten suwak: {names}."
+
+msgid "Antenna range (MHz)"
+msgstr "Zakres anteny (MHz)"
+
+
+msgid "Optional. This dongle scans only inside this range - for one on an antenna made for a single band, e.g. 144 to 146 for 2 m. Empty = no limit."
+msgstr "Opcjonalnie. Ten dongle skanuje tylko w tym zakresie - dla odbiornika z anteną zrobioną pod jedno pasmo, np. 144 do 146 dla 2 m. Puste = bez limitu."
+
+msgid "Memory List channels: {n} (e.g. {freq} MHz)"
+msgstr "Kanały z listy pamięci: {n} (np. {freq} MHz)"
+
+msgid "Not scanned - outside the antenna range of every receiver:"
+msgstr "Nie są skanowane - poza zakresem anteny każdego odbiornika:"
+
+msgid "Change the range under SDR device."
+msgstr "Zmień zakres w sekcji Urządzenie SDR."
+
+msgid "Nothing for this receiver to scan inside its antenna range ({low}-{high} MHz)."
+msgstr "Ten odbiornik nie ma nic do skanowania w swoim zakresie anteny ({low}-{high} MHz)."
+
+msgid "Can't start recording: {error}"
+msgstr "Nie można zacząć nagrywania: {error}"
+
+msgid "disk almost full"
+msgstr "dysk prawie pełny"
+
+msgid "Manual recording stopped: {error}"
+msgstr "Nagrywanie ręczne zatrzymane: {error}"
+
+msgid "Raw IQ recording stopped: {error}"
+msgstr "Nagrywanie surowego IQ zatrzymane: {error}"
+
+msgid "{freq:.4f} MHz: can't write the recording ({error}) - not recording"
+msgstr "{freq:.4f} MHz: nie można zapisać nagrania ({error}) - nie nagrywam"
+
+msgid "Less than 1 GB free on the recordings disk - not recording"
+msgstr "Mniej niż 1 GB wolnego miejsca na dysku z nagraniami - nie nagrywam"
+
+msgid "Fixed language"
+msgstr "Stały język"
+
+msgid "Empty: the language of each recording is detected (best for air traffic control, where languages mix). An ISO code, e.g. pl: always that language, no detection - about 40 % less CPU time."
+msgstr "Puste: język każdego nagrania jest wykrywany (najlepsze dla łączności lotniczej, gdzie języki się mieszają). Kod ISO, np. pl: zawsze ten język, bez wykrywania - ok. 40 % mniej czasu procesora."
+
+msgid "detect"
+msgstr "wykrywaj"
+
+msgid "best quality, all languages"
+msgstr "najlepsza jakość, wszystkie języki"
+
+msgid "almost as good, several times faster"
+msgstr "prawie tak dobry, kilka razy szybszy"
+
+msgid "lighter, all languages"
+msgstr "lżejszy, wszystkie języki"
+
+msgid "for weak computers"
+msgstr "dla słabych komputerów"
+
+msgid "rough, very fast"
+msgstr "zgrubny, bardzo szybki"
+
+msgid "None - the main model also does English"
+msgstr "Brak - angielski też robi model główny"
+
+msgid "English, tuned for air traffic control"
+msgstr "angielski, dostrojony do łączności lotniczej"
+
+msgid "English only, fast and accurate"
+msgstr "tylko angielski, szybki i dokładny"
+
+msgid "English only"
+msgstr "tylko angielski"
+
+msgid "English only, for weak computers"
+msgstr "tylko angielski, dla słabych komputerów"
+
+msgid "Other…"
+msgstr "Inny…"
+
+msgid "Hugging Face repo (user/name) or a folder"
+msgstr "Repozytorium Hugging Face (użytkownik/nazwa) lub folder"
+
+msgid "Transcribes every recording and detects its language - English too, unless an English model is set below. A bigger model is more accurate and slower; the first use downloads it."
+msgstr "Transkrybuje każde nagranie i rozpoznaje jego język - także angielski, chyba że niżej ustawisz model angielski. Większy model jest dokładniejszy i wolniejszy; pierwsze użycie pobiera go."
+
+msgid "Only for English, e.g. tuned for air traffic control. None: the main model does English too - one download, less memory."
+msgstr "Tylko dla angielskiego, np. dostrojony do łączności lotniczej. Brak: angielski też robi model główny - jedno pobranie, mniej pamięci."
+
+msgid "downloading the model…"
+msgstr "pobieranie modelu…"
+
+msgid "command sent…"
+msgstr "polecenie wysłane…"
+
+msgid "{name} hasn't answered yet ({s}) - is AliSDR running there and connected?"
+msgstr "{name} jeszcze nie odpowiada ({s}) - czy działa tam AliSDR i jest połączony?"
+
+msgid "Sent to {name} - waiting for it to pick the command up (a few seconds)…"
+msgstr "Wysłano do {name} - czekam, aż odbierze polecenie (kilka sekund)…"
+
+msgid "Downloading the model {model}: {size} so far - the first transcription waits for it. This can take several minutes."
+msgstr "Pobieranie modelu {model}: dotąd {size} - pierwsza transkrypcja na to czeka. To może potrwać kilka minut."
+
+msgid "SoapySDR"
+msgstr "SoapySDR"
+
+msgid "librtlsdr"
+msgstr "librtlsdr"
+
+msgid "libhackrf (experimental)"
+msgstr "libhackrf (eksperymentalne)"
+
+msgid "libairspy (experimental)"
+msgstr "libairspy (eksperymentalne)"
+
+msgid "Access method"
+msgstr "Sposób dostępu"
+
+msgid "How AliSDR talks to this receiver. The first choice is the default; the other one is the fallback when it will not open, and a way to compare."
+msgstr "Jak AliSDR komunikuje się z tym odbiornikiem. Pierwszy wybór jest domyślny; drugi to rozwiązanie awaryjne, gdy tamten się nie otwiera, i sposób na porównanie."
+
+msgid "{name} is plugged in but not listed. Install its SoapySDR module (e.g. soapysdr-module-hackrf), allow USB access (udev rules or the plugdev group), then reload this page."
+msgstr "{name} jest podłączony, ale nie ma go na liście. Zainstaluj jego moduł SoapySDR (np. soapysdr-module-hackrf), zezwól na dostęp do USB (reguły udev lub grupa plugdev) i odśwież stronę."
+
+msgid "{name} is plugged in, but SoapySDR is not available to AliSDR (the Python module python3-soapysdr is not visible to it). Install python3-soapysdr and soapysdr-module-<your receiver>, then reinstall with install.sh --from-source, or install libhackrf0 / libairspy0 for the experimental native access."
+msgstr "{name} jest podłączony, ale AliSDR nie ma dostępu do SoapySDR (moduł Pythona python3-soapysdr jest dla niego niewidoczny). Zainstaluj python3-soapysdr i soapysdr-module-<twój odbiornik>, a potem zainstaluj ponownie przez install.sh --from-source, albo zainstaluj libhackrf0 / libairspy0, by użyć eksperymentalnego dostępu natywnego."
+
+msgid "The receiver did not open with {method}. Stop the scanner and try {other} under SDR device → Access method."
+msgstr "Odbiornik nie otworzył się przez {method}. Zatrzymaj skaner i spróbuj {other} w sekcji Urządzenie SDR → Sposób dostępu."
+
+msgid "Add to favorites"
+msgstr "Dodaj do ulubionych"
+
+msgid "Remove from favorites"
+msgstr "Usuń z ulubionych"
+
+msgid "Downloading {n} recordings ({size}) as one ZIP…"
+msgstr "Pobieranie {n} nagrań ({size}) jako jeden plik ZIP…"
+
+msgid "same as the first"
+msgstr "jak w pierwszym"
+
+msgid "Receivers with different capture widths split the scan in proportion to their width, and a wide one joins neighbouring windows into one. The processor must keep up: a 30 ms block of a 10 MHz capture takes about 20 ms to analyse."
+msgstr "Odbiorniki o różnej szerokości przechwytu dzielą skanowanie proporcjonalnie do szerokości, a szeroki łączy sąsiednie okna w jedno. Procesor musi nadążyć: blok 30 ms przy przechwycie 10 MHz analizuje się około 20 ms."
+
+msgid "This receiver captures {actual:.2f} MHz, not {wanted:.2f} MHz - scanning with {actual:.2f} MHz."
+msgstr "Ten odbiornik przechwytuje {actual:.2f} MHz, a nie {wanted:.2f} MHz - skanuję z {actual:.2f} MHz."
+
+msgid "Optional - a name typed here is used instead of the folder above."
+msgstr "Opcjonalnie - wpisana tu nazwa zastąpi folder wybrany powyżej."
+
+msgid "Continuous RTL-SDR reading failed on this receiver ({error}) - switched it off and reconnected."
+msgstr "Ciągły odczyt RTL-SDR zawiódł na tym odbiorniku ({error}) - wyłączono go i połączono ponownie."
+
+msgid "The previous run ended while continuous RTL-SDR reading was on - it stays off for this run."
+msgstr "Poprzednie uruchomienie zakończyło się podczas ciągłego odczytu RTL-SDR - w tym uruchomieniu zostaje wyłączony."
+
+msgid "Continuous RTL-SDR reading"
+msgstr "Ciągły odczyt RTL-SDR"
+
+msgid "While the scanner stays on a frequency, an RTL-SDR read through librtlsdr (Windows, macOS and the receiver) is read as a continuous stream, which removes the buzz caused by lost samples. If it crashes the driver on your receiver, AliSDR switches it off by itself and says so in the Activity list; the buzz may come back. Takes effect the next time scanning starts."
+msgstr "Gdy skaner zostaje na jednej częstotliwości, RTL-SDR obsługiwany przez librtlsdr (Windows, macOS i odbiornik) jest czytany ciągłym strumieniem, co usuwa brzęczenie od gubionych próbek. Jeśli zawiesza to sterownik Twojego odbiornika, AliSDR sam go wyłączy i napisze o tym w Aktywności; brzęczenie może wrócić. Działa od następnego uruchomienia skanowania."
+
+msgid "Sort by {col}"
+msgstr "Sortuj według: {col}"
+
+msgid "Sort by scanned / not scanned"
+msgstr "Sortuj według skanowania włączone / wyłączone"
+
+msgid "Network receiver (rtl_tcp)"
+msgstr "Odbiornik w sieci (rtl_tcp)"
+
+msgid "rtl_tcp address"
+msgstr "Adres rtl_tcp"
+
+msgid "rtl_tcp"
+msgstr "rtl_tcp"
+
+msgid "The RTL-SDR on another computer, through its rtl_tcp server (host or host:port, default port 1234). It serves one program at a time, the stream is not encrypted - use it on a trusted network. Retuning takes longer than with a local dongle, so scanning many windows is slower."
+msgstr "RTL-SDR w innym komputerze, przez jego serwer rtl_tcp (host albo host:port, domyślny port 1234). Obsługuje jeden program naraz, strumień nie jest szyfrowany - używaj w zaufanej sieci. Zmiana częstotliwości trwa dłużej niż z lokalnym dongle, więc skanowanie wielu okien jest wolniejsze."
+
+msgid "No rtl_tcp address set - enter the host (and port) of the rtl_tcp server."
+msgstr "Nie ustawiono adresu rtl_tcp - wpisz host (i port) serwera rtl_tcp."
+
+msgid "The rtl_tcp port must be a number between 1 and 65535."
+msgstr "Port rtl_tcp musi być liczbą od 1 do 65535."
+
+msgid "Can't connect to rtl_tcp at {addr} ({error})."
+msgstr "Nie można połączyć się z rtl_tcp pod {addr} ({error})."
+
+msgid "rtl_tcp at {addr} didn't answer - it serves one program at a time; is another one connected?"
+msgstr "rtl_tcp pod {addr} nie odpowiada - obsługuje jeden program naraz; czy podłączył się inny?"
+
+msgid "{addr} is not an rtl_tcp server (wrong greeting)."
+msgstr "{addr} nie jest serwerem rtl_tcp (zły komunikat powitalny)."
+
+msgid "rtl_tcp connection lost ({error})"
+msgstr "Utracono połączenie z rtl_tcp ({error})"
+
+msgid "rtl_tcp closed the connection"
+msgstr "rtl_tcp zamknął połączenie"
+
+msgid "rtl_tcp sent no data for {s:g} s - connection lost or the server is not responding"
+msgstr "rtl_tcp nie przysłał danych przez {s:g} s - połączenie utracone albo serwer nie odpowiada"
+
+msgid "An RTL-SDR captures 0.23-0.30 or 0.90-3.20 MHz; {rate:g} MHz is not possible - change the capture width."
+msgstr "RTL-SDR przechwytuje 0,23-0,30 albo 0,90-3,20 MHz; {rate:g} MHz nie jest możliwe - zmień szerokość przechwytu."
+
+msgid "Add-ons"
+msgstr "Dodatki"
+
+msgid "Messages"
+msgstr "Wiadomości"
+
+msgid "Add-on running"
+msgstr "Dodatek działa"
+
+msgid "Decoders & tools"
+msgstr "Dekodery i narzędzia"
+
+msgid "Channels (MHz)"
+msgstr "Kanały (MHz)"
+
+msgid "separate program"
+msgstr "osobny program"
+
+msgid "built in"
+msgstr "wbudowany"
+
+msgid "experimental"
+msgstr "eksperymentalny"
+
+msgid "running"
+msgstr "działa"
+
+msgid "not installed"
+msgstr "nie zainstalowano"
+
+msgid "Licence: {license}"
+msgstr "Licencja: {license}"
+
+msgid "Read these channels"
+msgstr "Czytaj te kanały"
+
+msgid "While scanning, a transmission on one of these channels is decoded here instead of being played or recorded. Scan a band that contains them."
+msgstr "Podczas skanowania transmisja na jednym z tych kanałów jest tu dekodowana zamiast odtwarzana i nagrywana. Skanuj pasmo, które je zawiera."
+
+msgid "Channels heard: {slots} · messages decoded: {events}"
+msgstr "Usłyszane kanały: {slots} · odczytane wiadomości: {events}"
+
+msgid "Only tested on synthetic signals so far. If channels are heard but nothing is decoded, please report it."
+msgstr "Na razie testowane tylko na sygnałach syntetycznych. Jeśli kanały są słyszane, a nic się nie dekoduje, zgłoś to."
+
+msgid "Path of the program"
+msgstr "Ścieżka programu"
+
+msgid "Program"
+msgstr "Program"
+
+msgid "Where it is installed, if AliSDR does not find it by itself."
+msgstr "Gdzie jest zainstalowany, jeśli AliSDR sam go nie znajduje."
+
+msgid "Project page"
+msgstr "Strona projektu"
+
+msgid "Found: {path}"
+msgstr "Znaleziono: {path}"
+
+msgid "Extra options, for example -g 40"
+msgstr "Dodatkowe opcje, na przykład -g 40"
+
+msgid "Extra options"
+msgstr "Dodatkowe opcje"
+
+msgid "Added to the command line."
+msgstr "Dodawane do wiersza poleceń."
+
+msgid "Stop and resume scanning"
+msgstr "Zatrzymaj i wznów skanowanie"
+
+msgid "Start (pauses the scanner)"
+msgstr "Uruchom (wstrzymuje skaner)"
+
+msgid "It needs the receiver for itself: the scanner stops while it runs."
+msgstr "Potrzebuje odbiornika tylko dla siebie: skaner zatrzymuje się na czas jego pracy."
+
+msgid "Optional decoders. The built-in ones read the channels your scanner stops on; the separate programs are installed by you and use the receiver on their own - AliSDR only starts and stops them and shows what they decode in Messages."
+msgstr "Opcjonalne dekodery. Wbudowane czytają kanały, na których zatrzymuje się skaner; osobne programy instalujesz sam i używają odbiornika na własną rękę - AliSDR tylko je uruchamia i zatrzymuje oraz pokazuje w Wiadomościach, co zdekodowały."
+
+msgid "Hear and record data channels too"
+msgstr "Słuchaj i nagrywaj też kanały danych"
+
+msgid "Normally ACARS and APRS channels are only decoded - their buzz is not played or recorded."
+msgstr "Zwykle kanały ACARS i APRS są tylko dekodowane - ich brzęczenie nie jest odtwarzane ani nagrywane."
+
+msgid "Sensors"
+msgstr "Czujniki"
+
+msgid "Search…"
+msgstr "Szukaj…"
+
+msgid "Pause"
+msgstr "Pauza"
+
+msgid "Resume"
+msgstr "Wznów"
+
+msgid "Map"
+msgstr "Mapa"
+
+msgid "Nothing decoded yet. Turn an add-on on in Add-ons and scan a band that contains its channels."
+msgstr "Nic jeszcze nie zdekodowano. Włącz dodatek w Dodatkach i skanuj pasmo, które zawiera jego kanały."
+
+msgid "{name} is using the receiver"
+msgstr "{name} używa odbiornika"
+
+msgid "Stop it in Add-ons"
+msgstr "Zatrzymaj w Dodatkach"
+
+msgid "Reads aircraft text messages (ACARS, 131.5-131.9 MHz) from the channels the scanner stops on, instead of recording their buzz."
+msgstr "Czyta tekstowe wiadomości samolotów (ACARS, 131,5-131,9 MHz) z kanałów, na których zatrzymuje się skaner, zamiast nagrywać ich brzęczenie."
+
+msgid "Reads amateur-radio position reports, weather and messages (APRS, 144.800 MHz) from the channels the scanner stops on."
+msgstr "Czyta krótkofalarskie raporty pozycji, pogodę i wiadomości (APRS, 144,800 MHz) z kanałów, na których zatrzymuje się skaner."
+
+msgid "Weather stations, thermometers and other 433/868 MHz sensors, decoded by rtl_433. Needs the receiver for itself while it runs."
+msgstr "Stacje pogodowe, termometry i inne czujniki 433/868 MHz, dekodowane przez rtl_433. Na czas pracy potrzebuje odbiornika tylko dla siebie."
+
+msgid "Reads VDL Mode 2 aircraft data link (136.7-137 MHz) with dumpvdl2. Needs the receiver for itself while it runs."
+msgstr "Czyta łącze danych samolotów VDL Mode 2 (136,7-137 MHz) przez dumpvdl2. Na czas pracy potrzebuje odbiornika tylko dla siebie."
+
+msgid "Install it from your distribution (for example: sudo apt install rtl-433)."
+msgstr "Zainstaluj go z repozytorium swojej dystrybucji (na przykład: sudo apt install rtl-433)."
+
+msgid "Download the Windows or macOS build from the project's releases page and put rtl_433 in {folder}, or set its path below."
+msgstr "Pobierz wersję dla Windows lub macOS ze strony wydań projektu i umieść rtl_433 w {folder} albo podaj jego ścieżkę poniżej."
+
+msgid "dumpvdl2 has no ready Windows build: build it from its source (needs libacars) or use Linux, then put it in {folder} or set its path below."
+msgstr "dumpvdl2 nie ma gotowej wersji dla Windows: zbuduj go ze źródeł (wymaga libacars) albo użyj Linuksa, potem umieść go w {folder} albo podaj ścieżkę poniżej."
+
+msgid "An add-on is using the receiver - stop it first."
+msgstr "Dodatek używa odbiornika - najpierw go zatrzymaj."
+
+msgid "Another add-on is running - stop it first."
+msgstr "Działa inny dodatek - najpierw go zatrzymaj."
+
+msgid "{name} is not installed."
+msgstr "{name} nie jest zainstalowany."
+
+msgid "{name} works with RTL-SDR receivers only."
+msgstr "{name} działa tylko z odbiornikami RTL-SDR."
+
+msgid "{name} stopped by itself (exit {code}) {tail}"
+msgstr "{name} sam się zatrzymał (kod {code}) {tail}"
+
+msgid "{name} started - the scanner is paused while it runs."
+msgstr "Uruchomiono {name} - skaner jest wstrzymany na czas jego pracy."
+
+msgid "APRS (144.800 MHz)"
+msgstr "APRS (144,800 MHz)"
+
+msgid "The European APRS channel: position reports, weather and messages. Turn the APRS add-on on to decode them."
+msgstr "Europejski kanał APRS: raporty pozycji, pogoda i wiadomości. Włącz dodatek APRS, żeby je dekodować."
+
+msgid "ACARS (Europe, 131.525-131.825 MHz)"
+msgstr "ACARS (Europa, 131,525-131,825 MHz)"
+
+msgid "Aircraft text messages (ACARS). Turn the ACARS add-on on to decode them instead of recording their buzz."
+msgstr "Tekstowe wiadomości samolotów (ACARS). Włącz dodatek ACARS, żeby je dekodować zamiast nagrywać ich brzęczenie."
+
+msgid "The receiver was still busy - trying again."
+msgstr "Odbiornik był jeszcze zajęty - próbuję ponownie."
+
+msgid "No such receiver"
+msgstr "Nie ma takiego odbiornika"
+
+msgid "It is downloaded or built from the author's own release; AliSDR does not ship it."
+msgstr "Jest pobierany lub budowany z wydania samego autora; AliSDR go nie dostarcza."
+
+msgid "Install what the build needs first (this needs administrator rights, so AliSDR does not run it):"
+msgstr "Najpierw zainstaluj to, czego potrzebuje budowanie (wymaga uprawnień administratora, więc AliSDR tego nie uruchamia):"
+
+msgid "Receiver 1 (main)"
+msgstr "Odbiornik 1 (główny)"
+
+msgid "Receiver {n}"
+msgstr "Odbiornik {n}"
+
+msgid "Receiver to use"
+msgstr "Odbiornik do użycia"
+
+msgid "AliSDR can build dumpvdl2 for you from the author's source code (a few minutes)."
+msgstr "AliSDR może zbudować dumpvdl2 ze źródeł autora (kilka minut)."
+
+msgid "AliSDR can download the ready build the author publishes for this system."
+msgstr "AliSDR może pobrać gotową wersję, którą autor publikuje dla tego systemu."
+
+msgid "Install it from your distribution (for example: sudo apt install rtl-433), or put the program in {folder} or set its path below."
+msgstr "Zainstaluj go z repozytorium dystrybucji (na przykład: sudo apt install rtl-433) albo umieść program w {folder} lub podaj jego ścieżkę poniżej."
+
+msgid "AliSDR cannot install this one on this computer: put the program in {folder} or set its path below."
+msgstr "AliSDR nie może tego zainstalować na tym komputerze: umieść program w {folder} albo podaj jego ścieżkę poniżej."
+
+msgid "Starting…"
+msgstr "Uruchamianie…"
+
+msgid "Starting… the scanner stops first and the receiver needs a moment."
+msgstr "Uruchamianie… najpierw zatrzymuje się skaner, a odbiornik potrzebuje chwili."
+
+msgid "The scanner is paused: this program has the receiver. What it decodes appears here and in Messages. There is no spectrum while it runs."
+msgstr "Skaner jest wstrzymany: ten program ma odbiornik. To, co dekoduje, widać tu i w Wiadomościach. Na czas jego pracy nie ma widma."
+
+msgid "Open Messages"
+msgstr "Otwórz Wiadomości"
+
+msgid "running for {time}"
+msgstr "działa od {time}"
+
+msgid "{n} messages decoded"
+msgstr "odczytano wiadomości: {n}"
+
+msgid "Waiting for the first message…"
+msgstr "Czekam na pierwszą wiadomość…"
+
+msgid "gusts"
+msgstr "porywy"
+
+msgid "battery OK"
+msgstr "bateria OK"
+
+msgid "battery low"
+msgstr "bateria słaba"
+
+msgid "ch"
+msgstr "kan."
+
+msgid "last {time} · {n} readings"
+msgstr "ostatnio {time} · odczytów: {n}"
+
+msgid "Received {n} times:"
+msgstr "Odebrano {n} razy:"
+
+msgid "Hide link-layer frames (acknowledgements, polls)"
+msgstr "Ukryj ramki łącza (potwierdzenia, zapytania)"
+
+msgid "Fold repeats"
+msgstr "Zwijaj powtórzenia"
+
+msgid "Transcription, digital voice and decoders moved to"
+msgstr "Transkrypcja, głos cyfrowy i dekodery są teraz w zakładce"
+
+msgid "Decode these channels"
+msgstr "Dekoduj te kanały"
+
+msgid "The scanner does not visit {list} MHz yet, so nothing can be decoded."
+msgstr "Skaner jeszcze nie odwiedza {list} MHz, więc nic nie da się zdekodować."
+
+msgid "Add to scanned bands"
+msgstr "Dodaj do skanowanych pasm"
+
+msgid "Plays quiet recordings louder and loud ones softer, so they all sound alike. The files are not changed."
+msgstr "Cichym nagraniom podkręca głośność, głośne ściszą, żeby brzmiały podobnie. Pliki nie są zmieniane."
+
+msgid "AliSDR, GPL-3.0-or-later"
+msgstr "AliSDR, GPL-3.0 lub nowsza"
+
+msgid "Messages and data"
+msgstr "Wiadomości i dane"
+
+msgid "All frames"
+msgstr "Wszystkie ramki"
+
+msgid "This program has one receiver; the others keep scanning. What it decodes appears here and in Messages."
+msgstr "Ten program ma jeden odbiornik; pozostałe skanują dalej. To, co dekoduje, widać tu i w Wiadomościach."
+
+msgid "The scanner is paused: this program has the receiver. What it decodes appears here and in Messages."
+msgstr "Skaner jest wstrzymany: ten program ma odbiornik. To, co dekoduje, widać tu i w Wiadomościach."
+
+msgid "Any receiver"
+msgstr "Dowolny odbiornik"
+
+msgid "Decode only what this receiver hears."
+msgstr "Dekoduje tylko to, co słyszy ten odbiornik."
+
+msgid "This program takes this receiver; the others keep scanning."
+msgstr "Ten program zajmuje ten odbiornik; pozostałe skanują dalej."
+
+msgid "It needs its receiver for itself: that receiver stops scanning while it runs."
+msgstr "Potrzebuje swojego odbiornika tylko dla siebie: ten odbiornik nie skanuje na czas jego pracy."
+
+msgid "Clear list"
+msgstr "Wyczyść listę"
+
+msgid "Hides the messages received so far from this list. Nothing is deleted."
+msgstr "Ukrywa dotychczasowe wiadomości na tej liście. Nic nie jest usuwane."
+
+msgid "Last 5 minutes"
+msgstr "Ostatnie 5 minut"
+
+msgid "Last hour"
+msgstr "Ostatnia godzina"
+
+msgid "Last 24 hours"
+msgstr "Ostatnie 24 godziny"
+
+msgid "Everything"
+msgstr "Wszystko"
+
+msgid "Time range"
+msgstr "Zakres czasu"
+
+msgid "Most messages first"
+msgstr "Najwięcej wiadomości na górze"
+
+msgid "Sort"
+msgstr "Sortuj"
+
+msgid "By aircraft / station"
+msgstr "Wg samolotu / stacji"
+
+msgid "All frequencies"
+msgstr "Wszystkie częstotliwości"
+
+msgid "{n} earlier messages are hidden."
+msgstr "Ukryte wcześniejsze wiadomości: {n}."
+
+msgid "Show them"
+msgstr "Pokaż je"
+
+msgid "Nothing matches the filters."
+msgstr "Nic nie pasuje do filtrów."
+
+msgid "Show only this"
+msgstr "Pokaż tylko to"
+
+msgid "While scanning, a transmission on one of these channels is decoded instead of being played or recorded."
+msgstr "Podczas skanowania transmisja na jednym z tych kanałów jest dekodowana zamiast odtwarzana i nagrywana."
+
+msgid "Band"
+msgstr "Pasmo"
+
+msgid "433.92 MHz - most sensors"
+msgstr "433,92 MHz - większość czujników"
+
+msgid "868.3 MHz - European 868 MHz sensors"
+msgstr "868,3 MHz - europejskie czujniki 868 MHz"
+
+msgid "315 MHz"
+msgstr "315 MHz"
+
+msgid "915 MHz"
+msgstr "915 MHz"
+
+msgid "433.92 and 868.3 MHz (switches between them)"
+msgstr "433,92 i 868,3 MHz (przełącza się między nimi)"
+
+msgid "Own frequencies…"
+msgstr "Własne częstotliwości…"
+
+msgid "Which frequencies to listen to. Most weather stations and thermometers use 433.92 MHz; many European sensors use 868.3 MHz."
+msgstr "Jakich częstotliwości słuchać. Większość stacji pogodowych i termometrów używa 433,92 MHz, wiele europejskich czujników 868,3 MHz."
+
+msgid "Frequencies (MHz)"
+msgstr "Częstotliwości (MHz)"
+
+msgid "Separated by spaces or \"comma and space\"."
+msgstr "Oddzielone spacjami lub „przecinek i spacja”. Przecinek między cyframi to przecinek dziesiętny."
+
+msgid "Switch every (seconds)"
+msgstr "Przełączaj co (sekundy)"
+
+msgid "With several frequencies the receiver listens to each in turn."
+msgstr "Przy kilku częstotliwościach odbiornik słucha każdej po kolei."
+
+msgid "Gain (dB)"
+msgstr "Wzmocnienie (dB)"
+
+msgid "Leave empty for automatic gain."
+msgstr "Puste = wzmocnienie automatyczne."
+
+msgid "auto"
+msgstr "auto"
+
+msgid "Frequency correction (ppm)"
+msgstr "Korekcja częstotliwości (ppm)"
+
+msgid "For a receiver whose frequency is off. 0 for most."
+msgstr "Dla odbiornika, którego częstotliwość jest przesunięta. Zwykle 0."
+
+msgid "Units"
+msgstr "Jednostki"
+
+msgid "As the sensor reports"
+msgstr "Tak jak podaje czujnik"
+
+msgid "Metric (°C, km/h)"
+msgstr "Metryczne (°C, km/h)"
+
+msgid "Imperial (°F, mph)"
+msgstr "Imperialne (°F, mph)"
+
+msgid "Changes apply the next time it starts."
+msgstr "Zmiany zadziałają przy następnym uruchomieniu."
+
+msgid "Transcription & add-ons"
+msgstr "Transkrypcja i dodatki"
+
+msgid "Transcription, digital voice and the decoders (ACARS, APRS, VDL2, rtl_433) now have their own page."
+msgstr "Transkrypcja, głos cyfrowy i dekodery (ACARS, APRS, VDL2, rtl_433) mają teraz własną stronę."
+
+msgid "Go to transcription settings"
+msgstr "Przejdź do ustawień transkrypcji"
+
+msgid "All add-on settings"
+msgstr "Wszystkie ustawienia dodatków"
+
+msgid "For example: the Whisper model and the computers that transcribe · DMR and C4FM digital voice · ACARS and APRS decoders · rtl_433 sensors on 433 or 868 MHz · VDL2."
+msgstr "Na przykład: model Whisper i komputery, które transkrybują · głos cyfrowy DMR i C4FM · dekodery ACARS i APRS · czujniki rtl_433 na 433 lub 868 MHz · VDL2."
+
+msgid "What is this page?"
+msgstr "Co to za strona?"
+
+msgid "Whatever the add-on decoders read appears here: aircraft text messages (ACARS and VDL2), amateur radio position reports and messages (APRS) and readings of weather stations and sensors (rtl_433)."
+msgstr "Tu pojawia się wszystko, co odczytają dekodery dodatków: tekstowe wiadomości samolotów (ACARS i VDL2), krótkofalarskie raporty pozycji i wiadomości (APRS) oraz odczyty stacji pogodowych i czujników (rtl_433)."
+
+msgid "Switched on: {list}. Waiting for the first message - the scanner has to visit their channels."
+msgstr "Włączone: {list}. Czekam na pierwszą wiadomość - skaner musi odwiedzać ich kanały."
+
+msgid "No add-on is switched on yet."
+msgstr "Żaden dodatek nie jest jeszcze włączony."
+
+msgid "Add-on settings"
+msgstr "Ustawienia dodatków"
+
+msgid "Go to Add-ons and switch one on"
+msgstr "Przejdź do Dodatków i włącz któryś"
+
+msgid "Voice"
+msgstr "Głos"
+
+msgid "Overview"
+msgstr "Przegląd"
+
+msgid "Everything stored"
+msgstr "Wszystko, co zapisano"
+
+msgid "last {when}"
+msgstr "ostatnio {when}"
+
+msgid "nothing yet"
+msgstr "jeszcze nic"
+
+msgid "{n} acknowledgements and polls not counted"
+msgstr "{n} potwierdzeń i zapytań nie wliczono"
+
+msgid "Messages per hour"
+msgstr "Wiadomości na godzinę"
+
+msgid "Messages per day"
+msgstr "Wiadomości na dzień"
+
+msgid "Nothing decoded by {name} in this period."
+msgstr "{name} nic nie zdekodował w tym okresie."
+
+msgid "Nothing decoded in this period."
+msgstr "Nic nie zdekodowano w tym okresie."
+
+msgid "Aircraft"
+msgstr "Samoloty"
+
+msgid "Busiest hour"
+msgstr "Najbardziej ruchliwa godzina"
+
+msgid "Acknowledgements and polls"
+msgstr "Potwierdzenia i zapytania"
+
+msgid "Stations"
+msgstr "Stacje"
+
+msgid "Positions"
+msgstr "Pozycje"
+
+msgid "Farthest"
+msgstr "Najdalsza"
+
+msgid "set your location in Settings"
+msgstr "ustaw lokalizację w Ustawieniach"
+
+msgid "Devices"
+msgstr "Urządzenia"
+
+msgid "Warmest"
+msgstr "Najcieplej"
+
+msgid "Coldest"
+msgstr "Najzimniej"
+
+msgid "Per hour"
+msgstr "Na godzinę"
+
+msgid "Per day"
+msgstr "Na dzień"
+
+msgid "Click a row to see its messages"
+msgstr "Kliknij wiersz, żeby zobaczyć jego wiadomości"
+
+msgid "Click a row to see its readings"
+msgstr "Kliknij wiersz, żeby zobaczyć jego odczyty"
+
+msgid "Share"
+msgstr "Udział"
+
+msgid "Level"
+msgstr "Poziom"
+
+msgid "Message labels"
+msgstr "Etykiety wiadomości"
+
+msgid "The two-character ACARS label says what kind of message it is"
+msgstr "Dwuznakowa etykieta ACARS mówi, jakiego rodzaju jest wiadomość"
+
+msgid "Station"
+msgstr "Stacja"
+
+msgid "Packets"
+msgstr "Pakiety"
+
+msgid "Packet types"
+msgstr "Typy pakietów"
+
+msgid "Type"
+msgstr "Typ"
+
+msgid "Readings"
+msgstr "Odczyty"
+
+msgid "Temperature min / avg / max"
+msgstr "Temperatura min / średnia / max"
+
+msgid "Humidity"
+msgstr "Wilgotność"
+
+msgid "Battery"
+msgstr "Bateria"
+
+msgid "Counts of what was decoded, kept for up to {n} days (the messages themselves for a few days)."
+msgstr "Liczby tego, co zdekodowano, przechowywane do {n} dni (same wiadomości tylko kilka dni)."
+
+msgid "Stored so far: {n} days."
+msgstr "Dotąd zapisano: {n} dni."
+
+msgid "Click to see its messages"
+msgstr "Kliknij, żeby zobaczyć jego wiadomości"
+
+msgid "Voice: what was heard"
+msgstr "Głos: co było słychać"
+
+msgid "Add-ons: what was decoded"
+msgstr "Dodatki: co zdekodowano"
+
+msgid "Select all shown"
+msgstr "Zaznacz wszystkie widoczne"
+
+msgid "Scan"
+msgstr "Skanuj"
+
+msgid "Don't scan"
+msgstr "Nie skanuj"
+
+msgid "Move to folder…"
+msgstr "Przenieś do folderu…"
+
+msgid "Delete all"
+msgstr "Usuń wszystko"
+
+msgid "Delete all {n} channels from the Memory List?"
+msgstr "Usunąć wszystkie kanały ({n}) z Listy pamięci?"
+
+msgid "Remove all {n} entries from the blacklist?"
+msgstr "Usunąć wszystkie wpisy ({n}) z czarnej listy?"
+
+msgid "Delete all channels"
+msgstr "Usuń wszystkie kanały"
+
+msgid "Empty the blacklist"
+msgstr "Opróżnij czarną listę"
+
+msgid "The schedule is off - the switches in Listen → What to scan decide."
+msgstr "Harmonogram jest wyłączony - decydują przełączniki w Nasłuch → Co skanować."
+
+msgid "No time range right now"
+msgstr "Teraz żaden przedział czasu"
+
+msgid "{name} runs here"
+msgstr "działa tu {name}"
+
+msgid "by the schedule"
+msgstr "z harmonogramu"
+
+msgid "started by hand"
+msgstr "uruchomiony ręcznie"
+
+msgid "scanning"
+msgstr "skanuje"
+
+msgid "nothing planned"
+msgstr "nic nie zaplanowano"
+
+msgid "The day at a glance"
+msgstr "Dzień w skrócie"
+
+msgid "Add-on"
+msgstr "Dodatek"
+
+msgid "Empty stretches: scanning as usual"
+msgstr "Puste odcinki: skanowanie jak zwykle"
+
+msgid "Empty stretches: nothing is scanned"
+msgstr "Puste odcinki: nic nie jest skanowane"
+
+msgid "The schedule is off"
+msgstr "Harmonogram jest wyłączony"
+
+msgid "Add a scanning time range"
+msgstr "Dodaj przedział skanowania"
+
+msgid "Add an add-on time range"
+msgstr "Dodaj przedział z dodatkiem"
+
+msgid "What to do"
+msgstr "Co robić"
+
+msgid "{name} is not installed - this range is ignored until it is. Install it in Add-ons."
+msgstr "{name} nie jest zainstalowany - ten przedział jest ignorowany, dopóki go nie będzie. Zainstaluj go w Dodatkach."
+
+msgid "Receivers"
+msgstr "Odbiorniki"
+
+msgid "As set in Add-ons ({name})"
+msgstr "Jak w Dodatkach ({name})"
+
+msgid "The program holds this receiver while the range runs; the others keep scanning."
+msgstr "Program zajmuje ten odbiornik na czas przedziału; pozostałe skanują dalej."
+
+msgid "The scanner pauses while the range runs."
+msgstr "Skaner jest wstrzymany na czas przedziału."
+
+msgid "Only these receivers scan this range, and they scan nothing else meanwhile."
+msgstr "Ten przedział skanują tylko te odbiorniki i nie skanują w tym czasie niczego innego."
+
+msgid "All receivers share this range: together they scan what it selects."
+msgstr "Wszystkie odbiorniki dzielą ten przedział: razem skanują to, co wybrano."
+
+msgid "Overlaps with {names} on the same receiver - only the first of them runs."
+msgstr "Nakłada się z: {names} na tym samym odbiorniku - uruchomi się tylko pierwszy z nich."
+
+msgid "Add-on settings →"
+msgstr "Ustawienia dodatku →"
+
+msgid "Schedule: {addon} has this receiver now."
+msgstr "Harmonogram: ten odbiornik ma teraz {addon}."
+
+msgid "Schedule: {name} started on receiver {n}."
+msgstr "Harmonogram: uruchomiono {name} na odbiorniku {n}."
+
+msgid "Schedule: could not start {name}: {error}"
+msgstr "Harmonogram: nie udało się uruchomić {name}: {error}"
+
+msgid "Schedule: {name} stopped."
+msgstr "Harmonogram: zatrzymano {name}."
+
+msgid "{name} is already running."
+msgstr "{name} już działa."
+
+msgid "Receiver {n} is already used by {name} - stop it first."
+msgstr "Odbiornik {n} jest już używany przez {name} - najpierw go zatrzymaj."
+
+msgid "{name} are using receivers"
+msgstr "{name} używają odbiorników"
+
+msgid "315 MHz - US sensors and tyre pressure"
+msgstr "315 MHz - amerykańskie czujniki i ciśnienie w oponach"
+
+msgid "345 MHz - security sensors"
+msgstr "345 MHz - czujniki alarmowe"
+
+msgid "915 MHz - US meters and sensors"
+msgstr "915 MHz - amerykańskie liczniki i czujniki"
+
+msgid "868.95 MHz - wireless M-Bus meters (water, heat)"
+msgstr "868,95 MHz - liczniki wireless M-Bus (woda, ciepło)"
+
+msgid "Capture width"
+msgstr "Szerokość przechwytu"
+
+msgid "Wider is needed by some meters and tyre sensors; automatic is right for most."
+msgstr "Szerszy przechwyt potrzebny jest niektórym licznikom i czujnikom opon; automatyczny pasuje do większości."
+
+msgid "Show remote controls and key fobs"
+msgstr "Pokazuj piloty i breloki"
+
+msgid "Off by default: they belong to somebody's car, garage or door. Their codes are never stored, even when this is on."
+msgstr "Domyślnie wyłączone: należą do czyjegoś samochodu, garażu lub drzwi. Ich kody nigdy nie są zapisywane, nawet gdy to włączysz."
+
+msgid "Extra decoders ({n} switched on)"
+msgstr "Dodatkowe dekodery (włączone: {n})"
+
+msgid "These decoders are off by default because they report false alarms more often."
+msgstr "Te dekodery są domyślnie wyłączone, bo częściej zgłaszają fałszywe alarmy."
+
+msgid "The program did not list its decoders."
+msgstr "Program nie podał listy dekoderów."
+
+msgid "Thermometer"
+msgstr "Termometr"
+
+msgid "Weather station"
+msgstr "Stacja pogodowa"
+
+msgid "Tyre pressure"
+msgstr "Ciśnienie w oponach"
+
+msgid "Power and energy"
+msgstr "Moc i energia"
+
+msgid "Utility meter"
+msgstr "Licznik (woda, gaz, prąd)"
+
+msgid "Door, motion or alarm"
+msgstr "Drzwi, ruch lub alarm"
+
+msgid "Remote control"
+msgstr "Pilot"
+
+msgid "Tank level"
+msgstr "Poziom w zbiorniku"
+
+msgid "Soil"
+msgstr "Gleba"
+
+msgid "Air quality"
+msgstr "Jakość powietrza"
+
+msgid "Lightning"
+msgstr "Błyskawice"
+
+msgid "Temperature"
+msgstr "Temperatura"
+
+msgid "Soil moisture"
+msgstr "Wilgotność gleby"
+
+msgid "Pressure"
+msgstr "Ciśnienie"
+
+msgid "Wind"
+msgstr "Wiatr"
+
+msgid "Gusts"
+msgstr "Porywy"
+
+msgid "Wind direction"
+msgstr "Kierunek wiatru"
+
+msgid "Rain"
+msgstr "Deszcz"
+
+msgid "Rain rate"
+msgstr "Natężenie deszczu"
+
+msgid "UV index"
+msgstr "Indeks UV"
+
+msgid "Lightning strikes"
+msgstr "Wyładowania"
+
+msgid "Strike distance"
+msgstr "Odległość wyładowania"
+
+msgid "PM2.5"
+msgstr "PM2,5"
+
+msgid "PM10"
+msgstr "PM10"
+
+msgid "CO₂"
+msgstr "CO₂"
+
+msgid "Power"
+msgstr "Moc"
+
+msgid "Energy"
+msgstr "Energia"
+
+msgid "Voltage"
+msgstr "Napięcie"
+
+msgid "Current"
+msgstr "Prąd"
+
+msgid "Meter reading"
+msgstr "Odczyt licznika"
+
+msgid "Set point"
+msgstr "Temperatura zadana"
+
+msgid "Battery OK"
+msgstr "Bateria OK"
+
+msgid "Kinds of device"
+msgstr "Rodzaje urządzeń"
+
+msgid "Kind"
+msgstr "Rodzaj"
+
+msgid "Main reading: min / average / max"
+msgstr "Główny odczyt: min / średnia / max"
+
+msgid "Notifications"
+msgstr "Powiadomienia"
+
+msgid "A decoded message or sensor reading"
+msgstr "Zdekodowana wiadomość lub odczyt czujnika"
+
+msgid "A recording"
+msgstr "Nagranie"
+
+msgid "A word in a transcript"
+msgstr "Słowo w transkrypcji"
+
+msgid "Something went wrong"
+msgstr "Coś poszło nie tak"
+
+msgid "1 minute"
+msgstr "1 minuta"
+
+msgid "5 minutes"
+msgstr "5 minut"
+
+msgid "1 hour"
+msgstr "1 godzina"
+
+msgid "6 hours"
+msgstr "6 godzin"
+
+msgid "24 hours"
+msgstr "24 godziny"
+
+msgid "Webhook"
+msgstr "Webhook"
+
+msgid "Frost: a sensor below 0 °C"
+msgstr "Mróz: czujnik poniżej 0 °C"
+
+msgid "A sensor battery is low"
+msgstr "Słaba bateria czujnika"
+
+msgid "A particular aircraft (fill in the registration)"
+msgstr "Konkretny samolot (wpisz rejestrację)"
+
+msgid "Words in ACARS / VDL2 messages"
+msgstr "Słowa w wiadomościach ACARS / VDL2"
+
+msgid "An APRS station within 50 km"
+msgstr "Stacja APRS w promieniu 50 km"
+
+msgid "Activity on 121.5 MHz (emergency)"
+msgstr "Aktywność na 121,5 MHz (awaryjna)"
+
+
+msgid "A receiver loses its connection"
+msgstr "Odbiornik traci połączenie"
+
+msgid "An add-on stops by itself"
+msgstr "Dodatek zatrzymuje się sam"
+
+msgid "Server"
+msgstr "Serwer"
+
+msgid "Topic"
+msgstr "Temat"
+
+msgid "Access token (if the topic is protected)"
+msgstr "Token dostępu (jeśli temat jest chroniony)"
+
+msgid "Bot token"
+msgstr "Token bota"
+
+msgid "Chat id"
+msgstr "Id czatu"
+
+msgid "Address"
+msgstr "Adres"
+
+msgid "Header (optional)"
+msgstr "Nagłówek (opcjonalnie)"
+
+msgid "Header value"
+msgstr "Wartość nagłówka"
+
+msgid "Broker"
+msgstr "Broker"
+
+msgid "Port"
+msgstr "Port"
+
+msgid "User name"
+msgstr "Nazwa użytkownika"
+
+msgid "Encrypted connection (TLS)"
+msgstr "Połączenie szyfrowane (TLS)"
+
+msgid "The test failed: {error}"
+msgstr "Test się nie udał: {error}"
+
+msgid "Test sent - did it arrive?"
+msgstr "Wysłano test - doszedł?"
+
+msgid "Send a test"
+msgstr "Wyślij test"
+
+msgid "only in the app"
+msgstr "tylko w aplikacji"
+
+msgid "any add-on"
+msgstr "dowolny dodatek"
+
+msgid "containing {words}"
+msgstr "zawierające {words}"
+
+msgid "about {who}"
+msgstr "dotyczące {who}"
+
+msgid "label {label}"
+msgstr "etykieta {label}"
+
+msgid "within {km} km"
+msgstr "w promieniu {km} km"
+
+msgid "a recording on {f} MHz"
+msgstr "nagranie na {f} MHz"
+
+msgid "any recording"
+msgstr "dowolne nagranie"
+
+msgid "any transcript"
+msgstr "dowolna transkrypcja"
+
+msgid "an add-on stops by itself"
+msgstr "dodatek zatrzymuje się sam"
+
+msgid "a receiver loses its connection"
+msgstr "odbiornik traci połączenie"
+
+msgid "When"
+msgstr "Gdy"
+
+msgid "none selected = any"
+msgstr "nic nie zaznaczono = dowolny"
+
+msgid "Contains any of"
+msgstr "Zawiera którekolwiek z"
+
+msgid "Aircraft, station or device"
+msgstr "Samolot, stacja lub urządzenie"
+
+msgid "ACARS label"
+msgstr "Etykieta ACARS"
+
+msgid "Within (km)"
+msgstr "W promieniu (km)"
+
+msgid "Sensor reading"
+msgstr "Odczyt czujnika"
+
+msgid "(any)"
+msgstr "(dowolny)"
+
+msgid "below"
+msgstr "poniżej"
+
+msgid "above"
+msgstr "powyżej"
+
+msgid "0 = any frequency"
+msgstr "0 = dowolna częstotliwość"
+
+msgid "Event"
+msgstr "Zdarzenie"
+
+msgid "Send to"
+msgstr "Wyślij do"
+
+msgid "no channel yet"
+msgstr "brak kanału"
+
+msgid "It always appears in the app as well."
+msgstr "Zawsze pojawia się też w aplikacji."
+
+msgid "At most once per"
+msgstr "Najwyżej raz na"
+
+msgid "for the same aircraft, station or device"
+msgstr "dla tego samego samolotu, stacji lub urządzenia"
+
+msgid "Add a channel…"
+msgstr "Dodaj kanał…"
+
+msgid "Add a rule…"
+msgstr "Dodaj regułę…"
+
+msgid "Tells you when something is worth knowing: a message that matches, a sensor reading, a recording on a frequency, a word in a transcript, a receiver that fell off. In the app it appears as a notice; the channels below send it to your phone or your home automation."
+msgstr "Daje znać, gdy coś jest warte uwagi: pasująca wiadomość, odczyt czujnika, nagranie na częstotliwości, słowo w transkrypcji, odbiornik, który odpadł. W aplikacji pojawia się jako powiadomienie; kanały poniżej wysyłają je na telefon lub do automatyki domowej."
+
+msgid "Nothing is sent anywhere until you add a channel. The text of a message then goes to that service (ntfy.sh, Telegram...) - use your own server if that matters."
+msgstr "Nic nie jest nigdzie wysyłane, dopóki nie dodasz kanału. Tekst wiadomości trafia wtedy do tej usługi (ntfy.sh, Telegram...) - jeśli to ma znaczenie, użyj własnego serwera."
+
+msgid "Where to send"
+msgstr "Dokąd wysyłać"
+
+msgid "Rules"
+msgstr "Reguły"
+
+msgid "No rules yet. Start from one of the examples."
+msgstr "Jeszcze nie ma reguł. Zacznij od jednego z przykładów."
+
+msgid "Recent notifications"
+msgstr "Ostatnie powiadomienia"
+
+msgid "sent"
+msgstr "wysłano"
+
+msgid "failed"
+msgstr "błąd"
+
+msgid "Nothing yet."
+msgstr "Jeszcze nic."
+
+msgid "Receiver {n} lost its connection - reconnecting."
+msgstr "Odbiornik {n} stracił połączenie - łączę ponownie."
+
+msgid "30 seconds"
+msgstr "30 sekund"
+
+msgid "A sensor reading crosses a limit (set it below)"
+msgstr "Odczyt czujnika przekracza wartość (ustaw ją poniżej)"
+
+msgid "A particular aircraft, station or device (name it below)"
+msgstr "Konkretny samolot, stacja lub urządzenie (wpisz nazwę poniżej)"
+
+msgid "An APRS station within a distance (set it below)"
+msgstr "Stacja APRS w zadanej odległości (ustaw ją poniżej)"
+
+msgid "Activity on a chosen frequency (set it below)"
+msgstr "Aktywność na wybranej częstotliwości (ustaw ją poniżej)"
+
+msgid "Chosen words in a transcript (set them below)"
+msgstr "Wybrane słowa w transkrypcji (ustaw je poniżej)"
+
+msgid "for the same aircraft, station, device or frequency; more matches in that time are counted in the next notice"
+msgstr "dla tego samego samolotu, stacji, urządzenia lub częstotliwości; kolejne trafienia w tym czasie są liczone w następnym powiadomieniu"
+
+msgid "(+{n} more since the last notice)"
+msgstr "(+{n} kolejnych od ostatniego powiadomienia)"
+
+msgid "Select all"
+msgstr "Zaznacz wszystkie"
+
+msgid "An extra dongle already uses this receiver."
+msgstr "Ten odbiornik jest już używany przez dodatkowy dongiel."
+
+msgid "This receiver is already used above - it can only be opened once."
+msgstr "Ten odbiornik jest już użyty wyżej - można go otworzyć tylko raz."
+msgid "Manual tuning"
+msgstr "Strojenie ręczne"
+
+msgid "Sensitivity index"
+msgstr "Indeks czułości"
+
+msgid "Enter a valid receiver gain."
+msgstr "Wpisz prawidłowe wzmocnienie odbiornika."
+
+msgid "DAB/DAB+ stations"
+msgstr "Stacje DAB/DAB+"
+
+msgid "Live spectrum and waterfall around the tuned frequency."
+msgstr "Widmo i wykres wodospadowy wokół dostrojonej częstotliwości."
+
+msgid "Click the spectrum to select a frequency"
+msgstr "Kliknij widmo, aby wybrać częstotliwość"
+
+msgid "No data. Tune to a frequency."
+msgstr "Brak danych. Dostrój odbiornik do częstotliwości."
+
+msgid "FM broadcast"
+msgstr "Radio FM"
+
+msgid "Tune"
+msgstr "Dostrój"
+
+msgid "Stop tuning"
+msgstr "Zakończ strojenie"
+
+msgid "DAB channel"
+msgstr "Kanał DAB"
+
+msgid "DAB channel {channel}"
+msgstr "Kanał DAB {channel}"
+
+msgid "DAB station"
+msgstr "Stacja DAB"
+
+msgid "Play station"
+msgstr "Odtwórz stację"
+
+msgid "Ready to tune."
+msgstr "Gotowość do strojenia."
+
+msgid "Opening receiver…"
+msgstr "Otwieranie odbiornika…"
+
+msgid "Waiting for DAB stations on {channel}…"
+msgstr "Wyszukiwanie stacji DAB na kanale {channel}…"
+
+msgid "Tuned to {frequency} MHz ({mode})"
+msgstr "Dostrojono do {frequency} MHz ({mode})"
+
+msgid "Invalid receiver."
+msgstr "Nieprawidłowy odbiornik."
+
+msgid "Choose a DAB channel."
+msgstr "Wybierz kanał DAB."
+
+msgid "Enter a frequency between 0 and 6000 MHz and select a modulation."
+msgstr "Wpisz częstotliwość większą od 0 i nie większą niż 6000 MHz oraz wybierz modulację."
+
+msgid "The selected receiver is already in use."
+msgstr "Wybrany odbiornik jest już używany."
+
+msgid "The receiver is still stopping. Try again."
+msgstr "Trwa zatrzymywanie odbiornika. Spróbuj ponownie."
+
+msgid "DAB decoder unavailable. Run the receiver installer with --server --with-dab."
+msgstr "Dekoder DAB jest niedostępny. Uruchom instalator odbiornika z opcjami --server --with-dab."
+
+msgid "The DAB decoder could not start."
+msgstr "Nie udało się uruchomić dekodera DAB."
+
+msgid "The DAB decoder could not keep up with the receiver."
+msgstr "Dekoder DAB nie nadąża z przetwarzaniem danych odbiornika."
+
+msgid "DAB station is unavailable."
+msgstr "Stacja DAB jest niedostępna."
+
+msgid "Tune a DAB channel first."
+msgstr "Najpierw dostrój odbiornik do kanału DAB."
+
+msgid "The receiver capture bandwidth is too narrow for DAB/DAB+."
+msgstr "Pasmo odbiornika jest zbyt wąskie dla DAB/DAB+."
+
+msgid "DAB channel {channel} synchronized, but no audio stations were decoded."
+msgstr "Zsynchronizowano kanał DAB {channel}, ale nie zdekodowano żadnej stacji audio."
+
+msgid "No DAB signal could be synchronized on channel {channel}."
+msgstr "Nie udało się zsynchronizować sygnału DAB na kanale {channel}."
+
+msgid "The DAB station is selected, but no audio is being decoded."
+msgstr "Wybrano stację DAB, ale dekoder nie odbiera dźwięku."
+
+msgid "Favourites"
+msgstr "Ulubione"
+
+msgid "No favourites saved."
+msgstr "Brak zapisanych ulubionych stacji."
+
+msgid "Add to favourites"
+msgstr "Dodaj do ulubionych"
+
+msgid "Remove from favourites"
+msgstr "Usuń z ulubionych"
+
+msgid "Station information"
+msgstr "Informacje o stacji"
+
+msgid "Ensemble"
+msgstr "Multipleks"
+
+msgid "Tune to the station first."
+msgstr "Najpierw dostrój się do stacji."
+
+msgid "The favourites cookie is full."
+msgstr "Plik cookie z ulubionymi jest pełny."
+
+msgid "The browser could not save favourites in a cookie."
+msgstr "Przeglądarka nie mogła zapisać ulubionych w pliku cookie."
+
+msgid "Stop scanning or tuning to change the device or capture width."
+msgstr "Zatrzymaj skanowanie lub strojenie, aby zmienić urządzenie lub szerokość przechwytywania."
+
+msgid "Station artwork"
+msgstr "Grafika stacji"
+
+msgid "Station artwork is unavailable."
+msgstr "Grafika stacji jest niedostępna."
+
+msgid "Invalid recording request."
+msgstr "Nieprawidłowe żądanie nagrywania."
+
+msgid "Tune to a station before recording."
+msgstr "Przed nagrywaniem dostrój się do stacji."
