@@ -1,5 +1,7 @@
 # AliSDR
 
+Current version: **[1.1.5](docs/releases/1.1.5.md)**
+
 <img src="alisdr/web/static/icon.svg" width="96" align="right" alt="AliSDR logo">
 
 A wideband radio scanner for SDR receivers that **records only the

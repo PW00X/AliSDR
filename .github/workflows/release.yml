@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - alisdr/__init__.py
+      - docs/releases/**
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'PW00X/AliSDR' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m compileall -q main.py alisdr tests
+      - run: python -m unittest tests/test_core.py tests/test_addons.py
+      - name: Publish the version from source
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const source = fs.readFileSync('alisdr/__init__.py', 'utf8');
+            const match = source.match(/^__version__ = "(\d+\.\d+\.\d+)"$/m);
+            if (!match) throw new Error('A stable source version is required.');
+            const version = match[1];
+            const tag = `v${version}`;
+            const body = fs.readFileSync(`docs/releases/${version}.md`, 'utf8');
+            const repo = context.repo;
+            try {
+              const release = await github.rest.repos.getReleaseByTag({ ...repo, tag });
+              core.info(`${tag} is already published: ${release.data.html_url}`);
+              return;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            // Do not silently publish an existing tag from another commit.
+            try {
+              await github.rest.git.getRef({ ...repo, ref: `tags/${tag}` });
+              throw new Error(`${tag} already exists without a release; inspect it before publishing.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            const release = await github.rest.repos.createRelease({
+              ...repo,
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: `AliSDR ${version}`,
+              body,
+              draft: false,
+              prerelease: false,
+              make_latest: 'true',
+            });
+            await core.summary.addLink(`AliSDR ${version}`, release.data.html_url).write();
