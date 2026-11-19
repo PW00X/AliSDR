@@ -184,6 +184,7 @@ class Controller:
         self._manual_error = ""
         self._manual_record_lock = threading.Lock()
         self._manual_recording: _ManualRecording | None = None
+        self._manual_recording_revision = 0
         self._manual_finishing: set[Path] = set()
         self._manual_record_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="manual-recording")
         self.log(i18n.tr("Ready."))
@@ -489,6 +490,8 @@ class Controller:
 
     def _index_manual_recording(self, path: Path) -> None:
         self.library.add_file(path)
+        with self._lock:
+            self._manual_recording_revision += 1
         self._notify_recording(str(path))
 
     def _finish_manual_mp3(self, path: Path) -> None:
@@ -973,6 +976,7 @@ class Controller:
                 "running": bool(self._engines),
                 "stopping": any(e._stop_evt.is_set() for k, e in enumerate(self._engines) if k not in self._held),
                 "manual_tuning": session is not None,
+                "manual_recording_revision": self._manual_recording_revision,
                 "manual_tuning_recording": self._manual_recording is not None,
                 "manual_broadcast": bool(session and session.fm_scan is None and session.tuning.mode in ("DAB", "WFM")),
                 "manual_dab": bool(session and session.tuning.mode == "DAB"),

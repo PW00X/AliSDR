@@ -549,16 +549,28 @@ export function recordingsView(root) {
 
   // Files still being written aren't in the list yet (they appear once the
   // transmission's hold time ends) - say what's being recorded right now.
+  let recordingRevision = S.live?.manual_recording_revision ?? 0;
   const renderRecordingNow = () => {
     const live = S.live;
     const freqs = live && live.recording && ['SIGNAL_DETECTED', 'LINGER'].includes(live.state) ? live.frequencies : [];
-    recordingNow.classList.toggle('hidden', !freqs.length);
+    if (live && !loading && live.manual_recording_revision !== recordingRevision) {
+      recordingRevision = live.manual_recording_revision;
+      reload();
+      loadFacets();
+    }
+    recordingNow.classList.toggle('hidden', !freqs.length && !live?.manual_tuning_recording);
+    if (live?.manual_tuning_recording) {
+      mount(recordingNow, h('span.chip.bad.live', h('span.dot'), t('Recording now')),
+        h('span.muted', t('Stop recording on Listen to see the finished file here.')));
+      return;
+    }
     if (freqs.length) {
       mount(recordingNow, h('span.chip.bad.live', h('span.dot'), t('Recording now')),
         freqs.map(([f, n]) => h('span.chip', h('b.mono', fmtChannel(f)), n ? ` ${n}` : '')),
         h('span.muted', t('appears in the list when the transmission ends')));
     }
   };
+  renderRecordingNow();
   offs.push(on('live', renderRecordingNow));
   offs.push(on('settings', () => current && renderPlayer()));
   reload();

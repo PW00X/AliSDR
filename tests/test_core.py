@@ -3226,6 +3226,10 @@ class ManualTuningTest(unittest.TestCase):
         (saved_file,) = Path(cfg.recording.output_dir).rglob("*_Radio Plus.wav")
         from alisdr.playback.organizer import parse_recording
         self.assertEqual(parse_recording(saved_file).freq_khz, 223936)
+        with urlopen(Request(url + "/library?q=Radio%20Plus", headers=headers), timeout=5) as response:
+            (item,) = json.load(response)["items"]
+            self.assertEqual((item["name"], item["freq_khz"]), ("Radio Plus", 223936))
+        self.assertEqual(ctl.live()["manual_recording_revision"], 1)
         with wave.open(str(saved_file), "rb") as wav:
             self.assertEqual((wav.getframerate(), wav.getnchannels()), (48000, 2))
             stereo = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2").reshape(-1, 2)

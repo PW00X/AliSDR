@@ -4225,3 +4225,6 @@ msgstr "Kanały zmieniły się podczas importu. Zaimportuj plik ponownie, aby sp
 
 msgid "Imported {added} new channels and replaced {replaced} existing channels."
 msgstr "Zaimportowano {added} nowych kanałów i zastąpiono {replaced} istniejących."
+
+msgid "Stop recording on Listen to see the finished file here."
+msgstr "Zatrzymaj nagrywanie na stronie Słuchaj, aby zobaczyć tutaj gotowy plik."
