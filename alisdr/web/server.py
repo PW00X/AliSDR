@@ -34,7 +34,7 @@ from ..addons import install as installer
 from ..addons.external import list_rtl433_protocols
 from ..addons.sensors import metrics as sensor_metrics
 from ..config import AppConfig
-from ..controller import Controller, channel_dict, channel_from_dict
+from ..controller import Controller, channel_from_dict
 from ..military_presets import BandPreset
 from ..models import BlacklistEntry
 
@@ -366,10 +366,6 @@ def make_handler(app: App):
 
         def settings(self, _query: dict) -> None:
             data = ctl.settings()
-            data["curated"] = {
-                "military": [channel_dict(c) for c in military_presets.MILITARY_CHANNELS],
-                "fire": [channel_dict(c) for c in military_presets.FIRE_CHANNELS],
-            }
             data["mode"] = "server"
             data["config"].pop("access_token", None)
             data["config"].pop("remote_receiver", None)

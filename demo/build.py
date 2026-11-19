@@ -24,7 +24,6 @@ sys.path.insert(0, str(ROOT))
 
 from alisdr import __version__, i18n, military_presets  # noqa: E402
 from alisdr.config import AppConfig  # noqa: E402
-from alisdr.controller import channel_dict  # noqa: E402
 
 sys.path.insert(0, str(DEMO))
 import audio  # noqa: E402
@@ -38,10 +37,6 @@ def fixtures() -> dict:
         "version": __version__,
         "config": config,
         "presets": [{**p.to_dict(), "user": False} for p in military_presets.get_all_presets()],
-        "curated": {
-            "military": [channel_dict(c) for c in military_presets.MILITARY_CHANNELS],
-            "fire": [channel_dict(c) for c in military_presets.FIRE_CHANNELS],
-        },
         "languages": [{"code": c, "name": i18n.LANGUAGE_NAMES.get(c, c)} for c in i18n.available_languages()],
         "i18n": {c: i18n.catalog_for(c) for c in i18n.available_languages()},
     }

@@ -1,6 +1,7 @@
 // "Channels": the Memory List (named frequencies in folders, each with its
 // own modulation, priority weight and on/off) and the blacklist.
-import { carrierHz, confirmDialog, fmtChannel, fmtMHz, formDialog, h, icon, mount, select, tabs, t, toast, typedAs833 } from '../core.js';
+import { api, carrierHz, confirmDialog, errorToast, fmtChannel, fmtMHz, formDialog, h, icon, modal, mount, select, tabs, t, toast, typedAs833 } from '../core.js';
+import { exportChannelsXml, MAX_CHANNEL_FILE_BYTES, parseChannelsXml, planChannelImport } from '../channel-transfer.js';
 import { S, cfg, loadSettings, on, patchConfig, saveBlacklist, saveChannels } from '../state.js';
 import { modLabel, modOptions } from './bands.js';
 let tab = 'memory';
@@ -275,15 +276,61 @@ export function channelsView(root) {
     render();
   }
 
-  async function loadCurated(kind) {
-    const existing = new Set(S.settings.channels.map((c) => c.freq_hz));
-    const folder = kind === 'military' ? t('Military') : t('Fire brigade');
-    const add = S.settings.curated[kind].filter((c) => !existing.has(c.freq_hz)).map((c) => ({ ...c, folder }));
-    if (!add.length) { toast(t('All of these are already in the list.')); return; }
-    if (!cfg().channel_folders.includes(folder)) patchConfig({ channel_folders: [...cfg().channel_folders, folder] });
-    await saveChannels([...S.settings.channels, ...add]);
-    toast(t('Added {n} channels', { n: add.length }), 'good');
-    render();
+  let transferBusy = false;
+  const channelFile = h('input', { type: 'file', accept: '.xml,application/xml,text/xml', class: 'hidden',
+    'aria-label': t('Import channels'), onchange: async () => {
+      const file = channelFile.files[0];
+      channelFile.value = '';
+      if (!file || transferBusy) return;
+      transferBusy = true;
+      try {
+        if (file.size > MAX_CHANNEL_FILE_BYTES) throw new Error(t('The channel XML file must be smaller than 5 MB.'));
+        const imported = parseChannelsXml(await file.text());
+        await loadSettings();
+        const baseline = JSON.stringify(S.settings.channels);
+        const plan = planChannelImport(S.settings.channels, imported.channels);
+        const replacements = new Set();
+        const choices = plan.conflicts.map(({ current, incoming }) => select([
+          ['keep', t('Keep existing')], ['replace', t('Replace with imported')],
+        ], 'keep', value => value === 'replace' ? replacements.add(current.freq_hz) : replacements.delete(current.freq_hz),
+        { style: { width: 'auto', maxWidth: '100%' }, 'aria-label': t('Import choice for {f} MHz', { f: fmtChannel(current.freq_hz) }) }));
+        const description = channel => [modLabel(channel.modulation), channel.folder || t('(no folder)'),
+          channel.enabled ? t('Scan') : t("Don't scan"), `${t('Priority weight')}: ${channel.weight}`,
+          channel.ch833 ? t('8.33 channel {c}', { c: fmtChannel(channel.freq_hz) }) : ''].filter(Boolean).join(' · ');
+        const summary = h('div.col',
+          h('p', t('{added} new, {conflicts} changed, {unchanged} unchanged channels.', {
+            added: plan.added.length, conflicts: plan.conflicts.length, unchanged: plan.unchanged })),
+          plan.conflicts.length ? h('p.small.muted', t('Choose which existing channels to replace. Names and all other channel settings are kept unless you choose Replace with imported.')) : null,
+          ...plan.conflicts.map(({ current, incoming }, i) => h('div.col',
+            { style: { borderTop: '1px solid var(--separator)', paddingTop: '12px' } },
+            h('div.row.wrap', h('b.mono', `${fmtChannel(current.freq_hz)} MHz`), h('span.spacer'), choices[i]),
+            h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', overflowWrap: 'anywhere' } },
+              ...[[t('Existing'), current], [t('Imported'), incoming]].map(([label, channel]) => h('div.col', { style: { gap: '4px' } },
+                h('span.small.muted', label), h('b', channel.name || t('(unnamed)')), h('span.small.muted', description(channel))))))));
+        if (!(await modal(t('Import channels'), summary,
+          [[t('Cancel'), false, 'ghost'], [t('Import'), true, 'primary']], { dismissible: false }))) return;
+        // Recheck after the review dialog so changes made by another client are not discarded.
+        await loadSettings();
+        if (JSON.stringify(S.settings.channels) !== baseline) throw new Error(t('Channels changed during import. Please import the file again to review the latest channels.'));
+        const byFrequency = new Map(S.settings.channels.map(channel => [channel.freq_hz, channel]));
+        for (const channel of plan.added) byFrequency.set(channel.freq_hz, channel);
+        for (const { incoming } of plan.conflicts) if (replacements.has(incoming.freq_hz)) byFrequency.set(incoming.freq_hz, incoming);
+        await api.put('/api/channels', [...byFrequency.values()]);
+        const mergedFolders = [...new Set([...cfg().channel_folders, ...imported.folders])];
+        await api.post('/api/config', { channel_folders: mergedFolders });
+        await loadSettings();
+        sel.clear(); render();
+        toast(t('Imported {added} new channels and replaced {replaced} existing channels.', { added: plan.added.length, replaced: replacements.size }), 'good');
+      } catch (error) { errorToast(error); }
+      finally { transferBusy = false; }
+    } });
+
+  function exportChannels() {
+    const xml = exportChannelsXml(S.settings.channels, cfg().channel_folders);
+    const url = URL.createObjectURL(new Blob([xml], { type: 'application/xml;charset=utf-8' }));
+    const link = h('a', { href: url, download: 'alisdr-channels.xml' });
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function channelRow(ch) {
@@ -334,13 +381,13 @@ export function channelsView(root) {
         h('div.grow', search),
         h('button.primary', { onclick: () => editChannel(null) }, icon('plus'), t('Add channel')),
         h('button', { onclick: newFolder }, icon('folder'), t('New folder')),
+        h('button', { onclick: () => channelFile.click() }, t('Import')),
+        h('button', { onclick: exportChannels }, icon('download'), t('Export')),
         S.settings.channels.length ? h('button.ghost.danger', { onclick: deleteAll }, icon('trash'), t('Delete all')) : null),
+      channelFile,
       h('div.row.wrap.small.muted',
         t('{n} channels, {e} scanned', { n: S.settings.channels.length, e: enabled }),
-        cfg().memory_list_enabled ? null : h('span.chip.warn', t('The Memory List is switched off on the Scan page')),
-        h('span.spacer'),
-        h('button.ghost.small', { onclick: () => loadCurated('military') }, t('Add Polish military frequencies')),
-        h('button.ghost.small', { onclick: () => loadCurated('fire') }, t('Add Polish fire brigade frequencies'))),
+        cfg().memory_list_enabled ? null : h('span.chip.warn', t('The Memory List is switched off on the Scan page'))),
       bulkBox,
       S.settings.channels.length
         ? h('div.table-wrap', h('table',

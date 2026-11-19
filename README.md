@@ -1,6 +1,11 @@
 # AliSDR
 
-Current version: **[1.2.0](docs/releases/1.2.0.md)**
+Current source version: **1.2.1** (unreleased)
+
+On the Channels page, use **Export** to download an XML backup of the complete
+Memory List and its folders. Use **Import** on another AliSDR install to restore
+it. Channels are matched by carrier frequency; changed entries are shown for
+review and stay unchanged unless you choose **Replace with imported**.
 
 <img src="alisdr/web/static/icon.svg" width="96" align="right" alt="AliSDR logo">
 

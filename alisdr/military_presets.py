@@ -1,20 +1,4 @@
-"""Curated military/NATO aviation, fire-brigade and emergency-services
-frequencies for Poland with a realistic chance of catching real traffic
-(tankers, Baltic Air Policing/QRA, exercises near the eastern flank; PSP/OSP
-rescue-firefighting dispatch; PRM ambulance dispatch). All aviation voice
-channels use AM, same as civil aviation; fire-brigade/PRM channels use NFM.
-
-Sources are public monitoring references (NATO Joint Civil/Military Frequency
-Agreement UHF band 225-400 MHz, published guard/common-use frequencies, Polish
-military airbase tower/approach frequencies, the nationwide PSP "Kanal
-Ratowniczo-Gasniczy" (KRG) channel plan plus the OSP siren-alerting frequency
-pair, and the 168.5-169.2 MHz band used by PRM/pogotowie ratunkowe dispatch)
-as documented by hobbyist aviation/PMR-monitoring sites. Real-world usage
-shifts with exercises, re-assignments and PSP/OSP's ongoing migration to
-digital DMR (many OSP units still run analog, but not all), so treat this as a
-good starting point, not a guarantee - add anything you personally confirm
-active via the Memory List tab.
-"""
+"""Editable country-neutral band presets, bundled as JSON with user overrides."""
 from __future__ import annotations
 
 import json
@@ -23,13 +7,8 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from .config import CONFIG_DIR, VfoRangeConfig, atomic_write_text
-from .models import Channel, Modulation
 
 logger = logging.getLogger(__name__)
-
-
-def _ch(freq_mhz: float, name: str, modulation: Modulation = Modulation.AM) -> Channel:
-    return Channel(freq_hz=int(round(freq_mhz * 1e6)), name=name, modulation=modulation, enabled=True)
 
 
 @dataclass(frozen=True)
@@ -63,8 +42,7 @@ class BandPreset:
 
 
 # Built-in presets (gotcha 21): an editable JSON file shipped with the app,
-# useful in any country - country-specific frequencies are the opt-in
-# channel lists below.
+# useful in any country.
 _BUILTIN_PRESETS_PATH = Path(__file__).resolve().parent / "presets" / "band_presets.json"
 # The user's additions, edits and hidden built-ins; updates never touch it.
 USER_PRESETS_PATH = CONFIG_DIR / "band_presets.json"
@@ -195,73 +173,3 @@ def is_user_owned_preset(preset_id: str) -> bool:
     """True when the user file has this id (a user preset or an edited
     built-in); False for an untouched built-in."""
     return preset_id in {p.id for p in load_user_presets()}
-
-
-# Curated discrete channels (Memory List mode) ------------------------------
-# Highest hit-rate picks: guard, tankers, Warsaw OAT sectors and the bases
-# most active in Baltic Air Policing. Names are the real facility names heard
-# on air - proper nouns, not translated.
-MILITARY_CHANNELS: list[Channel] = [
-    # -- Guard / emergency (always worth a slot, near-constant monitoring) --
-    _ch(243.000, "UHF Guard (MAD, emergency)"),
-    _ch(121.500, "VHF Guard (IAD, emergency)"),
-
-    # -- NATO/USAF common air-to-air refueling (tankers) --
-    _ch(282.000, "Tankowanie - AR Common"),
-    _ch(282.800, "Tankowanie - AR Common"),
-    _ch(294.800, "Tankowanie - USAF Air Refueling"),
-    _ch(299.600, "Tankowanie - AR Common"),
-    _ch(341.700, "Tankowanie - AR Primary (boom coord.)"),
-    _ch(349.700, "Tankowanie - AR Secondary (boom coord.)"),
-    _ch(282.100, "SAR / Search and Rescue"),
-
-    # -- EPWW (Warsaw) OAT - military in-flight control sectors --
-    _ch(378.050, "EPWW OAT GF/B (UHF)"),
-    _ch(278.600, "EPWW OAT GF/NE (UHF)"),
-    _ch(267.825, "EPWW OAT NE/C (UHF)"),
-    _ch(280.725, "EPWW OAT JR (UHF)"),
-    _ch(339.850, "EPWW OAT DT/B (UHF)"),
-    _ch(143.500, "EPWW OAT GF/NE/JR/C sekundarna (VHF)"),
-    _ch(139.000, "EPWW OAT DT/B sekundarna (VHF)"),
-
-    # -- Malbork EPMB (QRA, Baltic Air Policing) --
-    _ch(235.200, "Malbork PAR (UHF)"),
-    _ch(240.550, "Malbork Approach (UHF)"),
-    _ch(234.050, "Malbork Wieza/Tower (UHF)"),
-
-    # -- Lask EPLK (F-16, BAP) --
-    _ch(306.775, "Lask ATIS (UHF)"),
-
-    # -- Minsk Mazowiecki EPMM (eastern flank, deployment/refueling) --
-    _ch(278.575, "Minsk Mazowiecki Approach (UHF)"),
-    _ch(279.075, "Minsk Mazowiecki Wieza/Tower (UHF)"),
-
-    # -- Powidz EPPW (strategic transport, tankers) --
-    _ch(279.850, "Powidz ATIS (UHF)"),
-
-    # -- Swidwin EPSN --
-    _ch(234.800, "Swidwin PAR (UHF)"),
-    _ch(278.975, "Swidwin Approach (UHF)"),
-    _ch(233.975, "Swidwin Wieza/Tower (UHF)"),
-
-    # -- Miroslawiec EPMI (UAVs/drones, support) --
-    _ch(234.075, "Miroslawiec PAR (UHF)"),
-    _ch(234.875, "Miroslawiec Approach (UHF)"),
-    _ch(264.875, "Miroslawiec Wieza/Tower (UHF)"),
-]
-
-# Fire brigade (PSP/OSP): the nationwide KRG 1-8 rescue channels
-# (148.6625-149.3375 MHz, NFM) plus the OSP siren-alerting pair. Local
-# channels in the same band may also be in use; part of PSP is on DMR now.
-FIRE_CHANNELS: list[Channel] = [
-    _ch(148.7000, "PSP KRG 1 (nationwide)", Modulation.NFM),
-    _ch(149.0875, "PSP KRG 2 (nationwide)", Modulation.NFM),
-    _ch(149.1375, "PSP KRG 3 (nationwide)", Modulation.NFM),
-    _ch(149.1625, "PSP KRG 4 (nationwide)", Modulation.NFM),
-    _ch(149.2250, "PSP KRG 5 (nationwide)", Modulation.NFM),
-    _ch(149.2375, "PSP KRG 6 (nationwide)", Modulation.NFM),
-    _ch(149.2625, "PSP KRG 7 (nationwide)", Modulation.NFM),
-    _ch(149.2750, "PSP KRG 8 (nationwide)", Modulation.NFM),
-    _ch(148.7250, "OSP - siren alerting (Tx)", Modulation.NFM),
-    _ch(148.8250, "OSP - siren alerting (Rx)", Modulation.NFM),
-]

@@ -4,9 +4,8 @@ on:
   push:
     branches: [master]
     paths:
-      - alisdr/__init__.py
+      # A version bump alone is unreleased; release notes explicitly publish it.
       - docs/releases/**
-      - .github/workflows/release.yml
   workflow_dispatch:
 
 permissions:

@@ -898,7 +898,7 @@ function settings() {
     devices: DEVICES.map((d) => ({ driver: d.driver, args: d.driver === 'rtl_tcp' && st.config.device.driver === 'rtl_tcp' ? st.config.device.device_args || '' : '', label: tr(d.label), rate: d.rate })),
     languages: FX.languages,
     capabilities: { ffmpeg: true, transcription_installed: true, digital: false, platform: 'linux' },
-    curated: FX.curated, mode: 'server', password_set: false,
+    mode: 'server', password_set: false,
   };
 }
 

@@ -1729,12 +1729,6 @@ msgstr "kanałów: {n}, skanowanych: {e}"
 msgid "The Memory List is switched off on the Scan page"
 msgstr "Lista pamięci jest wyłączona na stronie Skanowanie"
 
-msgid "Add Polish military frequencies"
-msgstr "Dodaj polskie częstotliwości wojskowe"
-
-msgid "Add Polish fire brigade frequencies"
-msgstr "Dodaj polskie częstotliwości straży"
-
 msgid "Mode"
 msgstr "Emisja"
 
@@ -4183,3 +4177,51 @@ msgstr "Dekoder DAB jest niedostępny. Uruchom instalator dla systemu Linux, aby
 
 msgid "From an AliSDR checkout on the worker, run:"
 msgstr "W katalogu źródłowym AliSDR na komputerze roboczym uruchom:"
+
+msgid "Import channels"
+msgstr "Importuj kanały"
+
+msgid "Import"
+msgstr "Importuj"
+
+msgid "Use an AliSDR channel XML file without a document type or entities."
+msgstr "Użyj pliku XML kanałów AliSDR bez deklaracji typu dokumentu ani encji."
+
+msgid "This is not a supported AliSDR channel XML file."
+msgstr "To nie jest obsługiwany plik XML kanałów AliSDR."
+
+msgid "Invalid channel data at entry {n}."
+msgstr "Nieprawidłowe dane kanału w pozycji {n}."
+
+msgid "The XML file contains duplicate frequencies. No channels were imported."
+msgstr "Plik XML zawiera powtarzające się częstotliwości. Nie zaimportowano żadnych kanałów."
+
+msgid "The channel XML file must be smaller than 5 MB."
+msgstr "Plik XML kanałów musi być mniejszy niż 5 MB."
+
+msgid "Keep existing"
+msgstr "Zachowaj istniejący"
+
+msgid "Replace with imported"
+msgstr "Zastąp importowanym"
+
+msgid "Import choice for {f} MHz"
+msgstr "Wybór importu dla {f} MHz"
+
+msgid "{added} new, {conflicts} changed, {unchanged} unchanged channels."
+msgstr "Kanały: {added} nowych, {conflicts} zmienionych, {unchanged} bez zmian."
+
+msgid "Choose which existing channels to replace. Names and all other channel settings are kept unless you choose Replace with imported."
+msgstr "Wybierz istniejące kanały do zastąpienia. Nazwy i pozostałe ustawienia zostaną zachowane, chyba że wybierzesz Zastąp importowanym."
+
+msgid "Existing"
+msgstr "Istniejący"
+
+msgid "Imported"
+msgstr "Importowany"
+
+msgid "Channels changed during import. Please import the file again to review the latest channels."
+msgstr "Kanały zmieniły się podczas importu. Zaimportuj plik ponownie, aby sprawdzić aktualne kanały."
+
+msgid "Imported {added} new channels and replaced {replaced} existing channels."
+msgstr "Zaimportowano {added} nowych kanałów i zastąpiono {replaced} istniejących."
