@@ -1,4 +1,5 @@
-// Live audio: one long fetch() of raw PCM16 (X-Sample-Rate header) from
+// Android uses native WAV streaming for background playback and media controls.
+// Desktop live audio: one long fetch() of raw PCM16 (X-Sample-Rate header) from
 // /api/audio, each chunk scheduled back to back as an AudioBufferSourceNode.
 // Works over plain http:// to an IP (no AudioWorklet, which needs HTTPS).
 // Keeps ~0.4 s of latency and resyncs after gaps (no transmission = no data). 0.25 s was
@@ -33,6 +34,11 @@ export function makeLoudnessChain(ctx, boostDbValue) {
 }
 
 export const liveAudio = {
+  // Android must own the network audio as media, rather than a JS-fed MediaStream.
+  // This works over the receiver's plain HTTP URL as well as HTTPS.
+  native: /Android/i.test(navigator.userAgent),
+  generation: 0,
+  retry: null,
   ctx: null,
   gain: null,
   chain: null,
@@ -52,35 +58,55 @@ export const liveAudio = {
       this.gain.gain.value = this.volume;
       this.chain = makeLoudnessChain(this.ctx, this.boostDb);
       this.chain.output.connect(this.gain);
-      // Through an <audio> element, not straight to the speakers: Android then treats
-      // it as media playback - keeps it going with the screen off, shows controls.
-      if (this.ctx.createMediaStreamDestination) {
+      if (this.native) {
+        this.el = new Audio();
+        this.el.preload = 'none';
+        this.input = this.ctx.createMediaElementSource(this.el);
+        this.input.connect(this.broadcast ? this.gain : this.chain.input);
+        this.gain.connect(this.ctx.destination);
+        this.el.onplay = () => this.ctx.resume().catch(e => console.warn('live audio:', e));
+        this.el.onerror = this.el.onended = () => this._retryNative();
+        this.el.onpause = () => {
+          if (this.playing && this.el.paused && !this.el.error && !this.el.ended && this.el.readyState >= 2) this.stop();
+        };
+      } else if (this.ctx.createMediaStreamDestination) {
         const dest = this.ctx.createMediaStreamDestination();
         this.gain.connect(dest);
         this.el = new Audio();
         this.el.srcObject = dest.stream;
       } else this.gain.connect(this.ctx.destination);
     }
-    if (this.el) this.el.play().catch(() => {});
-    await this.ctx.resume();
+    // Both calls must originate in the Listen tap, before awaiting either promise.
+    const resumed = this.ctx.resume();
+    if (this.native && !this.el.getAttribute('src')) this.el.src = this._nativeURL();
+    const playback = this.el ? this.el.play() : Promise.resolve();
+    if (this.native) await Promise.all([resumed, playback]);
+    else { playback.catch(() => {}); await resumed; }
   },
 
   async start() {
-    await this.prepare();
+    const generation = ++this.generation;
+    try { await this.prepare(); }
+    catch (e) { if (generation === this.generation) this.stop(); throw e; }
+    if (generation !== this.generation) return;
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: 'AliSDR', artist: 'Live' });
-      navigator.mediaSession.setActionHandler('play', () => this.start());
+      if ('MediaMetadata' in window) navigator.mediaSession.metadata = new MediaMetadata({ title: 'AliSDR', artist: 'Live' });
+      navigator.mediaSession.setActionHandler('play', () => this.start().catch(e => console.warn('live audio:', e)));
       navigator.mediaSession.setActionHandler('pause', () => this.stop());
+      navigator.mediaSession.setActionHandler('stop', () => this.stop());
+      navigator.mediaSession.playbackState = 'playing';
     }
     this.playing = true;
     this.onchange();
-    if (!this.ctrl) this._stream();
+    if (!this.native && !this.ctrl) this._stream();
   },
 
   stop() {
+    ++this.generation;
     this.playing = false;
     this.resetStream();
     if (this.el) this.el.pause();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     this.onchange();
   },
 
@@ -88,10 +114,41 @@ export const liveAudio = {
     if (this.broadcast === enabled) return;
     this.broadcast = enabled;
     this.resetStream();
-    if (this.playing) this._stream();
+    if (this.native && this.input) {
+      this.input.disconnect();
+      this.input.connect(this.broadcast ? this.gain : this.chain.input);
+    }
+    if (this.playing) {
+      if (this.native) this.start().catch(e => console.warn('live audio:', e));
+      else this._stream();
+    }
+  },
+
+  _nativeURL() {
+    return '/api/audio?format=wav' + (this.broadcast ? '&broadcast=1' : '');
+  },
+
+  _retryNative() {
+    if (!this.playing || this.retry) return;
+    const generation = this.generation;
+    this.retry = setTimeout(() => {
+      this.retry = null;
+      if (!this.playing || generation !== this.generation) return;
+      this.el.src = this._nativeURL();
+      this.el.play().catch(e => {
+        if (e.name === 'NotAllowedError') this.stop();
+        else this._retryNative();
+      });
+    }, 1000);
   },
 
   resetStream() {
+    clearTimeout(this.retry);
+    this.retry = null;
+    if (this.native && this.el) {
+      this.el.removeAttribute('src');
+      this.el.load();  // abort the media request, including while paused
+    }
     if (this.ctrl) { this.ctrl.abort(); this.ctrl = null; }
     for (const source of this.sources) source.stop();
     this.sources.clear();

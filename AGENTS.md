@@ -438,12 +438,20 @@ catalog loads; wrap them in a function called at point of use
     `POST /api/config` → `merge_patch`, which coerces to the field's current
     type); only `bands` goes as a whole list. `access_token` and `workers`
     are never patchable — they have their own endpoints.
-40. **Live audio in the browser = one long `fetch()` of raw PCM16 +
+40. **Desktop live audio = one long `fetch()` of raw PCM16 +
     back-to-back `AudioBufferSourceNode`s** (`live-audio.js`, same approach
     as the owner's SW listener). Not `AudioWorklet`: that needs a secure
     context (HTTPS/localhost), and the UI is reached by plain `http://IP`.
     Idle streams get 10 ms of silence every 5 s (keeps proxies/sockets
-    alive and lets the server notice dead listeners).
+    alive and lets the server notice dead listeners). Android instead uses
+    an `<audio src="/api/audio?format=wav">` as the Web Audio input so Chrome
+    owns the media request and Android audio focus; a generated MediaStream
+    output alone does not reliably keep background playback alive. WAV streams
+    supply real-time silence while idle, preserve mono/stereo sample rates,
+    and reconnect on errors/end. Stop unloads the source to release the request.
+    Keep Media Session play/pause/stop and playbackState in sync. Both paths
+    work over plain HTTP. Never wait for the desktop MediaStream element's
+    play promise before starting its PCM fetch (it would wait for its own data).
 41. **Server shutdown closes every open recording.** SIGTERM/SIGINT
     set the stop event in `main.py`; the main thread calls
     `controller.shutdown()` before exiting.

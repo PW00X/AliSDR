@@ -2592,6 +2592,49 @@ class WorkerSafeRelTest(unittest.TestCase):
 
 
 class HttpTest(unittest.TestCase):
+    def test_native_live_audio_is_authenticated_streaming_wav(self) -> None:
+        import queue
+        import struct
+        from http.server import ThreadingHTTPServer
+        from alisdr.web.server import App, make_handler
+
+        class Ctl:
+            library = None
+
+            def live(self, since_log=0):
+                return {"audio_rate": 12500}
+
+            def subscribe_audio(self, broadcast=False):
+                q = queue.Queue()
+                q.put(struct.pack("<hh", 1200, -800) * 480)
+                return q
+
+            def unsubscribe_audio(self, q, broadcast=False):
+                pass
+
+        web = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "secret")))
+        web.daemon_threads = True
+        threading.Thread(target=web.serve_forever, daemon=True).start()
+        self.addCleanup(web.server_close)
+        self.addCleanup(web.shutdown)
+        url = f"http://127.0.0.1:{web.server_port}/api/audio?format=wav"
+        self.assertEqual(self._status(url), 401)
+        for broadcast, rate, channels in ((False, 12500, 1), (True, 48000, 2)):
+            with self.subTest(broadcast=broadcast):
+                request = Request(url + ("&broadcast=1" if broadcast else ""),
+                                  headers={"Authorization": "Bearer secret"})
+                with urlopen(request, timeout=3) as response:
+                    self.assertEqual(response.headers["Content-Type"], "audio/wav")
+                    header = struct.unpack("<4sI4s4sIHHIIHH4sI", response.read(44))
+                    self.assertEqual(header[0:1] + header[2:4], (b"RIFF", b"WAVE", b"fmt "))
+                    self.assertEqual(header[5:11], (1, channels, rate, rate * channels * 2, channels * 2, 16))
+                    self.assertEqual(header[11], b"data")
+                    self.assertEqual(header[1], header[12] + 36)
+                    self.assertEqual(response.read(1920), struct.pack("<hh", 1200, -800) * 480)
+                    # Idle radio still supplies real-time silence for native playback.
+                    self.assertEqual(response.read(round(rate * 0.2) * channels * 2),
+                                     bytes(round(rate * 0.2) * channels * 2))
+
     def _serve(self, token: str):
         from alisdr.web.server import App, make_handler
         from http.server import ThreadingHTTPServer

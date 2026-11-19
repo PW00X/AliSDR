@@ -17,6 +17,7 @@ import mimetypes
 import os
 import queue
 import secrets
+import struct
 import threading
 import time
 import traceback
@@ -244,28 +245,50 @@ def make_handler(app: App):
             broadcast = _qs(_query, "broadcast", "") == "1" or _qs(_query, "dab", "") == "1"
             if broadcast:
                 from ..broadcast_fm import AUDIO_RATE as BROADCAST_AUDIO_RATE
+            rate = BROADCAST_AUDIO_RATE if broadcast else ctl.live()["audio_rate"]
+            channels = 2 if broadcast else 1
+            wav = _qs(_query, "format", "") == "wav"
             self.send_response(200)
-            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Type", "audio/wav" if wav else "application/octet-stream")
             self.send_header("Cache-Control", "no-store")
-            self.send_header("X-Sample-Rate", str(BROADCAST_AUDIO_RATE if broadcast else ctl.live()["audio_rate"]))
-            self.send_header("X-Audio-Channels", "2" if broadcast else "1")
+            self.send_header("X-Sample-Rate", str(rate))
+            self.send_header("X-Audio-Channels", str(channels))
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
             q = ctl.subscribe_audio(broadcast=True) if broadcast else ctl.subscribe_audio()
             try:
+                # A native media resource gives Android audio focus. Keep the raw PCM
+                # endpoint for the desktop jitter buffer and existing clients.
+                remaining = 0xFFFFFF00
+                if wav:
+                    self.wfile.write(struct.pack(
+                        "<4sI4s4sIHHIIHH4sI", b"RIFF", remaining + 36, b"WAVE",
+                        b"fmt ", 16, 1, channels, rate, rate * channels * 2,
+                        channels * 2, 16, b"data", remaining,
+                    ))
+                    self.wfile.flush()
                 while True:
                     try:
-                        chunks = [q.get(timeout=_KEEPALIVE_S)]
+                        chunks = [q.get(timeout=0.1 if wav else _KEEPALIVE_S)]
                     except queue.Empty:
-                        chunks = [bytes(1920) if broadcast else _KEEPALIVE]
+                        # Native playback needs a continuous timeline even between
+                        # transmissions; 10 ms every five seconds would run dry.
+                        chunks = [bytes(round(rate * 0.1) * channels * 2) if wav
+                                  else bytes(1920) if broadcast else _KEEPALIVE]
                     while True:
                         try:
                             chunks.append(q.get_nowait())
                         except queue.Empty:
                             break
-                    self.wfile.write(b"".join(chunks))
+                    data = b"".join(chunks)
+                    if wav:
+                        data = data[:remaining]
+                        remaining -= len(data)
+                    self.wfile.write(data)
                     self.wfile.flush()
+                    if wav and not remaining:
+                        break  # the player reconnects when the finite WAV ends
             except OSError:
                 pass
             finally:
