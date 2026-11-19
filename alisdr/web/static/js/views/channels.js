@@ -53,14 +53,14 @@ export async function editChannelDialog(ch, defaults = {}) {
   const v = await formDialog(isNew ? t('Add channel') : t('Edit channel'), [
     { key: 'freq', label: t('Frequency (MHz)'), type: 'number', value: initial.freq_hz ? fmtChannel(initial.freq_hz) : '',
       hint: t('Airband: type the channel as published, e.g. 126.805') },
-    { key: 'name', label: t('Name'), value: initial.name || '', placeholder: t('e.g. Downtown Tower') },
+    { key: 'name', label: t('Name'), value: isNew ? '' : initial.name || '', placeholder: t('e.g. Downtown Tower') },
     { key: 'mod', label: t('Modulation'), type: 'select', value: initial.modulation || 'AM', options: modOptions() },
     { key: 'folder', label: t('Folder'), type: 'select', value: initial.folder || '',
       options: [['', t('(no folder)')], ...folders().map((f) => [f, f])] },
     { key: 'newFolder', label: t('New folder'), hint: t('Optional - a name typed here is used instead of the folder above.') },
     { key: 'weight', label: t('Priority weight'), type: 'number', value: initial.weight || 0,
       hint: t('0 = normal. Higher = checked more often.') },
-  ], isNew ? t('Add') : t('Save'));
+  ], t('Save'), { dismissible: false, autocomplete: 'off' });
   if (!v || !(v.freq > 0)) return false;
   const hz = carrierHz(v.freq);
   const channels = S.settings.channels;

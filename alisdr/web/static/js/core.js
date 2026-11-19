@@ -228,9 +228,9 @@ export function errorToast(e) {
   toast(e && e.message ? e.message : String(e), 'bad');
 }
 
-// A modal dialog; resolves with the clicked button's value (or null on Esc/backdrop).
+// Resolves with the clicked button's value; Esc/backdrop return null unless dismissible is false.
 let modalSeq = 0;
-export function modal(title, body, buttons = [[t('Close'), null]]) {
+export function modal(title, body, buttons = [[t('Close'), null]], options = {}) {
   return new Promise((resolve) => {
     const opener = document.activeElement;
     const titleId = `modal-title-${++modalSeq}`;
@@ -242,8 +242,8 @@ export function modal(title, body, buttons = [[t('Close'), null]]) {
       if (opener && opener.isConnected) opener.focus();
       resolve(v);
     };
-    const onKey = (e) => { if (e.key === 'Escape') close(null); };
-    const back = h('div.modal-back', { onclick: (e) => { if (e.target === back) close(null); } },
+    const onKey = (e) => { if (e.key === 'Escape' && options.dismissible !== false) close(null); };
+    const back = h('div.modal-back', { onclick: (e) => { if (e.target === back && options.dismissible !== false) close(null); } },
       h('div.modal', { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId },
         h('h2', { id: titleId }, title),
         typeof body === 'string' ? h('p', body) : body,
@@ -261,18 +261,20 @@ export async function confirmDialog(title, text, okLabel, danger = false) {
 }
 
 // Form dialog: fields = [{key, label, type, value, options, hint}] -> values object or null.
-export async function formDialog(title, fields, okLabel) {
+export async function formDialog(title, fields, okLabel, options = {}) {
   const inputs = {};
-  const form = h('form.col', { onsubmit: (e) => { e.preventDefault(); back.querySelector('.actions button.primary').click(); } },
+  const form = h('form.col', { autocomplete: options.autocomplete || null,
+    onsubmit: (e) => { e.preventDefault(); back.querySelector('.actions button.primary').click(); } },
     fields.map((f) => {
       let input;
       if (f.type === 'select') input = select(f.options, f.value, () => {});
       else if (f.type === 'textarea') input = h('textarea', { value: f.value ?? '' });
       else input = h('input', { type: f.type || 'text', value: f.value ?? '', step: f.step || 'any', placeholder: f.placeholder || '', list: f.list || null });
+      if (f.autocomplete || options.autocomplete) input.setAttribute('autocomplete', f.autocomplete || options.autocomplete);
       inputs[f.key] = input;
       return h('label.field', f.label, input, f.hint ? h('span.hint', f.hint) : null);
     }));
-  const promise = modal(title, form, [[t('Cancel'), false, 'ghost'], [okLabel || t('Save'), true, 'primary']]);
+  const promise = modal(title, form, [[t('Cancel'), false, 'ghost'], [okLabel || t('Save'), true, 'primary']], options);
   const back = form.closest('.modal-back');
   if (!(await promise)) return null;
   const out = {};
