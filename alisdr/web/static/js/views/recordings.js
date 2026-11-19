@@ -82,10 +82,12 @@ export function recordingsView(root) {
   // ---------------------------------------------------------- data
   function params(extra = {}) {
     return { sel: F.sel, q: F.q, since: rangeSince(F.range), minq: F.minq || '',
-      group: F.sel.length ? '' : F.facetSort, ...extra };
+      group: F.sel.length || F.sort === 'new' ? '' : F.facetSort, ...extra };
   }
 
+  let listRevision = 0;
   async function reload() {
+    listRevision++;
     items = [];
     total = 0;
     selected.clear();
@@ -94,10 +96,12 @@ export function recordingsView(root) {
   }
 
   async function load(first = false) {
-    if (loading) return;
+    if (loading && !first) return;
+    const revision = listRevision;
     loading = true;
     try {
       const res = await api.get('/api/library' + qs(params({ sort: F.sort, offset: items.length, limit: PAGE })));
+      if (revision !== listRevision) return;
       if (first) list.replaceChildren();
       items.push(...res.items);
       total = res.total;
@@ -107,8 +111,8 @@ export function recordingsView(root) {
       lastRes = res;
       renderStatus();
       renderBulk();
-    } catch (e) { errorToast(e); }
-    loading = false;
+    } catch (e) { if (revision === listRevision) errorToast(e); }
+    finally { if (revision === listRevision) loading = false; }
   }
 
   function renderStatus() {
@@ -522,9 +526,11 @@ export function recordingsView(root) {
   // New recordings slide in at the top while the newest ones are shown -
   // no reload, so scroll position, selection and the player stay put.
   const freshTimer = setInterval(async () => {
-    if (F.sort !== 'new' || !F.sel.length || loading || !lastRes || document.hidden) return;
+    if (F.sort !== 'new' || loading || !lastRes || document.hidden) return;
+    const revision = listRevision;
     try {
       const res = await api.get('/api/library' + qs(params({ sort: 'new', limit: 40 })));
+      if (revision !== listRevision || loading) return;
       const known = new Map(items.map((x) => [x.id, x]));
       // Quality (seconds after closing) and transcripts (later) land on rows already shown.
       res.items.forEach((x) => {
