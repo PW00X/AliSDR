@@ -324,8 +324,9 @@ export function listenView(root, modes) {
     h('div.col', { style: { gap: '4px' } },
       h('div.meter', meterFill, meterMark),
       h('div.meter-legend', h('span', '-100'), levelText, h('span', '0 dBFS'))),
-    h('div.controls', startBtn, h('div.row', listenBtn, h('div.volume', icon('volume'), volume)), skipBtn, blBtn, holdBtn, recBtn, addChannelBtn),
-    h('div.row.wrap', autoRec, h('span.spacer'), h('span.faint.small', t('Boost')), boost, iqBtn));
+    h('div.controls', startBtn, h('div.row', listenBtn, h('div.volume', icon('volume'), volume)),
+      skipBtn, blBtn, holdBtn, recBtn, addChannelBtn, autoRec,
+      h('label.row', h('span.faint.small', t('Boost')), boost), iqBtn));
 
   // ---------------------------------------------------------- an external add-on (rtl_433, VDL2) holds the receiver
   // The scanner is paused then, and there is no spectrum (the program owns the dongle): show that, what the
