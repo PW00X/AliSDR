@@ -54,30 +54,25 @@ export const liveAudio = {
       this.gain.gain.value = this.volume;
       this.chain = makeLoudnessChain(this.ctx, this.boostDb);
       this.chain.output.connect(this.gain);
+      this.gain.connect(this.ctx.destination);
       if (this.native) {
         this.el = new Audio();
         this.el.preload = 'none';
         this.input = this.ctx.createMediaElementSource(this.el);
         this.input.connect(this.broadcast ? this.gain : this.chain.input);
-        this.gain.connect(this.ctx.destination);
         this.el.onplay = () => this.ctx.resume().catch(e => console.warn('live audio:', e));
         this.el.onerror = this.el.onended = () => this._retryNative();
         this.el.onpause = () => {
           if (this.playing && this.el.paused && !this.el.error && !this.el.ended && this.el.readyState >= 2) this.stop();
         };
-      } else if (this.ctx.createMediaStreamDestination) {
-        const dest = this.ctx.createMediaStreamDestination();
-        this.gain.connect(dest);
-        this.el = new Audio();
-        this.el.srcObject = dest.stream;
-      } else this.gain.connect(this.ctx.destination);
+      }
     }
     // Both calls must originate in the Listen tap, before awaiting either promise.
     const resumed = this.ctx.resume();
-    if (this.native && !this.el.getAttribute('src')) this.el.src = this._nativeURL();
-    const playback = this.el ? this.el.play() : Promise.resolve();
-    if (this.native) await Promise.all([resumed, playback]);
-    else { playback.catch(() => {}); await resumed; }
+    if (this.native) {
+      if (!this.el.getAttribute('src')) this.el.src = this._nativeURL();
+      await Promise.all([resumed, this.el.play()]);
+    } else await resumed;
   },
 
   async start() {
