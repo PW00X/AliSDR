@@ -121,7 +121,7 @@ function shell() {
     mount(status,
       live && (live.recording || live.manual_tuning_recording) ? h('span.chip.bad.live', { title: t('Recording') }, h('span.dot'), 'REC') : null,
       live && live.manual_tuning
-        ? h('span.chip.good.live', h('span.dot'), t('Tuning'))
+        ? h('span.chip.good.live', h('span.dot'), t('Tuned'))
         : live && live.addon
         ? h('span.chip.good.live', h('span.dot'), t('Add-on running'))
         : h('span.chip', { class: running ? (signal ? 'good live' : 'accent') : '' }, h('span.dot'),

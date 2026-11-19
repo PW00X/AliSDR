@@ -3932,6 +3932,9 @@ msgstr "Dostrój"
 msgid "Tuning"
 msgstr "Strojenie"
 
+msgid "Tuned"
+msgstr "Dostrojony"
+
 msgid "Receiver mode"
 msgstr "Tryb odbiornika"
 
