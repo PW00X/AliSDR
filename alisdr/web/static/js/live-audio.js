@@ -53,7 +53,7 @@ export const liveAudio = {
 
   async prepare() {
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback' });
       this.gain = this.ctx.createGain();
       this.gain.gain.value = this.volume;
       this.chain = makeLoudnessChain(this.ctx, this.boostDb);

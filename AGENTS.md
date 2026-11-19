@@ -449,6 +449,12 @@ catalog loads; wrap them in a function called at point of use
     output alone does not reliably keep background playback alive. WAV streams
     supply real-time silence while idle, preserve mono/stereo sample rates,
     and reconnect on errors/end. Stop unloads the source to release the request.
+    Native streams start with 600 ms of silence as a jitter reserve. Track the
+    duration already sent and refill silence only when that timeline runs low;
+    a queue timeout is not an audio underrun (DAB delivers audio in bursts).
+    Never insert a fixed silence block on each short input timeout. The HTTP
+    burst regression verifies contiguous PCM, including 240 ms decoder bursts.
+    Use the AudioContext playback latency hint for sustained listening.
     Keep Media Session play/pause/stop and playbackState in sync. Both paths
     work over plain HTTP. Never wait for the desktop MediaStream element's
     play promise before starting its PCM fetch (it would wait for its own data).

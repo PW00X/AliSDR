@@ -45,6 +45,8 @@ except (OSError, UnicodeError):
 _COOKIE = "sst"
 _MAX_JSON = 32 * 1024 * 1024
 _KEEPALIVE_S = 5.0
+_WAV_BUFFER_S = 0.6
+_WAV_REFILL_S = 0.2
 _LOGIN_FAIL_DELAY_S = 1.0  # a threaded server: this slows a password guesser, not other users
 _LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 
@@ -267,15 +269,30 @@ def make_handler(app: App):
                         b"fmt ", 16, 1, channels, rate, rate * channels * 2,
                         channels * 2, 16, b"data", remaining,
                     ))
+                    # Give native playback a reserve for decoder/network bursts.
+                    # Keep an audio timeline: an empty input queue does not mean
+                    # the audio previously sent has finished playing.
+                    bytes_per_second = rate * channels * 2
+                    silence = bytes(round(rate * _WAV_BUFFER_S) * channels * 2)
+                    self.wfile.write(silence)
+                    remaining -= len(silence)
+                    queued_until = time.monotonic() + len(silence) / bytes_per_second
                     self.wfile.flush()
                 while True:
                     try:
-                        chunks = [q.get(timeout=0.1 if wav else _KEEPALIVE_S)]
+                        chunks = [q.get(timeout=0.05 if wav else _KEEPALIVE_S)]
                     except queue.Empty:
-                        # Native playback needs a continuous timeline even between
-                        # transmissions; 10 ms every five seconds would run dry.
-                        chunks = [bytes(round(rate * 0.1) * channels * 2) if wav
-                                  else bytes(1920) if broadcast else _KEEPALIVE]
+                        if wav:
+                            ahead = queued_until - time.monotonic()
+                            if ahead > _WAV_REFILL_S:
+                                continue
+                            # Refill only when the *playback timeline* runs low.
+                            # DAB audio can arrive in >100 ms bursts. Padding on
+                            # every queue timeout inserts gaps into valid audio.
+                            frames = round(rate * (_WAV_BUFFER_S - max(0.0, ahead)))
+                            chunks = [bytes(frames * channels * 2)]
+                        else:
+                            chunks = [bytes(1920) if broadcast else _KEEPALIVE]
                     while True:
                         try:
                             chunks.append(q.get_nowait())
@@ -285,6 +302,7 @@ def make_handler(app: App):
                     if wav:
                         data = data[:remaining]
                         remaining -= len(data)
+                        queued_until = max(queued_until, time.monotonic()) + len(data) / bytes_per_second
                     self.wfile.write(data)
                     self.wfile.flush()
                     if wav and not remaining:

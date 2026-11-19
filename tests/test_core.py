@@ -2630,10 +2630,55 @@ class HttpTest(unittest.TestCase):
                     self.assertEqual(header[5:11], (1, channels, rate, rate * channels * 2, channels * 2, 16))
                     self.assertEqual(header[11], b"data")
                     self.assertEqual(header[1], header[12] + 36)
+                    reserve = round(rate * 0.6) * channels * 2
+                    self.assertEqual(response.read(reserve), bytes(reserve))
                     self.assertEqual(response.read(1920), struct.pack("<hh", 1200, -800) * 480)
                     # Idle radio still supplies real-time silence for native playback.
                     self.assertEqual(response.read(round(rate * 0.2) * channels * 2),
                                      bytes(round(rate * 0.2) * channels * 2))
+
+    def test_native_audio_keeps_decoder_bursts_contiguous(self) -> None:
+        import queue
+        import struct
+        from http.server import ThreadingHTTPServer
+        from alisdr.web.server import App, make_handler
+
+        stopped = threading.Event()
+        rate = 48000
+        burst = struct.pack("<hh", 1234, -5678) * round(rate * 0.24)
+
+        class Ctl:
+            library = None
+
+            def subscribe_audio(self, broadcast=False):
+                q = queue.Queue()
+
+                def produce():
+                    for _ in range(5):
+                        if stopped.wait(0.24):
+                            return
+                        q.put(burst)
+
+                threading.Thread(target=produce, daemon=True).start()
+                return q
+
+            def unsubscribe_audio(self, q, broadcast=False):
+                stopped.set()
+
+        web = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "")))
+        web.daemon_threads = True
+        threading.Thread(target=web.serve_forever, daemon=True).start()
+        self.addCleanup(web.server_close)
+        self.addCleanup(web.shutdown)
+        self.addCleanup(stopped.set)
+        url = f"http://127.0.0.1:{web.server_port}/api/audio?format=wav&broadcast=1"
+        with urlopen(url, timeout=4) as response:
+            response.read(44)
+            reserve = round(rate * 0.6) * 4
+            self.assertEqual(response.read(reserve), bytes(reserve))
+            # Each decoder delivery is slower than the old 100 ms timeout.
+            # All samples must stay adjacent, without synthetic silence inside.
+            self.assertEqual(response.read(len(burst) * 5), burst * 5)
 
     def _serve(self, token: str):
         from alisdr.web.server import App, make_handler
