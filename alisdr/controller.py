@@ -26,6 +26,7 @@ import numpy as np
 
 from . import __version__, antenna_range, digital_voice, i18n, military_presets, schedule, storage
 from .audio_transcode import ffmpeg_available, transcode_to_mp3
+from .channelizer import plan_windows
 from .config import DEFAULT_RECORDINGS_DIR, AppConfig, ScheduleEntry, VfoRangeConfig, _from_dict
 from .dab import AUDIO_RATE as BROADCAST_AUDIO_RATE, load_decoder
 from .manual_tuning import DAB_CHANNELS, FM_FREQUENCIES, ManualSession, Tuning
@@ -148,7 +149,7 @@ class Controller:
         self.channels: list[Channel] = storage.load_channels()
         self.blacklist: list[BlacklistEntry] = storage.load_blacklist()
         self._lock = threading.Lock()
-        self._start_lock = threading.Lock()  # two Start requests at once must not start two sets of engines
+        self._start_lock = threading.RLock()  # serialize receiver handoffs, including idle starts
         self.before_dab = None
         # One engine per dongle (config.device + device.extra_devices); the
         # first is the "lead". _audible = index of the one heard live.
@@ -179,6 +180,7 @@ class Controller:
         self._bg_stop = threading.Event()
         self._shared: Optional[SharedFrequencies] = None
         self._resume = False    # the scanner was running when its last receiver was taken
+        self._idle_monitors = {}  # receiver -> (configuration signature, engine)
         self.manual_session: ManualSession | None = None
         self._fm_stations: dict | None = None
         self._manual_error = ""
@@ -207,6 +209,9 @@ class Controller:
 
     def shutdown(self) -> None:
         self._bg_stop.set()
+        with self._start_lock:
+            for k in list(self._idle_monitors):
+                self._stop_idle_monitor(k)
         try:
             self.stop_manual()
         except RuntimeError as exc:
@@ -265,6 +270,9 @@ class Controller:
 
     def start(self) -> None:
         with self._start_lock:
+            for k in list(self._idle_monitors):
+                self._stop_idle_monitor(k)
+            self._yield_vdl2(scan=True)
             if self.manual_session is not None:
                 self._resume = False
                 self._stop_manual_locked()
@@ -287,6 +295,9 @@ class Controller:
                 self._join(e, 8.0)
             if any(e.is_alive() for e in existing):
                 raise RuntimeError(i18n.tr("Scanner is still stopping - try again"))
+        for k in list(self._idle_monitors):
+            if k not in held:
+                self._stop_idle_monitor(k)
         shared = SharedFrequencies() if len(devices) > 1 else None
         self._shared = shared
         engines = [
@@ -374,6 +385,9 @@ class Controller:
                 old.state = "starting"
                 old.tuning = tuning
                 return
+            self._stop_idle_monitor(k)
+            if self._addon_dongles.get("vdl2") == k:
+                self._yield_vdl2(scan=False)
             if not same_receiver and k in self._held:
                 raise RuntimeError(i18n.tr("The selected receiver is already in use."))
             library = load_decoder() if tuning.mode == "DAB" else None
@@ -422,7 +436,7 @@ class Controller:
             session.tuning.mode == "DAB" or (
                 session.tuning.mode == "WFM"
                 and (session.fm_scan is None or session.fm_scan["stage"] == "rds")))
-        return manual_decoder or bool(self._addon_dongles) or any(
+        return manual_decoder or bool(self._idle_monitors) or bool(self._addon_dongles) or any(
             engine.decoder_active for engine in self._engines)
 
     def record_manual(self, enabled: bool) -> None:
@@ -644,6 +658,7 @@ class Controller:
                 dongle = self.addons.receiver(addon_id, 0)
             if not 0 <= dongle < len(devices):
                 dongle = 0      # the receiver that was chosen has been removed since
+            self._stop_idle_monitor(dongle)
             if dongle in self._held:
                 other = next((a for a, d in self._addon_dongles.items() if d == dongle), "")
                 raise RuntimeError(i18n.tr("Receiver {n} is already used by {name} - stop it first.").format(n=dongle + 1, name=other))
@@ -654,6 +669,21 @@ class Controller:
             except Exception:
                 self._resume_scanning(addon_id)
                 raise
+
+    def _yield_vdl2(self, scan: bool) -> None:
+        dongle = self._addon_dongles.get("vdl2")
+        if dongle is None:
+            return
+        self.log(i18n.tr("VDL2 scan stopping"))
+        if "vdl2" in self._sched_started:
+            self._sched_suppressed["vdl2"] = self._schedule_key("vdl2")
+        self.addons.stop_external("vdl2")
+        self._addon_dongles.pop("vdl2", None)
+        self._sched_started.pop("vdl2", None)
+        self._held.discard(dongle)
+        self._resume = False
+        if scan and self.running:
+            self._release_receiver(dongle)
 
     def stop_addon(self, addon_id: str = "") -> None:
         """Stops one add-on (or all). Stopping a scheduled one by hand keeps the schedule from starting it again
@@ -671,7 +701,8 @@ class Controller:
         """An external program ended (its own exit or a stop): give its receiver back, off the reader's thread."""
         def release() -> None:
             with self._start_lock:
-                self._resume_scanning(addon_id)
+                if addon_id not in self.addons.running_ids:
+                    self._resume_scanning(addon_id)
         threading.Thread(target=release, daemon=True, name="addon-release").start()
 
     def _resume_scanning(self, addon_id: str) -> None:
@@ -688,6 +719,7 @@ class Controller:
         with self._lock:
             running = any(e.is_alive() and not e._stop_evt.is_set() for e in self._engines)
         if running:
+            self._stop_idle_monitor(dongle)
             self._restart_engine(dongle)
             for e in list(self._engines):
                 if e.is_alive():
@@ -742,6 +774,79 @@ class Controller:
                 traceback.print_exc()
 
     def reconcile_schedule(self) -> None:
+        with self._start_lock:
+            if self._bg_stop.is_set():
+                return
+            self._reconcile_schedule()
+            self._reconcile_idle_monitors()
+
+    def _stop_idle_monitor(self, k):
+        monitor = self._idle_monitors.get(k)
+        if monitor is None:
+            return
+        signature, engine = monitor
+        if any(name == "vdl2" for name, _ in signature[0]):
+            self.log(i18n.tr("VDL2 scan stopping"))
+        engine.request_stop()
+        self._join(engine, 8)
+        if engine.is_alive():
+            raise RuntimeError(i18n.tr("The receiver is still stopping. Try again."))
+        del self._idle_monitors[k]
+
+    def _reconcile_idle_monitors(self):
+        devices = self._devices()
+        cfg = self.config
+        wanted = {}
+        for name in ("acars", "vdl2"):
+            if not cfg.addons.options.get(name, {}).get("when_idle", False):
+                continue
+            k = max(0, self.addons.receiver(name))
+            if k >= len(devices) or k in self._held or (k < len(self._engines) and self._engines[k].is_alive()):
+                continue
+            if name == "vdl2" and not self.addons.program(name):
+                continue
+            freqs = tuple(getattr(cfg.addons, name + "_frequencies_hz"))
+            if freqs:
+                wanted.setdefault(k, []).append((name, freqs))
+        for k in set(wanted) | set(self._idle_monitors):
+            groups = tuple(wanted.get(k, ()))
+            device = asdict(cfg.device)
+            device.pop("extra_devices")
+            if groups and devices[k] is not None:
+                device.update(devices[k])
+            if groups:
+                device["sample_rate_hz"] = antenna_range.device_rates(cfg)[k]
+            signature = (groups, device, cfg.trigger_level_dbfs)
+            current = self._idle_monitors.get(k)
+            if current and current[0] == signature and current[1].is_alive():
+                continue
+            self._stop_idle_monitor(k)
+            if not groups:
+                continue
+            # One private memory-only scan per free receiver, shared by both decoders.
+            # Its channels, recording switch and schedule never change the user's scan plan.
+            local = copy.deepcopy(cfg)
+            local._held_dongles = set()
+            local.device = _from_dict(type(cfg.device), device)
+            local.bands = []
+            local.memory_list_enabled = True
+            local.schedule.enabled = local.recording.enabled = False
+            local.timing.scanning_dwell_ms = max(2000, local.timing.scanning_dwell_ms)
+            freqs = sorted({f for _, frequencies in groups for f in frequencies})
+            if (len(groups) > 1 and device_family(local.device.driver) == "airspy"
+                    and len(plan_windows(freqs, local.device.sample_rate_hz, local.memory_channel_bandwidth_hz)) > 1):
+                # The R2's 10 MS/s mode covers the usual ACARS and VDL2 channels together.
+                # The engine replans at the actual rate reported by the driver.
+                local.device.sample_rate_hz = max(local.device.sample_rate_hz, 10_000_000)
+            engine = ScannerEngine(local, [Channel(f) for f in freqs], [])
+            engine.addons = self.addons
+            engine.decoder_receiver = k
+            engine.idle_decoders = {name for name, _ in groups}
+            engine.signals.log.connect(self.log)
+            engine.start()
+            self._idle_monitors[k] = (signature, engine)
+
+    def _reconcile_schedule(self) -> None:
         """Brings the running add-ons in line with the schedule (called every few seconds)."""
         addons = self.addons
         manual = self._held - set(self._sched_started.values())
@@ -988,6 +1093,7 @@ class Controller:
                 "log": [e for e in self._log if e["id"] > since_log],
                 "audio_rate": AUDIO_RATE,
                 "addon": self.addons.running_external,
+                "idle_decoders": [{"id": name, "receiver": k} for k, (sig, _) in self._idle_monitors.copy().items() for name, _ in sig[0]],
                 "addons": [{"id": a, "receiver": d} for a, d in self._addon_dongles.items()],
                 "notify_seq": self.notifier.seq,
                 "addon_since": self.addons.started_at,

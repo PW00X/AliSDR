@@ -1,4 +1,4 @@
-import { api, errorToast, fmtMHz, h, icon, mount, t, toggle } from '../core.js';
+import { api, errorToast, fmtMHz, h, icon, mount, t, toast, toggle } from '../core.js';
 import { liveAudio } from '../live-audio.js';
 import { S, cfg, confirmRecording, on, syncConfig } from '../state.js';
 import { liveListenButton, receiverGainControl, receiverPanel, spectrumPainter } from './listen.js';
@@ -467,7 +467,11 @@ export function manualView(root, modes) {
     busy = true;
     updateControls();
     try {
-      if (path === '/api/manual/tune' || path === '/api/manual/fm-scan') await syncConfig();
+      if (path === '/api/manual/tune' || path === '/api/manual/fm-scan') {
+        if ([...(S.live?.addons || []), ...(S.live?.idle_decoders || [])]
+          .some(a => a.id === 'vdl2' && a.receiver === (body.receiver ?? 0))) toast(t('VDL2 scan stopping'));
+        await syncConfig();
+      }
       const data = await api.post(path, body);
       if (data.tuning) liveAudio.useBroadcast(!data.fm_scan && ['DAB', 'WFM'].includes(data.tuning.mode));
       if (destroyed) return;

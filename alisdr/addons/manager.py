@@ -53,7 +53,7 @@ CATALOG: tuple[AddonSpec, ...] = (
               "Weather stations, thermometers and other 433/868 MHz sensors, decoded by rtl_433. Needs the receiver for itself while it runs.",
               "rtl_433: GPL-2.0", homepage="https://github.com/merbanan/rtl_433", exe=("rtl_433", "rtl_433.exe")),
     AddonSpec("vdl2", "VDL2", "external",
-              "Reads VDL Mode 2 aircraft data link (136.7-137 MHz) with dumpvdl2. Needs the receiver for itself while it runs.",
+              "Decodes VDL2 on the listed frequencies during scanning. Start it separately for continuous reception.",
               "dumpvdl2: GPL-3.0, libacars: MIT", homepage="https://github.com/szpajder/dumpvdl2",
               frequencies="vdl2_frequencies_hz", exe=("dumpvdl2", "dumpvdl2.exe")),
 )
@@ -67,7 +67,8 @@ RTL433_SAMPLE_RATES = ("", "250k", "1000k", "1200k", "2048k")     # "" = rtl_433
 OPTION_DEFAULTS: dict[str, dict] = {
     "rtl_433": {"band": "433", "custom_mhz": "", "hop_s": 30, "gain": "", "ppm": 0, "units": "native", "sample_rate": "",
                 "remotes": False, "extra_decoders": []},
-    "vdl2": {"gain": "", "ppm": 0},
+    "vdl2": {"gain": "", "ppm": 0, "when_idle": False, "during_scan": True},
+    "acars": {"when_idle": False},
 }
 
 
@@ -107,6 +108,9 @@ def clean_options(addon_id: str, current: dict, patch: dict) -> dict:
         elif key == "sample_rate":
             if value not in RTL433_SAMPLE_RATES:
                 raise ValueError("sample rate: unknown")
+        elif key in ("when_idle", "during_scan"):
+            if type(value) is not bool:
+                raise ValueError(f"{key}: expected a boolean")
         elif key == "remotes":
             value = bool(value)
         elif key == "extra_decoders":
@@ -251,10 +255,10 @@ class AddonManager:
         value = self._config.addons.receivers.get(addon_id, default)
         return value if isinstance(value, int) else default
 
-    def claim(self, freq_hz: int, receiver: int = 0) -> Claim | None:
+    def claim(self, freq_hz: int, receiver: int = 0, idle_decoders=None) -> Claim | None:
         cfg = self._config.addons
         for spec in CATALOG:
-            if spec.kind != "builtin" or spec.id not in cfg.enabled:
+            if spec.kind != "builtin" or spec.id not in (cfg.enabled if idle_decoders is None else idle_decoders):
                 continue
             if self.receiver(spec.id) not in (-1, receiver):
                 continue          # this add-on listens on another receiver
@@ -263,6 +267,29 @@ class AddonManager:
                 self._stats[spec.id]["slots"] += 1
                 return Claim(spec.id, spec.modulation, make)
         return None
+
+    def scan_vdl2(self, frequency, center, rate, receiver, idle_decoders=None):
+        if idle_decoders is not None:
+            if "vdl2" not in idle_decoders:
+                return None
+        elif not self._config.addons.options.get("vdl2", {}).get("during_scan", True):
+            return None
+        if receiver != self.receiver("vdl2", 0):
+            return None
+        channels = self._config.addons.vdl2_frequencies_hz
+        target = min(channels, key=lambda f: abs(f - frequency), default=None)
+        if target is None or abs(target - frequency) > CLAIM_TOLERANCE_HZ:
+            return None
+        program = self.program("vdl2")
+        if program is None:
+            return None
+        from .scan_vdl2 import ScanVdl2
+
+        def publish(event, summary):
+            self.hub.publish("vdl2", event, summary)
+            self._stats["vdl2"]["events"] += 1
+
+        return ScanVdl2(program, target, target - center, rate, publish, self._log)
 
     def publish_decoded(self, addon_id: str, freq_hz: int, events: list[dict]) -> None:
         for event in events:
@@ -345,7 +372,7 @@ class AddonManager:
             raise RuntimeError(f"{spec.name}: {exc}") from exc
         self._log(tr("{name} started - the scanner is paused while it runs.").format(name=spec.name))
 
-    def _launch(self, addon_id: str, argv: list[str], parse, tries: int) -> None:
+    def _launch(self, addon_id: str, argv: list[str], parse, tries: int, expected_run=None) -> None:
         spec = SPECS[addon_id]
         started = time.monotonic()
 
@@ -360,16 +387,19 @@ class AddonManager:
             SoapyBackend._record_close_time()       # the next open (the scanner's) keeps the cooldown too
             with self._lock:
                 run = self._runs.get(addon_id)
-                runner = run["runner"] if run else None
-                cancelled = run is None or run["cancelled"]
+                if run is None or run["runner"] is not runner:
+                    return
+                cancelled = run["cancelled"]
             tail = list(runner.stderr_tail) if runner else []
             busy = (bool(code) and tries > 0 and not cancelled and time.monotonic() - started < 10
                     and any(re.search(r"claim|busy|-6\b", line, re.I) for line in tail))
             if busy:    # the receiver was not yet free: wait and try again, quietly
                 self._log(tr("The receiver was still busy - trying again."))
-                threading.Timer(_BUSY_RETRY_S, lambda: self._retry(addon_id, argv, parse, tries - 1)).start()
+                threading.Timer(_BUSY_RETRY_S, lambda: self._launch(addon_id, argv, parse, tries - 1, run)).start()
                 return
             with self._lock:
+                if self._runs.get(addon_id) is not run:
+                    return
                 self._runs.pop(addon_id, None)
                 if code:
                     shown = " ".join(tail[-3:])
@@ -382,16 +412,11 @@ class AddonManager:
 
         runner = ExternalRunner(argv, on_line, on_exit)
         with self._lock:
-            if addon_id in self._runs:
-                self._runs[addon_id]["runner"] = runner
-        runner.start()
-
-    def _retry(self, addon_id: str, argv: list[str], parse, tries: int) -> None:
-        with self._lock:
             run = self._runs.get(addon_id)
-            if run is None or run["cancelled"]:
+            if run is None or run["cancelled"] or (expected_run is not None and run is not expected_run):
                 return
-        self._launch(addon_id, argv, parse, tries)
+            run["runner"] = runner
+            runner.start()
 
     def stop_external(self, addon_id: str = "") -> None:
         """Stops one external program, or all of them."""

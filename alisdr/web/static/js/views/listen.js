@@ -397,7 +397,7 @@ export function listenView(root, modes) {
   function syncAddonPanel() {
     const id = S.live && S.live.addon;
     // Several receivers: the others keep scanning, so the scanner stays on screen next to the panel.
-    const paused = !!id && !(S.live && S.live.running);
+    const paused = !!id && !S.live.addons?.some(a => a.id === 'vdl2') && !S.live.running;
     hero.classList.toggle('hidden', paused);
     spectrumCard.classList.toggle('hidden', paused);
     addonPanel.classList.toggle('hidden', !id);
@@ -437,6 +437,7 @@ export function listenView(root, modes) {
     try {
       if (S.live && S.live.running) await api.post('/api/scanner/stop');
       else {
+        if ([...(S.live?.addons || []), ...(S.live?.idle_decoders || [])].some(a => a.id === 'vdl2')) toast(t('VDL2 scan stopping'));
         await syncConfig();
         await api.post('/api/scanner/start');
         if (!liveAudio.playing && localStorage.getItem('autolisten') !== '0') liveAudio.start().catch(() => {});

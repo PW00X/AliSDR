@@ -55,7 +55,13 @@ headless receiver you listen to from any phone or PC on your network.
   **APRS** (built in), plus **VDL2** (dumpvdl2) and **rtl_433** (sensors:
   weather stations, thermometers, tyre pressure, power, door and alarm
   sensors, tank levels...) as separate programs that take a
-  receiver for as long as they run. VDL2 supports RTL-SDR and Airspy R2 (native libairspy or SoapySDR). Select the Airspy receiver in Add-ons. Everything decoded appears on the **Messages** page, with
+  receiver when started separately. With dumpvdl2 installed, Listen can also decode
+  configured VDL2 channels during a normal scan. A successfully decoded VDL2
+  transmission appears in Messages and its automatic audio recording is discarded.
+  Enable **Monitor when receiver is idle** for ACARS, VDL2, or both under Add-ons.
+  On one receiver, channels inside its capture width are monitored together and
+  wider groups are visited in turn. Tune and Scan take priority. VDL2 supports
+  RTL-SDR and Airspy R2 (native libairspy or SoapySDR). Everything decoded appears on the **Messages** page, with
   search, filters, a map link and per-add-on statistics.
 - **Notifications** with rules ("a sensor below 0 °C", "a word in an ACARS
   message", "activity on a frequency", "a receiver lost") to ntfy, Telegram,

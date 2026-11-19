@@ -53,11 +53,12 @@ class Recorder:
         self._close_file()
         self._session_active = False
 
-    def begin_transmission(self, freq_hz: int, channel_name: str = '') -> None:
+    def begin_transmission(self, freq_hz: int, channel_name: str = '', *, pending: bool = False) -> None:
         """Opens a new per-transmission file (not used with ``single_file``)."""
         if not self._session_active:
             return
-        self._open_file(self._split_file_path(freq_hz))
+        path = self._split_file_path(freq_hz)
+        self._open_file(path.with_suffix(".wav.pending") if pending else path)
         self._channel_name = channel_name
         self._frequency_hz = freq_hz
 
@@ -95,7 +96,7 @@ class Recorder:
             except OSError:
                 pass
             return None
-        if path is not None and self._channel_name.strip():
+        if path is not None and path.suffix != ".pending" and self._channel_name.strip():
             try:
                 path = rename_recording(path, self._frequency_hz, self._channel_name, new_file=True)
             except (OSError, ValueError):

@@ -4234,3 +4234,18 @@ msgstr "Wybierz częstotliwości VDL2 w jednym paśmie o szerokości 2 MHz."
 
 msgid "VDL2 requires an RTL-SDR or Airspy receiver."
 msgstr "VDL2 wymaga odbiornika RTL-SDR lub Airspy."
+
+msgid "VDL2 scan stopping"
+msgstr "Zatrzymywanie skanowania VDL2"
+
+msgid "Decodes VDL2 on the listed frequencies during scanning. Start it separately for continuous reception."
+msgstr "Dekoduje VDL2 na podanych częstotliwościach podczas skanowania. Uruchom osobno, aby prowadzić ciągły odbiór."
+
+msgid "Monitor when receiver is idle"
+msgstr "Monitoruj, gdy odbiornik jest bezczynny"
+
+msgid "Decode VDL2 during scanning"
+msgstr "Dekoduj VDL2 podczas skanowania"
+
+msgid "Monitoring"
+msgstr "Monitorowanie"

@@ -310,7 +310,7 @@ class EngineSlotTest(unittest.TestCase):
         mgr = AddonManager(cfg)
         audio = _afsk(_ax25("SP9ABC-9", "APRS", ["WIDE1-1"], b"!4903.50N/07201.75W-engine"))
         blocks = iter([audio[i:i + 375] for i in range(0, audio.size, 375)])
-        slot = SimpleNamespace(dsd=None, data_decoder=AprsDecoder(), data_addon="aprs", freq_hz=144_800_000, offset_hz=0.0,
+        slot = SimpleNamespace(vdl2=None, dsd=None, data_decoder=AprsDecoder(), data_addon="aprs", freq_hz=144_800_000, offset_hz=0.0,
                                modulation=Modulation.NFM, demod=SimpleNamespace(demod=lambda iq, mod, off: next(blocks)))
         fake = SimpleNamespace(addons=mgr, _play_and_record_slot=mock.Mock(), signals=SimpleNamespace(log=SimpleNamespace(emit=lambda m: None)))
         fake._is_silent_data = lambda s: ScannerEngine._is_silent_data(fake, s)
@@ -710,6 +710,80 @@ class OptionsTest(unittest.TestCase):
         m.configure("rtl_433", {"options": {"; rm -rf /": "1", "ppm": 2}})            # not an option: dropped
         self.assertEqual(m.status()[2]["options"]["ppm"], 2)
         self.assertNotIn("; rm -rf /", m.status()[2]["options"])
+
+
+class ScanDecoderTest(unittest.TestCase):
+    def test_frames_control_only_their_own_pending_recording(self):
+        from types import SimpleNamespace
+        from unittest import mock
+        import subprocess
+        import sys
+        from alisdr.addons.scan_vdl2 import ScanVdl2
+        from alisdr.scanner_engine import ScannerEngine
+
+        frequency = 136975000
+        popen = subprocess.Popen
+        for decoded in (False, True):
+            message = '{"vdl2":{"freq":136975000,"avlc":{"src":{"addr":"ABC123"}}}}' if decoded else '{}'
+            script = ("import sys; data = sys.stdin.buffer.read(); "
+                      "assert len(data) > 8192 and any(data); print(" + repr(message) + ")")
+            def launch(argv, **kwargs):
+                self.assertEqual(argv[-1], str(frequency))
+                return popen([sys.executable, "-c", script], **kwargs)
+            events = []
+            with tempfile.TemporaryDirectory() as folder, mock.patch("alisdr.addons.scan_vdl2.subprocess.Popen", launch):
+                decoder = ScanVdl2("dumpvdl2", frequency, 25000, 250000,
+                                   lambda event, summary: events.append(event), self.fail)
+                decoder.feed(np.ones(8192, dtype=np.complex64))
+                decoder.end_input()
+                path = Path(folder) / "2026-01-01_10-00-00-000001_136975.wav.pending"
+                path.write_bytes(b"test")
+                engine = SimpleNamespace(_finish_recording=mock.Mock())
+                ScannerEngine._finish_vdl2(engine, decoder, path, "Test", "linger")
+                self.assertEqual(bool(events), decoded)
+                self.assertEqual(engine._finish_recording.called, not decoded)
+                self.assertEqual(len(list(Path(folder).iterdir())), int(not decoded))
+
+    def test_idle_acars_and_vdl2_share_one_monitor_and_yield_to_scan(self):
+        from unittest import mock
+        from alisdr.config import AppConfig
+        from alisdr.controller import Controller
+        cfg = AppConfig()
+        cfg.device.driver = "airspy_native"
+        cfg.addons.options = {name: {"when_idle": True} for name in ("acars", "vdl2")}
+        ctl = Controller(cfg)
+        with mock.patch.object(ctl.addons, "program", return_value="dumpvdl2"), \
+             mock.patch("alisdr.controller.ScannerEngine") as factory:
+            engine = factory.return_value
+            engine.is_alive.side_effect = lambda: not engine.request_stop.called
+            ctl.reconcile_schedule()
+            ctl.reconcile_schedule()
+            factory.assert_called_once()
+            local, channels, _ = factory.call_args.args
+            self.assertEqual({c.freq_hz for c in channels},
+                             set(cfg.addons.acars_frequencies_hz + cfg.addons.vdl2_frequencies_hz))
+            self.assertFalse(local.recording.enabled)
+            self.assertEqual(local.device.sample_rate_hz, 10_000_000)
+            self.assertEqual(engine.idle_decoders, {"acars", "vdl2"})
+            with mock.patch.object(ctl, "_start"):
+                ctl.start()
+            engine.request_stop.assert_called_once()
+            self.assertFalse(ctl._idle_monitors)
+            with mock.patch.object(ctl.addons, "stop_external") as stop, mock.patch.object(ctl, "_start"):
+                ctl._held.add(0)
+                ctl._addon_dongles["vdl2"] = 0
+                ctl.start()
+                stop.assert_called_once_with("vdl2")
+                self.assertFalse(ctl._held)
+            with mock.patch.object(ctl.addons, "stop_external") as stop, mock.patch("alisdr.controller.ManualSession"):
+                ctl._held.add(0)
+                ctl._addon_dongles["vdl2"] = 0
+                ctl.tune_manual({"mode": "WFM", "frequency_hz": 99000000})
+                stop.assert_called_once_with("vdl2")
+                self.assertIsNotNone(ctl.manual_session)
+                ctl.manual_session = None
+                ctl._held.clear()
+        ctl.shutdown()
 
 
 class StatsTest(unittest.TestCase):

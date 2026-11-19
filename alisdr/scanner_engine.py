@@ -354,6 +354,7 @@ class _Slot:
         # Add-on data decoder (ACARS, APRS - alisdr/addons): reads this slot's audio instead of playing/recording it.
         self.data_decoder = None
         self.data_addon = ""
+        self.vdl2 = None
         self.announced_call: tuple[str, str] = ("", "")
         # A write failed (or the disk is nearly full): listened to, not recorded.
         self.recording_failed = False
@@ -485,6 +486,8 @@ class ScannerEngine(threading.Thread):
         self.config = config
         self._device = device
         self._share = share
+        self.decoder_receiver = share[0]
+        self.idle_decoders = None
         self._shared = shared
         self.channels = channels
         self.blacklist = blacklist
@@ -1509,6 +1512,23 @@ class ScannerEngine(threading.Thread):
                 self._feed_raw_iq(iq, window.center_hz)
                 self._maybe_run_software_agc(iq)
 
+                if self.idle_decoders is not None:
+                    # Decode all channels in this window continuously, including the first
+                    # symbols of overlapping bursts. Idle monitoring never opens an audio file.
+                    for freq in window.freqs:
+                        if freq not in self._slots:
+                            self._open_slot(freq, window, -120)
+                        slot = self._slots[freq]
+                        if slot.vdl2 is not None:
+                            slot.vdl2.feed(iq)
+                        elif slot.data_decoder is not None:
+                            self._decode_data(slot, slot.demod.demod(iq, slot.modulation, slot.offset_hz))
+                    if len(self._default_lane.windows) > 1 and time.monotonic() >= scanning_deadline:
+                        for freq in list(self._slots):
+                            self._close_slot(freq, reason="retune")
+                        state = ScannerState.CALCULATE_NEXT_FREQ
+                    continue
+
                 # One FFT, shared by both steps below.
                 spectrum = spectrum_cumsum(iq, sample_rate)
 
@@ -1592,6 +1612,11 @@ class ScannerEngine(threading.Thread):
                             self._channel_bw_map.get(best_freq, 0.0),
                         )
                         self._open_slot(best_freq, window, raw_level)
+                        opened = self._slots.get(best_freq)
+                        if opened is not None and opened.vdl2 is not None:
+                            opened.vdl2.feed(iq)  # include the burst preamble in the trigger block
+                        elif opened is not None and opened.data_decoder is not None:
+                            self._process_one_slot(opened, iq, False)
                 elif not any_active and not self._hold and time.monotonic() >= scanning_deadline:
                     # Nothing active and the dwell is over - move on.
                     self._maybe_log_floor(iq, sample_rate, window)
@@ -1814,6 +1839,8 @@ class ScannerEngine(threading.Thread):
     def _process_one_slot(self, slot: _Slot, iq: np.ndarray, squelched: bool) -> None:
         """Demodulates one slot from the shared, read-only ``iq`` (may run on
         the slot pool)."""
+        if slot.vdl2 is not None:
+            slot.vdl2.feed(iq)
         if slot.dsd is not None:
             # The decoder decides what is voice. Squelch (RF level) would mute decoded speech in the gaps of a TDMA
             # carrier (30 ms on / 30 ms off with one slot in use) and leave single syllables.
@@ -1835,7 +1862,8 @@ class ScannerEngine(threading.Thread):
         self._play_and_record_slot(slot, audio, squelched=squelched)
 
     def _is_silent_data(self, slot: _Slot) -> bool:
-        return slot.data_decoder is not None and not (self.addons is not None and self.addons.listen_to_data)
+        return (slot.data_decoder is not None or slot.vdl2 is not None) and not (
+            self.addons is not None and self.addons.listen_to_data)
 
     def _decode_data(self, slot: _Slot, audio: np.ndarray) -> None:
         try:
@@ -1858,7 +1886,7 @@ class ScannerEngine(threading.Thread):
 
     @property
     def decoder_active(self) -> bool:
-        return any(slot.data_decoder is not None or slot.dsd is not None
+        return any(slot.data_decoder is not None or slot.dsd is not None or slot.vdl2 is not None
                    for slot in self._slots.copy().values())
 
     def _open_slot(self, freq_hz: int, window: ScanWindow, level_dbfs: float) -> None:
@@ -1870,11 +1898,14 @@ class ScannerEngine(threading.Thread):
         recorder = Recorder(self.config.recording, AUDIO_RATE)
         name = self._channel_name_map.get(freq_hz) or self._channel_name_by_khz.get(round(freq_hz / 1000), "")
         modulation = self._channel_mod_map.get(freq_hz, Modulation.AM)
-        claim = self.addons.claim(freq_hz, self._share[0]) if self.addons is not None else None
+        claim = self.addons.claim(freq_hz, self.decoder_receiver, self.idle_decoders) if self.addons is not None else None
         if claim is not None:
             modulation = claim.modulation      # the decoder needs this demodulation whatever the band says
         offset_hz = float(freq_hz - window.center_hz)
         slot = _Slot(freq_hz, name, modulation, offset_hz, demod, noise_reducer, recorder)
+        if self.addons is not None and claim is None:
+            slot.vdl2 = self.addons.scan_vdl2(freq_hz, window.center_hz, self.sample_rate_hz,
+                                             self.decoder_receiver, self.idle_decoders)
         if claim is not None:
             slot.data_decoder, slot.data_addon = claim.make(), claim.addon_id
         slot.window = window  # remembered for _register_recency_boost on close
@@ -1934,7 +1965,7 @@ class ScannerEngine(threading.Thread):
             else:
                 try:
                     recorder.start_session()
-                    recorder.begin_transmission(freq_hz, name)
+                    recorder.begin_transmission(freq_hz, name, pending=slot.vdl2 is not None)
                 except OSError as exc:
                     self._recording_failed(slot, exc)
         self._emit_recording_changed()
@@ -1952,7 +1983,7 @@ class ScannerEngine(threading.Thread):
             if slot.dsd.encrypted:
                 self.signals.log.emit(tr("{freq:.4f} MHz: encrypted - not decoded").format(freq=freq_hz / 1e6))
         finished_path = None
-        if self.config.recording.enabled:
+        if self.config.recording.enabled or slot.recorder.is_writing:
             finished_path = slot.recorder.end_transmission()
             slot.recorder.stop_session()
             if (finished_path is None and reason == "linger" and not slot.recording_failed and not (slot.dsd and slot.dsd.encrypted)
@@ -1962,7 +1993,7 @@ class ScannerEngine(threading.Thread):
                     (tr("{freq:.4f} MHz: no digital voice decoded - recording discarded") if slot.dsd
                      else tr("{freq:.4f} MHz: nothing above the squelch level - recording discarded")).format(freq=freq_hz / 1e6)
                 )
-            if finished_path is not None and reason == "reflection":
+            if finished_path is not None and reason == "reflection" and slot.vdl2 is None:
                 # A reflection is never a real transmission. Renamed, not
                 # deleted, so a false positive is recoverable; the suffix
                 # keeps it out of the library.
@@ -1981,7 +2012,10 @@ class ScannerEngine(threading.Thread):
                     append_metadata_chunk(Path(finished_path), slot.meta)
                 except Exception:
                     pass
-        if finished_path is not None:
+        if slot.vdl2 is not None:
+            slot.vdl2.end_input()
+            self._slot_pool.submit(self._finish_vdl2, slot.vdl2, finished_path, slot.name, reason)
+        elif finished_path is not None:
             self._finish_recording(Path(finished_path))
         if reason == "linger":
             # Only a natural end earns a boost - not a Skip, Stop or lost device.
@@ -1990,6 +2024,27 @@ class ScannerEngine(threading.Thread):
             self._reassign_primary()
         self._emit_recording_changed()
         self._emit_freqs()
+
+    def _finish_vdl2(self, decoder, path, name, reason) -> None:
+        decoded = decoder.finish()
+        if path is None:
+            return
+        from .recording_names import move_without_overwrite, named_recording_path
+        try:
+            if decoded:
+                path.unlink()
+                return
+            target = path.with_suffix("")
+            if reason == "reflection":
+                move_without_overwrite(path, target.with_suffix(".wav.rejected"))
+                return
+            try:
+                path = move_without_overwrite(path, named_recording_path(target, name))
+            except FileExistsError:
+                path = move_without_overwrite(path, target)
+            self._finish_recording(path)
+        except OSError as exc:
+            self.signals.log.emit(str(exc))
 
     def _finish_recording(self, path: Path) -> None:
         """Emits recording_finished for a closed file - after the mp3
@@ -2072,7 +2127,7 @@ class ScannerEngine(threading.Thread):
             slot.was_squelched = False
         # Vocoder output is already clean; a spectral gate only damages it.
         mono = audio if slot.dsd is not None else self._apply_noise_reduction(slot, audio)
-        if slot.freq_hz == self._primary_freq:
+        if slot.freq_hz == self._primary_freq and not self._is_silent_data(slot):
             self.signals.live_audio_ready.emit(mono)
         if slot.freq_hz == self._primary_freq:
             # Manual recording follows the primary slot regardless of mute.

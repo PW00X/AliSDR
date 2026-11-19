@@ -175,7 +175,8 @@ export function decodersCard(box) {
       h('p.faint.small', { style: { margin: 0 } }, t('Licence: {license}', { license: a.license })),
     ];
     if (!external) {
-      if (a.enabled) {
+      if (a.id === 'acars') parts.push(idleOption(a));
+      if (a.enabled || a.options?.when_idle) {
         parts.push(h('p.faint.small', { style: { margin: 0 } }, t('While scanning, a transmission on one of these channels is decoded instead of being played or recorded.')));
         const missing = a.frequencies.filter((f) => !scanned(f));
         if (missing.length) {
@@ -221,7 +222,15 @@ export function decodersCard(box) {
       if (a.error) parts.push(h('span', { style: { color: 'var(--red)' } }, a.error));
       parts.push(h('h4.addon-sub', t('Settings')));
       if (a.running) parts.push(h('p.faint.small', { style: { margin: 0 } }, t('Changes apply the next time it starts.')));
-      if (a.frequencies.length) parts.push(setting(t('Channels (MHz)'), '', frequencyEditor(a)));
+      if (a.id === 'vdl2') {
+        parts.push(setting(t('Channels (MHz)'), '', frequencyEditor(a)));
+        if (a.frequencies.some(f => !scanned(f))) parts.push(h('button', { onclick: async () => {
+          await addToScan(a); await loadSettings(); render();
+        } }, t('Add to scanned bands')));
+        parts.push(setting(t('Decode VDL2 during scanning'), '',
+          toggle(a.options.during_scan ? t('On') : t('Off'), a.options.during_scan, v => setOption(a, 'during_scan', v))));
+        parts.push(idleOption(a));
+      }
       parts.push(...optionRows(a));
       const picker = receiverPicker(a);
       if (picker) parts.push(picker);
@@ -233,6 +242,12 @@ export function decodersCard(box) {
         a.managed && !a.running ? h('div.row', h('button.ghost.danger', { onclick: () => act('/api/addons/uninstall', { id: a.id }) }, icon('trash'), t('Uninstall'))) : null));
     }
     return h('section.addon-card', ...parts);
+  }
+
+  function idleOption(a) {
+    const active = S.live?.idle_decoders?.some(d => d.id === a.id);
+    return setting(t('Monitor when receiver is idle'), active ? t('Monitoring') : '',
+      toggle(a.options.when_idle ? t('On') : t('Off'), a.options.when_idle, v => setOption(a, 'when_idle', v)));
   }
 
   function render() {

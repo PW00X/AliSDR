@@ -120,5 +120,5 @@ export async function confirmRecording() {
 // add-on statistics are only offered then; the Add-ons page is always there to show what exists.
 export function addonsInUse() {
   const live = S.live;
-  return S.settings.config.addons.enabled.length > 0 || !!(live && live.addon) || !!S.settings.capabilities.addon_messages;
+  return S.settings.config.addons.enabled.length > 0 || !!live?.idle_decoders?.length || !!live?.addon || !!S.settings.capabilities.addon_messages;
 }

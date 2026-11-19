@@ -146,7 +146,8 @@ export function messagesView(root) {
   // Nothing received yet: say what this page is and where to switch the decoders on.
   function drawIntro() {
     const names = NAMES();
-    const on_ = cfg().addons.enabled.map((id) => names[id] || id);
+    const ids = new Set([...cfg().addons.enabled, ...(S.live?.idle_decoders || []).map(d => d.id)]);
+    const on_ = [...ids].map((id) => names[id] || id);
     mount(intro,
       h('h2', { style: { margin: '0 0 6px' } }, t('What is this page?')),
       h('p', { style: { margin: '0 0 8px' } }, t('Whatever the add-on decoders read appears here: aircraft text messages (ACARS and VDL2), amateur radio position reports and messages (APRS) and readings of weather stations and sensors (rtl_433).')),
