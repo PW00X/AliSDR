@@ -274,6 +274,8 @@ class AddonManager:
     def _device_args(self, addon_id: str, device: dict) -> list[str]:
         driver = str(device.get("driver", "auto"))
         if driver not in ("auto", "rtlsdr", "rtlsdr_native"):
+            if addon_id == "vdl2":
+                raise RuntimeError(tr("VDL2 requires an RTL-SDR or Airspy receiver."))
             raise RuntimeError(tr("{name} works with RTL-SDR receivers only.").format(name=SPECS[addon_id].name))
         args = dict(kv.split("=", 1) for kv in str(device.get("device_args", "")).split(",") if "=" in kv)
         ident = args.get("serial") or args.get("index") or ""
@@ -287,6 +289,16 @@ class AddonManager:
         extra = shlex.split(str(cfg.extra_args.get(addon_id, "")), posix=os.name != "nt")      # posix mode would eat the backslashes of a Windows path
         gain = [] if opts["gain"] == "" else [("--gain" if addon_id == "vdl2" else "-g"), f"{float(opts['gain']):g}"]
         ppm = [] if not opts["ppm"] else [("--correction" if addon_id == "vdl2" else "-p"), str(int(opts["ppm"]))]
+        if addon_id == "vdl2" and device.get("driver") in ("airspy", "airspy_native"):
+            freqs = [int(f) for f in cfg.vdl2_frequencies_hz]
+            if not freqs or max(freqs) - min(freqs) > 2_000_000:
+                raise ValueError(tr("Choose VDL2 frequencies within one 2 MHz band."))
+            center = (min(freqs) + max(freqs)) // 2 + 25000
+            return [sys.executable, "-m", "alisdr.addons.airspy_vdl2", device["driver"],
+                    device.get("device_args", ""), str(center), str(opts["gain"]), str(opts["ppm"]),
+                    "1" if device.get("bias_tee") else "0", program, "--output", "decoded:json:file:path=-",
+                    "--iq-file", "-", "--sample-format", "S16_LE", "--oversample", "20",
+                    "--centerfreq", str(center), *extra, *map(str, freqs)], parse_vdl2
         if addon_id == "vdl2":
             return [program, "--output", "decoded:json:file:path=-", *self._device_args(addon_id, device), *gain, *ppm, *extra,
                     *[str(int(f)) for f in cfg.vdl2_frequencies_hz]], parse_vdl2

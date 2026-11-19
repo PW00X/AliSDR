@@ -1,6 +1,6 @@
 # AliSDR
 
-Current source version: **1.2.1** (unreleased)
+Current source version: **1.2.2** (unreleased)
 
 On the Channels page, use **Export** to download an XML backup of the complete
 Memory List and its folders. Use **Import** on another AliSDR install to restore
@@ -54,8 +54,8 @@ headless receiver you listen to from any phone or PC on your network.
 - Decoders that listen to what the scanner already receives: **ACARS** and
   **APRS** (built in), plus **VDL2** (dumpvdl2) and **rtl_433** (sensors:
   weather stations, thermometers, tyre pressure, power, door and alarm
-  sensors, tank levels...) as separate programs (RTL-SDR only) that take a
-  receiver for as long as they run. Everything decoded appears on the **Messages** page, with
+  sensors, tank levels...) as separate programs that take a
+  receiver for as long as they run. VDL2 supports RTL-SDR and Airspy R2 (native libairspy or SoapySDR). Select the Airspy receiver in Add-ons. Everything decoded appears on the **Messages** page, with
   search, filters, a map link and per-add-on statistics.
 - **Notifications** with rules ("a sensor below 0 °C", "a word in an ACARS
   message", "activity on a frequency", "a receiver lost") to ntfy, Telegram,

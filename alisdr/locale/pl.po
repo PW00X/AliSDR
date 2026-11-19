@@ -4228,3 +4228,9 @@ msgstr "Zaimportowano {added} nowych kanałów i zastąpiono {replaced} istniej�
 
 msgid "Stop recording on Listen to see the finished file here."
 msgstr "Zatrzymaj nagrywanie na stronie Słuchaj, aby zobaczyć tutaj gotowy plik."
+
+msgid "Choose VDL2 frequencies within one 2 MHz band."
+msgstr "Wybierz częstotliwości VDL2 w jednym paśmie o szerokości 2 MHz."
+
+msgid "VDL2 requires an RTL-SDR or Airspy receiver."
+msgstr "VDL2 wymaga odbiornika RTL-SDR lub Airspy."

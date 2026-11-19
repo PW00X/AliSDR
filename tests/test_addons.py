@@ -670,6 +670,38 @@ class OptionsTest(unittest.TestCase):
         self.assertEqual(argv[i:i + 4], ["--gain", "40", "--correction", "12"])
         self.assertEqual(argv[-1], "136975000")
 
+    def test_airspy_vdl2_uses_selected_device_and_iq_input(self) -> None:
+        m = self._manager()
+        for driver in ("airspy_native", "airspy"):
+            argv, _ = m._argv("vdl2", "dumpvdl2", {"driver": driver, "device_args": "serial=abc"})
+            self.assertEqual(argv[2:5], ["alisdr.addons.airspy_vdl2", driver, "serial=abc"])
+            self.assertEqual(argv[argv.index("--iq-file") + 1], "-")
+            self.assertEqual(argv[argv.index("--centerfreq") + 1], argv[5])
+            self.assertEqual(argv[-1], "136975000")
+
+    def test_airspy_vdl2_converts_complex_samples_at_actual_device_rate(self) -> None:
+        from unittest.mock import Mock, patch
+        import numpy as np
+        from alisdr.addons import airspy_vdl2 as bridge
+
+        receiver, capture, decoder = Mock(), Mock(), Mock()
+        receiver.sample_rate = 2_500_000
+        phase = np.arange(65536 * 2) * (2 * np.pi * 125000 / receiver.sample_rate)
+        capture.read.side_effect = np.split((0.5 * np.exp(1j * phase)).astype(np.complex64), 2)
+        decoder.poll.side_effect = [None, None, 0, 0]
+        decoder.returncode = 0
+        with patch.object(bridge, "open_real_backend", return_value=receiver), \
+             patch.object(bridge, "AcquisitionThread", return_value=capture), \
+             patch.object(bridge.subprocess, "Popen", return_value=decoder):
+            self.assertEqual(bridge.run("airspy_native", "", 137000000, "", 0, False, ["dumpvdl2"]), 0)
+        capture.close.assert_called_once()
+        raw = b"".join(call.args[0] for call in decoder.stdin.write.call_args_list)
+        pairs = np.frombuffer(raw, dtype="<i2").reshape(-1, 2)
+        self.assertAlmostEqual(len(pairs), len(phase) * 2_100_000 / receiver.sample_rate, delta=32)
+        iq = pairs[50:-50, 0] + 1j * pairs[50:-50, 1]
+        hz = np.angle(np.vdot(iq[:-1], iq[1:])) * 2_100_000 / (2 * np.pi)
+        self.assertAlmostEqual(hz, 125000, delta=2)
+
     def test_bad_values_are_refused_and_unknown_keys_ignored(self) -> None:
         m = self._manager()
         for bad in ({"band": "12"}, {"gain": 500}, {"ppm": "x"}, {"units": "furlongs"}, {"hop_s": 0}, {"custom_mhz": "433.92 abc"}):
