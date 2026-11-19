@@ -304,7 +304,7 @@ export function listenView(root, modes) {
   }, icon('plus'), t('Add to Channels'));
   const recBtn = h('button.recbtn', { onclick: () => toggleManualRecord(), title: t('Continuous recording of what you hear, including silence') }, icon('record'), t('Record'));
   const iqBtn = h('button.ghost.small', { onclick: () => toggleRawIq(), title: t('Raw wideband IQ (SigMF) - about 19 MB per second') }, t('Raw IQ'));
-  const autoRec = toggle(t('Auto-record transmissions'), cfg().recording.enabled, async (v, e) => {
+  const autoRec = toggle(t('Auto-record'), cfg().recording.enabled, async (v, e) => {
     if (v && !(await confirmRecording())) { e.target.checked = false; return; }
     patchConfig({ recording: { enabled: v } });
   });

@@ -1417,6 +1417,9 @@ msgstr "Surowe IQ"
 msgid "Auto-record transmissions"
 msgstr "Automatycznie nagrywaj transmisje"
 
+msgid "Auto-record"
+msgstr "Automatyczne nagrywanie"
+
 msgid "Spectrum"
 msgstr "Widmo"
 
