@@ -3,6 +3,8 @@
 # Linux/Windows/macOS:
 numpy>=1.26
 scipy>=1.11
+# Read/write recording identity in MP3 tags without re-encoding audio (GPL-2.0-or-later).
+mutagen>=1.47
 # Windows has no system time zone database - zoneinfo needs this package
 # there (on Linux/macOS it's harmless, the system one is used first).
 tzdata

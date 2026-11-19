@@ -64,6 +64,10 @@ headless receiver you listen to from any phone or PC on your network.
   live spectrum. Voice is levelled (AM by its carrier, then to a steady
   loudness) so a weak airband station and a strong fire channel sound alike;
   Listen has a boost setting, and the Recordings player evens out files too.
+- Recordings from known channels use the channel name in the filename.
+  **Settings → Recording → Rename existing recordings** applies names to the
+  existing library and shows progress. Frequency stays in embedded metadata;
+  transcripts, favourites and quality results are retained.
 - Skip, skip + blacklist, solo a single band, listen to a single frequency.
 - Works on phones, with play/pause/next controls on the lock screen and
   headset.
@@ -400,7 +404,7 @@ are responsible for how you use this program.
 ## License
 
 GPL-3.0-or-later (see [LICENSE](LICENSE)) - required by `pyrtlsdr` and the
-the native librtlsdr dependency. The optional native receiver libraries carry their own licenses.
+native librtlsdr dependency. Mutagen uses GPL-2.0-or-later. The optional native receiver libraries carry their own licenses.
 Transcription software and Whisper models are not bundled: they are
 downloaded on the user's own request from their publishers (faster-whisper,
 CTranslate2 and the default model `Systran/faster-whisper-large-v3` are MIT-licensed, as

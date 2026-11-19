@@ -91,6 +91,48 @@ export function settingsView(root, hash, scope = 'settings') {
   const body = (k) => (cards[k] ? cards[k].lastChild : document.createElement('div'));
 
   // ---------------------------------------------------------- recording
+  let renameClosed = false;
+  let renamePollBusy = false;
+  let renameStarting = false;
+  let renameRevision = 0;
+  const renameStatus = h('div.col', { role: 'status', 'aria-live': 'polite', style: { gap: '6px' } });
+  const renameButton = h('button', { disabled: true, onclick: async () => {
+    renameStarting = true;
+    renameRevision++;
+    renderRename({ state: 'running', processed: 0, total: 0, renamed: 0 });
+    try { renderRename(await api.post('/api/library/rename', {})); }
+    catch (e) { errorToast(e); renderRename({ state: 'failed', error: e.message }); }
+    finally { renameStarting = false; loadRenameStatus(); }
+  } }, t('Rename existing recordings'));
+  const renamePanel = h('div.col', { style: { gap: '8px' } }, renameButton, renameStatus);
+  function renderRename(job) {
+    if (renameClosed) return;
+    const running = job.state === 'running';
+    renameButton.disabled = running;
+    renameButton.textContent = running ? t('Renaming…') : t('Rename existing recordings');
+    const text = running ? t('Renaming recordings: {processed}/{total} checked, {renamed} renamed.', job)
+      : job.state === 'completed' ? t('Finished: {renamed} renamed, {skipped} skipped, {failed} failed.', job)
+        : job.state === 'failed' ? t('Renaming failed: {error}', job)
+          : job.state === 'cancelled' ? t('Renaming stopped.') : t('Not started.');
+    mount(renameStatus, h('span.small', text),
+      running ? h('progress', { max: Math.max(1, job.total), value: job.processed,
+        'aria-label': t('Recording renaming progress'), style: { width: 'min(300px, 100%)' } }) : null,
+      running && job.current ? h('span.mono.small.ellipsis', job.current) : null,
+      !running && job.busy ? h('span.small.muted', t('{n} busy recordings were skipped. Run again when they are idle.', { n: job.busy })) : null,
+      !running && job.collisions ? h('span.small.muted', t('{n} filename conflicts were skipped. Existing files were kept.', { n: job.collisions })) : null,
+      job.failed && job.error ? h('span.small', t('Last error: {error}', job)) : null);
+  }
+  async function loadRenameStatus() {
+    if (renameClosed || renamePollBusy || renameStarting) return;
+    renamePollBusy = true;
+    const revision = renameRevision;
+    try {
+      const job = await api.get('/api/library/rename');
+      if (revision === renameRevision && !renameStarting) renderRename(job);
+    }
+    catch (e) { if (!renameClosed && revision === renameRevision && !renameStarting) renameStatus.textContent = e.message; }
+    finally { renamePollBusy = false; }
+  }
   function renderRecording() {
     const r = cfg().recording;
     mount(body('recording'),
@@ -109,7 +151,10 @@ export function settingsView(root, hash, scope = 'settings') {
           h('button', { onclick: async () => {
             const dir = await pickFolder(r.output_dir);
             if (dir) { patchConfig({ recording: { output_dir: dir } }); renderRecording(); }
-          } }, icon('folder'), t('Browse…')))));
+          } }, icon('folder'), t('Browse…')))),
+      setting(t('Recording filenames'),
+        t('Use channel names for existing recordings. Audio, transcripts and favourites are kept. Busy recordings are skipped.'),
+        renamePanel));
   }
 
   // The folder lives on the scanning machine, so its own file system is browsed via the API.
@@ -511,6 +556,7 @@ export function settingsView(root, hash, scope = 'settings') {
     renderStorage(); renderAccess(); renderAdvanced();
   }
   renderAll();
+  if (scope === 'settings') { loadRenameStatus(); timers.push(setInterval(loadRenameStatus, 1000)); }
   // Every second while something is going on with a computer (so a click shows its effect), else every 3 s.
   let pollTick = 0;
   if (scope === 'addons') timers.push(setInterval(() => { pollTick += 1; if (fastPoll || pollTick % 3 === 0) loadWorkers(); }, 1000));
@@ -532,5 +578,5 @@ export function settingsView(root, hash, scope = 'settings') {
     const timeout = setTimeout(stop, 4000);
     stopFollowing = () => { clearTimeout(timeout); stop(); };
   }
-  return { destroy() { timers.forEach(clearInterval); clearTimeout(digitalPoll); offs.forEach((f) => f()); if (stopDecoders) stopDecoders(); if (stopNotify) stopNotify(); stopFollowing(); } };
+  return { destroy() { renameClosed = true; timers.forEach(clearInterval); clearTimeout(digitalPoll); offs.forEach((f) => f()); if (stopDecoders) stopDecoders(); if (stopNotify) stopNotify(); stopFollowing(); } };
 }

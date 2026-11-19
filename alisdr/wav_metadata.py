@@ -31,22 +31,37 @@ def append_metadata_chunk(path: Path, metadata: dict[str, Any]) -> None:
 
 
 def read_metadata_chunk(path: Path) -> dict[str, Any] | None:
-    """Reads back what append_metadata_chunk() wrote, if present. Not used
-    anywhere in the app yet (metadata is meant for external tools/future
-    use) but kept alongside the writer for symmetry."""
+    """Read INFO comments without loading or scanning the audio payload."""
+    result = None
     try:
-        data = path.read_bytes()
-    except OSError:
+        with path.open('rb') as stream:
+            header = stream.read(12)
+            if len(header) != 12 or header[:4] != b'RIFF' or header[8:] != b'WAVE':
+                return None
+            end = path.stat().st_size
+            while stream.tell() + 8 <= end:
+                chunk, size = struct.unpack('<4sI', stream.read(8))
+                start = stream.tell()
+                if start + size > end:
+                    break
+                if chunk == b'LIST' and size <= 1024 * 1024:
+                    data = stream.read(size)
+                    if data[:4] == b'INFO':
+                        offset = 4
+                        while offset + 8 <= len(data):
+                            key, length = struct.unpack_from('<4sI', data, offset)
+                            offset += 8
+                            if offset + length > len(data):
+                                break
+                            if key == b'ICMT':
+                                try:
+                                    value = json.loads(data[offset:offset + length].rstrip(b'\x00').decode('utf-8'))
+                                    if isinstance(value, dict):
+                                        result = value
+                                except (UnicodeDecodeError, ValueError):
+                                    pass
+                            offset += length + length % 2
+                stream.seek(start + size + size % 2)
+    except (OSError, struct.error):
         return None
-    idx = data.find(b"INFOICMT")
-    if idx == -1:
-        return None
-    size_off = idx + len(b"INFOICMT")
-    if size_off + 4 > len(data):
-        return None
-    (size,) = struct.unpack_from("<I", data, size_off)
-    payload = data[size_off + 4: size_off + 4 + size]
-    try:
-        return json.loads(payload.rstrip(b"\x00").decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
+    return result

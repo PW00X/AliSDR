@@ -33,7 +33,7 @@ def parse_filename(name: str) -> ParsedName | None:
     m = _NAME_RE.match(name)
     if not m:
         return None
-    year, month, day, hour, minute, second, micros, freq, station = m.groups()
+    year, month, day, hour, minute, second, micros, freq, station, label = m.groups()
     dt_local = datetime(
         int(year), int(month), int(day), int(hour), int(minute), int(second),
         microsecond=int(micros) if micros else 0,
@@ -42,7 +42,24 @@ def parse_filename(name: str) -> ParsedName | None:
     # see FILENAME_REGEX's own comment) - no single fixed frequency, so
     # MANUAL_FREQ_KHZ (0, never a real radio frequency) stands in for it.
     freq_khz = int(freq) if freq is not None else MANUAL_FREQ_KHZ
-    return ParsedName(dt_local=dt_local, freq_khz=freq_khz, station_name=unquote(station or ""))
+    return ParsedName(dt_local=dt_local, freq_khz=freq_khz, station_name=unquote(station or label or ""))
+
+
+def parse_recording(path: Path) -> ParsedName | None:
+    """Name-only files retain frequency in their portable audio metadata."""
+    from alisdr.recording_names import read_recording_metadata
+    parsed = parse_filename(path.name)
+    if parsed is None:
+        return None
+    metadata = read_recording_metadata(path)
+    frequency = metadata.get('freq_hz')
+    if isinstance(frequency, (int, float)) and not isinstance(frequency, bool) and 0 < frequency <= 6_000_000_000:
+        parsed.freq_khz = round(frequency / 1000)
+        if isinstance(metadata.get('recording_name'), str):
+            parsed.station_name = metadata['recording_name']
+    if parsed.station_name and not parsed.freq_khz:
+        return None  # a name without identity cannot safely join a frequency group
+    return parsed
 
 
 def organize(root: Path = ALISDR_DIR) -> List[Path]:
@@ -62,7 +79,7 @@ def organize(root: Path = ALISDR_DIR) -> List[Path]:
     loose_files = [p for p in root.iterdir() if p.is_file() and p.suffix.lower() in (".wav", ".mp3")]
 
     for path in sorted(loose_files):
-        parsed = parse_filename(path.name)
+        parsed = parse_recording(path)
         if parsed is None:
             logger.debug("Skipping file with an unrecognized name: %s", path.name)
             continue

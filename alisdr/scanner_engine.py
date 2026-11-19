@@ -630,7 +630,8 @@ class ScannerEngine(threading.Thread):
         path = recorder.current_path
         recorder.stop_session()
         if path and first_freq is not None:
-            renamed = Recorder.rename_session_file_with_frequency(Path(path), first_freq)
+            name = self._channel_name_map.get(first_freq) or self._channel_name_by_khz.get(round(first_freq / 1000), '')
+            renamed = Recorder.rename_session_file_with_frequency(Path(path), first_freq, name)
             if renamed is not None:
                 path = str(renamed)
         self.signals.manual_recording_changed.emit(False, "")
@@ -1905,6 +1906,7 @@ class ScannerEngine(threading.Thread):
             "app": "AliSDR",
             "freq_hz": freq_hz,
             "name": name,
+            "recording_name": name.strip()[:48],
             "modulation": modulation.value,
             "channel_weight": weight,
             "window_center_hz": window.center_hz,
@@ -1932,7 +1934,7 @@ class ScannerEngine(threading.Thread):
             else:
                 try:
                     recorder.start_session()
-                    recorder.begin_transmission(freq_hz)
+                    recorder.begin_transmission(freq_hz, name)
                 except OSError as exc:
                     self._recording_failed(slot, exc)
         self._emit_recording_changed()

@@ -4,7 +4,6 @@ each; also the continuous manual recording (``single_file``).
 from __future__ import annotations
 
 import datetime as dt
-import re
 import wave
 from pathlib import Path
 from typing import List
@@ -12,6 +11,7 @@ from typing import List
 import numpy as np
 
 from .config import RecordingConfig
+from .recording_names import move_without_overwrite, rename_recording
 
 
 class Recorder:
@@ -30,6 +30,8 @@ class Recorder:
         # Squelched silence waits here: written if real audio follows, dropped
         # if the file closes first (gotcha 6).
         self._pending_silence: List[np.ndarray] = []
+        self._channel_name = ''
+        self._frequency_hz = 0
 
     @property
     def current_path(self) -> str:
@@ -51,11 +53,13 @@ class Recorder:
         self._close_file()
         self._session_active = False
 
-    def begin_transmission(self, freq_hz: int) -> None:
+    def begin_transmission(self, freq_hz: int, channel_name: str = '') -> None:
         """Opens a new per-transmission file (not used with ``single_file``)."""
         if not self._session_active:
             return
         self._open_file(self._split_file_path(freq_hz))
+        self._channel_name = channel_name
+        self._frequency_hz = freq_hz
 
     def write_audio(self, audio: np.ndarray, real: bool = True) -> None:
         """Writes mono ``audio``. ``real=False`` (squelched silence) is held
@@ -91,6 +95,11 @@ class Recorder:
             except OSError:
                 pass
             return None
+        if path is not None and self._channel_name.strip():
+            try:
+                path = rename_recording(path, self._frequency_hz, self._channel_name, new_file=True)
+            except (OSError, ValueError):
+                pass  # keep the frequency filename if metadata or renaming fails
         return path
 
     def abort(self) -> None:
@@ -114,22 +123,18 @@ class Recorder:
 
     @staticmethod
     def rename_session_file_with_frequency(path: Path, freq_hz: int, station_name: str = "") -> Path | None:
-        """Renames a closed manual "..._session" file to "..._<freq_khz>",
-        like auto-recordings (gotcha 13). Returns None, keeping the old name,
+        """Name a closed manual file after its station, falling back to kHz.
+        Returns None, keeping the old name,
         if there's no marker or the rename fails - never a recording failure."""
-        khz = round(freq_hz / 1000)
-        # Escape path separators, control characters and Windows-reserved
-        # characters. Keep ordinary Unicode readable in downloads.
-        label = re.sub(r'[<>:"/\\|?*%\x00-\x1f]', lambda match: f"%{ord(match[0]):02X}",
-                       station_name.strip()[:48])
-        station_suffix = f"~{label}" if label else ""
-        new_name = path.name.replace("_session", f"_{khz}{station_suffix}")
+        new_name = path.name.replace("_session", f"_{round(freq_hz / 1000)}")
         if new_name == path.name:
             return None
         new_path = path.with_name(new_name)
         try:
-            path.rename(new_path)
-        except OSError:
+            if station_name.strip():
+                return rename_recording(path, freq_hz, station_name, new_file=True)
+            move_without_overwrite(path, new_path)
+        except (OSError, ValueError):
             return None
         return new_path
 

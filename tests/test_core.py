@@ -569,7 +569,9 @@ class RtlTcpTest(unittest.TestCase):
             server.close()
 
     def test_bias_tee_on_last_and_off_on_close(self) -> None:
-        server = _FakeRtlTcp()
+        # Only test commands here. Undrained simulated IQ can turn a Windows
+        # socket close into a reset and hide the last command from the fake.
+        server = _FakeRtlTcp(stream=False)
         backend = self._backend(server, bias_tee=True)
         try:
             time.sleep(0.1)
@@ -3054,7 +3056,9 @@ class ManualTuningTest(unittest.TestCase):
         ctl.tune_manual({"mode": "NFM", "frequency_hz": 145_500_000})
         self.assertFalse(ctl.manual_status()["recording"])
         self.assertEqual(ctl.open_recording_paths(), set())
-        (fm,) = Path(cfg.recording.output_dir).rglob("*_99500~Radio%2FL*.wav")
+        (fm,) = Path(cfg.recording.output_dir).rglob("*_Radio%2FL*.wav")
+        from alisdr.playback.organizer import parse_recording
+        self.assertEqual(parse_recording(fm).freq_khz, 99500)
         ctl.library.rescan()
         self.assertEqual(ctl.library.query(q="radio/l'été")["items"][0]["name"], "Radio/L'été")
         with wave.open(str(fm), "rb") as wav:
@@ -3178,7 +3182,9 @@ class ManualTuningTest(unittest.TestCase):
         with urlopen(Request(record_url, b'{"enabled":false}', headers), timeout=5) as response:
             self.assertFalse(json.load(response)["recording"])
         self.assertEqual(ctl.manual_status()["station"], 0xabcd)
-        (saved_file,) = Path(cfg.recording.output_dir).rglob("*_223936~Radio Plus.wav")
+        (saved_file,) = Path(cfg.recording.output_dir).rglob("*_Radio Plus.wav")
+        from alisdr.playback.organizer import parse_recording
+        self.assertEqual(parse_recording(saved_file).freq_khz, 223936)
         with wave.open(str(saved_file), "rb") as wav:
             self.assertEqual((wav.getframerate(), wav.getnchannels()), (48000, 2))
             stereo = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2").reshape(-1, 2)
@@ -3570,6 +3576,193 @@ class MergePatchTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctl.patch_config({"trigger_level_dbfs": None})
         self.assertIsInstance(ctl.config.trigger_level_dbfs, float)
+
+
+class RecordingNamesTest(_LibCase):
+    def _audio(self, name: str) -> Path:
+        import wave
+        path = self.root / '2026-11-19' / name
+        path.parent.mkdir(exist_ok=True)
+        with wave.open(str(path), 'wb') as audio:
+            audio.setnchannels(1)
+            audio.setsampwidth(2)
+            audio.setframerate(12500)
+            audio.writeframes(b'\x10\x01' * 1250)
+        return path
+
+    def _run(self) -> dict:
+        self.lib.rename_existing_recordings()
+        self.lib._rename_thread.join(5)
+        status = self.lib.recording_rename_status()
+        self.assertEqual(status['state'], 'completed', status)
+        return status
+
+    def test_batch_preserves_audio_metadata_and_restart_identity(self) -> None:
+        import wave
+        from alisdr.playback.models import QualityMetrics
+        path = self._audio('2026-11-19_10-00-01_131000.wav')
+        self.lib._freq_names = lambda: {131000: 'Tower'}
+        self.lib.rescan()
+        rel = path.relative_to(self.root).as_posix()
+        rec = self.lib.get(rel)
+        old_key = rec.key
+        rec.quality = QualityMetrics(1, 2, 3, 0, 75, .1)
+        self.lib.quality.put(rec.key, rec.quality)
+        self.lib.set_transcript_text(rel, 'Cleared to land')
+        self.lib.set_favorite([rel], True)
+        self.lib.request_transcription([rel], 'nl')
+        self.lib._peaks[rel] = [.1, .2]
+        status = self._run()
+        self.assertEqual((status['renamed'], status['failed']), (1, 0))
+        target = path.with_name('2026-11-19_10-00-01_Tower.wav')
+        self.assertFalse(path.exists())
+        with wave.open(str(target)) as audio:
+            self.assertEqual(audio.readframes(1250), b'\x10\x01' * 1250)
+        new_rel = target.relative_to(self.root).as_posix()
+        renamed = self.lib.get(new_rel)
+        self.assertEqual((renamed.freq_khz, renamed.station_name), (131000, 'Tower'))
+        self.assertTrue(renamed.is_favorite)
+        self.assertEqual(renamed.transcript.text, 'Cleared to land')
+        self.assertEqual(renamed.quality.quality_score, 75)
+        self.assertEqual(self.lib._requests[new_rel], 'nl')
+        self.assertEqual(self.lib._peaks[new_rel], [.1, .2])
+        self.assertNotIn(old_key, self.lib.quality._data)
+        self.assertNotIn(old_key, self.lib.transcripts._data)
+        other = Library(self.cfg, lambda: set(), lambda: {})
+        other.rescan()
+        reloaded = other.get(new_rel)
+        self.assertEqual(reloaded.freq_khz, 131000)
+        self.assertTrue(reloaded.is_favorite)
+        self.assertEqual(reloaded.transcript.text, 'Cleared to land')
+        self.assertEqual(self._run()['renamed'], 0)
+
+    def test_busy_unknown_and_conflicting_files_are_kept(self) -> None:
+        conflict = self._audio('2026-11-19_10-00-02_131000.wav')
+        target = self._audio('2026-11-19_10-00-02_Tower.wav')
+        original = target.read_bytes()
+        busy = self._audio('2026-11-19_10-00-03_132000.wav')
+        unknown = self._audio('2026-11-19_10-00-04_133000.wav')
+        opened = self._audio('2026-11-19_10-00-05_134000.wav')
+        self.open.add(opened)
+        self.lib._freq_names = lambda: {131000: 'Tower', 132000: 'Approach', 134000: 'Open'}
+        self.lib.rescan()
+        self.lib._leases[busy.relative_to(self.root).as_posix()] = ('worker', time.monotonic() + 60)
+        status = self._run()
+        self.assertEqual((status['renamed'], status['busy'], status['collisions'], status['failed']), (0, 1, 1, 0))
+        for path in (conflict, busy, unknown, opened):
+            self.assertTrue(path.exists())
+        self.assertEqual(target.read_bytes(), original)
+
+    def test_new_recordings_use_safe_names_even_numeric_or_session(self) -> None:
+        import numpy as np
+        from alisdr.recorder import Recorder
+        from alisdr.playback.organizer import parse_recording
+        for name in ('538', 'session', 'Tower/West:50%', 'Zażółć'):
+            with self.subTest(name=name):
+                recorder = Recorder(self.cfg.recording, 12500)
+                recorder.start_session()
+                recorder.begin_transmission(99500000, name)
+                recorder.write_audio(np.ones(100, dtype=np.float32) * .2)
+                path = recorder.end_transmission()
+                self.assertNotIn('_99500', path.name)
+                parsed = parse_recording(path)
+                self.assertEqual((parsed.freq_khz, parsed.station_name), (99500, name))
+
+    def test_mp3_renaming_preserves_mpeg_bytes_and_existing_tags(self) -> None:
+        from mutagen.id3 import ID3, TIT2
+        from alisdr.recording_names import rename_recording
+        from alisdr.playback.organizer import parse_recording
+        path = self.root / '2026-11-19_10-00-06_131000.mp3'
+        payload = b'\xff\xfb' + b'MPEG audio unchanged' * 1000
+        path.write_bytes(payload)
+        tags = ID3()
+        tags.add(TIT2(encoding=3, text=['Original title']))
+        tags.save(path)
+        target = rename_recording(path, 131000000, 'Tower')
+        with target.open('rb') as stream:
+            stream.seek(ID3(target).size)
+            self.assertEqual(stream.read(), payload)
+        self.assertEqual(str(ID3(target)['TIT2']), 'Original title')
+        self.assertEqual(parse_recording(target).freq_khz, 131000)
+
+    def test_progress_deduplicates_requests_and_holds_worker_claims(self) -> None:
+        from unittest.mock import patch
+        from alisdr.recording_names import rename_recording
+        self._audio('2026-11-19_10-00-07_131000.wav')
+        self.lib._freq_names = lambda: {131000: 'Tower'}
+        self.cfg.transcription.enabled = True
+        entered, release = threading.Event(), threading.Event()
+        def paused(*args, **kwargs):
+            entered.set()
+            release.wait(3)
+            return rename_recording(*args, **kwargs)
+        with patch('alisdr.playback.index.rename_recording', side_effect=paused):
+            try:
+                self.lib.rename_existing_recordings()
+                self.assertTrue(entered.wait(3))
+                worker = self.lib._rename_thread
+                self.assertEqual(self.lib.rename_existing_recordings()['state'], 'running')
+                self.assertIs(self.lib._rename_thread, worker)
+                self.assertIsNone(self.lib.claim_job('worker'))
+            finally:
+                release.set()
+                self.lib._rename_thread.join(5)
+        status = self.lib.recording_rename_status()
+        self.assertEqual((status['state'], status['processed'], status['renamed']), ('completed', 1, 1))
+
+    def test_bad_audio_reports_failure_without_changing_file(self) -> None:
+        path = _wav(self.root, '2026-11-19_10-00-08_131000.wav')
+        original = path.read_bytes()
+        self.lib._freq_names = lambda: {131000: 'Tower'}
+        status = self._run()
+        self.assertEqual(status['failed'], 1)
+        self.assertIn('Invalid WAV', status['error'])
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_metadata_survives_mp3_transcoding_and_wav_reader_skips_audio(self) -> None:
+        from unittest.mock import patch
+        from alisdr.audio_transcode import ffmpeg_available, transcode_to_mp3
+        from alisdr.recording_names import rename_recording
+        from alisdr.playback.organizer import parse_recording
+        from alisdr.wav_metadata import read_metadata_chunk
+        path = self._audio('2026-11-19_10-00-09_131000.wav')
+        target = rename_recording(path, 131000000, 'Tower')
+        with patch.object(Path, 'read_bytes', side_effect=AssertionError('audio must not be read into memory')):
+            self.assertEqual(read_metadata_chunk(target)['freq_hz'], 131000000)
+        if not ffmpeg_available():
+            self.skipTest('ffmpeg unavailable')
+        mp3 = transcode_to_mp3(target)
+        self.assertIsNotNone(mp3)
+        parsed = parse_recording(mp3)
+        self.assertEqual((parsed.freq_khz, parsed.station_name), (131000, 'Tower'))
+
+    def test_rename_endpoint_requires_authentication_and_csrf_header(self) -> None:
+        from types import SimpleNamespace
+        from http.server import ThreadingHTTPServer
+        from alisdr.web.server import App, make_handler
+        self._audio('2026-11-19_10-00-10_131000.wav')
+        self.lib._freq_names = lambda: {131000: 'Tower'}
+        ctl = SimpleNamespace(library=self.lib)
+        web = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(App(self.cfg, ctl, 'secret')))
+        web.daemon_threads = True
+        threading.Thread(target=web.serve_forever, daemon=True).start()
+        self.addCleanup(web.server_close)
+        self.addCleanup(web.shutdown)
+        url = f'http://127.0.0.1:{web.server_port}/api/library/rename'
+        with self.assertRaises(HTTPError) as denied:
+            urlopen(url, timeout=3)
+        self.assertEqual(denied.exception.code, 401)
+        headers = {'Authorization': 'Bearer secret', 'Content-Type': 'application/json'}
+        with self.assertRaises(HTTPError) as denied:
+            urlopen(Request(url, data=b'{}', headers=headers), timeout=3)
+        self.assertEqual(denied.exception.code, 403)
+        headers['X-AliSDR'] = '1'
+        with urlopen(Request(url, data=b'{}', headers=headers), timeout=3) as response:
+            self.assertIn(json.load(response)['state'], ('running', 'completed'))
+        self.lib._rename_thread.join(5)
+        with urlopen(Request(url, headers=headers), timeout=3) as response:
+            status = json.load(response)
+        self.assertEqual((status['state'], status['renamed'], status['total']), ('completed', 1, 1))
 
 
 class CacheKeyTest(_LibCase):

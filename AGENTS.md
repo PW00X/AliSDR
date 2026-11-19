@@ -23,7 +23,7 @@ python3 -m unittest tests/test_core.py tests/test_addons.py
 python3 main.py --probe-sdr [driver]   # with the scanner stopped: measures a real receiver (gotcha 55)
 ```
 
-`numpy`, `scipy`, `pyrtlsdr`/`pyrtlsdrlib`, `tzdata` —
+`numpy`, `scipy`, `pyrtlsdr`/`pyrtlsdrlib`, `tzdata`, `mutagen` —
 `pip install -r requirements.txt`. `SoapySDR` needs system packages on Linux
 (see `requirements.txt`). No SDR hardware/library at all, with
 `AppConfig.debug_mode` on → `SimulatedBackend` fallback rather than failing
@@ -31,8 +31,8 @@ to start; with debug off (the default), a real connection failure stays
 visible (retry/backoff state) instead of silently simulating — gotcha 8.
 
 **License: GPL-3.0-or-later** (`LICENSE`) — forced by `pyrtlsdr` (GPL-3.0-or-later)
-and the bundled `librtlsdr` (GPL-2.0-or-later); every other dependency is
-permissive. A new dependency must be GPLv3-compatible.
+and the bundled `librtlsdr` (GPL-2.0-or-later). Mutagen is also GPL-2.0-or-later;
+the other dependencies are permissive. A new dependency must be GPLv3-compatible.
 
 **i18n**: Python strings go through `tr()`, browser strings through `t()`
 (`static/js/core.js`) — both use the English text as the key into the same
@@ -183,7 +183,7 @@ catalog loads; wrap them in a function called at point of use
     continuous including silence. Never dropped as a "phantom" (always
     `write_audio(real=True)`). Never persisted — off again on next launch.
     A recording that captures a real frequency gets renamed from
-    `..._session` to a frequency-tagged name
+    `..._session` to a channel-name filename when known, otherwise a frequency-tagged name
     (`Recorder.rename_session_file_with_frequency()`, first-wins latch in
     `_manual_recording_first_freq`).
 14. **MP3 (`RecordingConfig.output_format == "mp3"`) is a transcode run
@@ -196,6 +196,16 @@ catalog loads; wrap them in a function called at point of use
     transcode outlasted `AcquisitionThread`'s ~1.9s queue and dropped IQ for
     other open slots) — and emits `recording_finished` only afterwards.
     Missing `ffmpeg` silently keeps the WAV.
+    Name-only recordings store frequency in RIFF INFO JSON or MP3 ID3 metadata
+    (`recording_names.py`, Mutagen). Index with `parse_recording(path)`, not
+    `parse_filename(path.name)`, when frequency is needed. FFmpeg may write the
+    WAV comment as either COMM or TXXX:comment; preserve both readers. Legacy
+    frequency and frequency~station filenames remain readable. The Settings
+    rename job runs outside receiver threads, skips open/analyzing/leased files
+    and collisions, and migrates cache keys, favourites and queued requests.
+    `_rescan_lock` prevents scans from pruning metadata during renaming; pin
+    `_renaming` under `_lock` before doing file IO outside that lock. Never
+    rewrite the audio payload or overwrite another recording.
 15. **Raw IQ recording (`iq_recorder.py`) is a third, independent
     mechanism** — not audio, not `Recorder`-based. Writes SigMF from the
     *shared* window capture (never a second hardware read). Manual/

@@ -1420,6 +1420,57 @@ msgstr "Automatycznie nagrywaj transmisje"
 msgid "Auto-record"
 msgstr "Automatyczne nagrywanie"
 
+msgid "Rename existing recordings"
+msgstr "Zmień nazwy istniejących nagrań"
+
+msgid "Renaming…"
+msgstr "Zmienianie nazw…"
+
+msgid "Renaming recordings: {processed}/{total} checked, {renamed} renamed."
+msgstr "Zmienianie nazw nagrań: sprawdzono {processed}/{total}, zmieniono {renamed}."
+
+msgid "Finished: {renamed} renamed, {skipped} skipped, {failed} failed."
+msgstr "Zakończono: zmieniono {renamed}, pominięto {skipped}, błędy: {failed}."
+
+msgid "Renaming failed: {error}"
+msgstr "Zmiana nazw nie powiodła się: {error}"
+
+msgid "Renaming stopped."
+msgstr "Zatrzymano zmianę nazw."
+
+msgid "Not started."
+msgstr "Nie rozpoczęto."
+
+msgid "Recording renaming progress"
+msgstr "Postęp zmiany nazw nagrań"
+
+msgid "{n} busy recordings were skipped. Run again when they are idle."
+msgstr "Pominięto {n} zajętych nagrań. Uruchom ponownie, gdy będą wolne."
+
+msgid "{n} filename conflicts were skipped. Existing files were kept."
+msgstr "Pominięto {n} konfliktów nazw. Zachowano istniejące pliki."
+
+msgid "Last error: {error}"
+msgstr "Ostatni błąd: {error}"
+
+msgid "Recording filenames"
+msgstr "Nazwy plików nagrań"
+
+msgid "Use channel names for existing recordings. Audio, transcripts and favourites are kept. Busy recordings are skipped."
+msgstr "Użyj nazw kanałów dla istniejących nagrań. Dźwięk, transkrypcje i ulubione zostaną zachowane. Zajęte nagrania są pomijane."
+
+msgid "Wait for recording renaming to finish before changing the recordings folder."
+msgstr "Przed zmianą folderu nagrań poczekaj na zakończenie zmiany nazw."
+
+msgid "Invalid WAV recording"
+msgstr "Nieprawidłowe nagranie WAV"
+
+msgid "Recording changed while its metadata was being updated"
+msgstr "Nagranie zmieniło się podczas aktualizacji metadanych"
+
+msgid "Recordings folder changed during renaming"
+msgstr "Folder nagrań zmienił się podczas zmiany nazw"
+
 msgid "Spectrum"
 msgstr "Widmo"
 

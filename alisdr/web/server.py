@@ -509,6 +509,13 @@ def make_handler(app: App):
             sizes = sum(lib.get(rel).size for rel in victims if lib.get(rel))
             self._json({**lib.storage(), "retention_pending": len(victims), "retention_bytes": sizes})
 
+        def lib_rename_recordings(self, _query: dict) -> None:
+            if self.command == 'POST':
+                self._body()
+                self._json(lib.rename_existing_recordings())
+            else:
+                self._json(lib.recording_rename_status())
+
         def lib_delete(self, _query: dict) -> None:
             self._json({"deleted": lib.delete(self._body()["ids"])})
 
@@ -754,6 +761,8 @@ def make_handler(app: App):
         ("GET", "/api/library/facets"): Handler.facets,
         ("GET", "/api/library/stats"): Handler.stats,
         ("GET", "/api/library/storage"): Handler.storage,
+        ("GET", "/api/library/rename"): Handler.lib_rename_recordings,
+        ("POST", "/api/library/rename"): Handler.lib_rename_recordings,
         ("GET", "/api/dirs"): Handler.dirs,
         ("POST", "/api/library/delete"): Handler.lib_delete,
         ("POST", "/api/library/retention"): Handler.lib_retention_now,

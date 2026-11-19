@@ -454,8 +454,8 @@ class Controller:
         if session and session.tuning.mode == "DAB":
             return session.stations.get(session.station, {}).get("name", "")
         if session and session.tuning.mode == "WFM":
-            return session.station_info.get("name", "")
-        return ""
+            return self.freq_names().get(round(session.tuning.frequency_hz / 1000)) or session.station_info.get("name", "")
+        return self.freq_names().get(round(session.tuning.frequency_hz / 1000), '') if session else ''
 
     @staticmethod
     def _can_record_manual(session: ManualSession | None) -> bool:
@@ -849,8 +849,8 @@ class Controller:
             self.notifier.on_system("receiver_lost", i18n.tr("Receiver {n} lost its connection - reconnecting.").format(n=k + 1))
 
     def _notify_recording(self, path: str) -> None:
-        from .playback.organizer import parse_filename
-        parsed = parse_filename(Path(path).name)
+        from .playback.organizer import parse_recording
+        parsed = parse_recording(Path(path))
         if parsed is None or not parsed.freq_khz:
             return
         names = self.freq_names()
@@ -1101,6 +1101,11 @@ class Controller:
     def patch_config(self, patch: dict) -> None:
         old_language = self.config.language
         old_root = self.config.recording.output_dir
+        recording_patch = patch.get('recording')
+        if (isinstance(recording_patch, dict) and 'output_dir' in recording_patch
+                and recording_patch['output_dir'] != old_root
+                and self.library.recording_rename_status()['state'] == 'running'):
+            raise ValueError(i18n.tr('Wait for recording renaming to finish before changing the recordings folder.'))
         for locked in ("access_token", "workers", "notify", "manual_favourites", "remote_receiver"):
             patch.pop(locked, None)
         if isinstance(patch.get("addons"), dict):

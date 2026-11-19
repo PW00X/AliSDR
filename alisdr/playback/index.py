@@ -26,12 +26,14 @@ from typing import Callable, Iterable, Optional
 from alisdr.config import AppConfig, atomic_write_text
 from alisdr.military_presets import get_all_presets
 from alisdr.models import airband_channel, snap_airband_hz
+from alisdr.i18n import tr
 from alisdr.playback import stats
 from alisdr.playback.audio_analysis import analyze_wav, compute_waveform_peaks
 from alisdr.playback.config import APP_DATA_DIR, UTC_TZ
 from alisdr.playback.favorites_store import FavoritesStore
 from alisdr.playback.models import MANUAL_FREQ_KHZ, QualityMetrics, Recording, TranscriptionResult
-from alisdr.playback.organizer import organize, parse_filename
+from alisdr.playback.organizer import organize, parse_filename, parse_recording
+from alisdr.recording_names import named_recording_path, rename_recording
 from alisdr.playback.quality_cache import QualityCache
 from alisdr.playback.transcription_cache import TranscriptionCache
 
@@ -70,6 +72,12 @@ class Library:
         self._open_paths = open_paths
         self._freq_names = freq_names
         self._lock = threading.RLock()
+        self._rescan_lock = threading.RLock()
+        self._renaming: set[str] = set()
+        self._analyzing: set[str] = set()
+        self._rename_thread: Optional[threading.Thread] = None
+        self._rename_status = dict(state='idle', total=0, processed=0, renamed=0, skipped=0,
+                                   busy=0, collisions=0, failed=0, current='', error='')
         self._recs: dict[str, Recording] = {}   # relpath (posix) -> Recording
         self._blobs: dict[str, str] = {}        # relpath -> lowercased search text
         self.quality = QualityCache()
@@ -106,6 +114,8 @@ class Library:
 
     def stop(self) -> None:
         self._stop.set()
+        if self._rename_thread is not None:
+            self._rename_thread.join(timeout=5)
         self.save(force=True)
 
     def save(self, force: bool = False) -> None:
@@ -189,7 +199,7 @@ class Library:
             self.transcripts.save()
 
     def _make(self, path: Path) -> Optional[Recording]:
-        parsed = parse_filename(path.name)
+        parsed = parse_recording(path)
         if parsed is None:
             return None
         try:
@@ -211,6 +221,10 @@ class Library:
         return rec
 
     def rescan(self) -> None:
+        with self._rescan_lock:
+            self._rescan()
+
+    def _rescan(self) -> None:
         root = self.root
         if not root.is_dir():
             with self._lock:
@@ -292,11 +306,20 @@ class Library:
         for rec in todo:
             if time.monotonic() > deadline or self._stop.is_set():
                 return
-            quality = analyze_wav(rec.path)
             with self._lock:
-                rec.quality = quality
-                self.quality.put(rec.key, quality)
-                self._dirty = True
+                rel = self._rel_safe(rec)
+                if rel in self._renaming or self._recs.get(rel) is not rec:
+                    continue
+                self._analyzing.add(rel)
+            try:
+                quality = analyze_wav(rec.path)
+                with self._lock:
+                    rec.quality = quality
+                    self.quality.put(rec.key, quality)
+                    self._dirty = True
+            finally:
+                with self._lock:
+                    self._analyzing.discard(rel)
 
     # -- reading ----------------------------------------------------------
     def get(self, rel: str) -> Optional[Recording]:
@@ -516,6 +539,116 @@ class Library:
             return ""
 
     # -- writing ----------------------------------------------------------
+    def recording_rename_status(self) -> dict:
+        with self._lock:
+            return dict(self._rename_status)
+
+    def rename_existing_recordings(self) -> dict:
+        with self._lock:
+            if self._rename_status['state'] == 'running':
+                return dict(self._rename_status)
+            self._rename_status = dict(state='running', total=0, processed=0, renamed=0,
+                                       skipped=0, busy=0, collisions=0, failed=0, current='', error='')
+            self._rename_thread = threading.Thread(target=self._rename_recordings, name='recording-names', daemon=True)
+            self._rename_thread.start()
+            return dict(self._rename_status)
+
+    def _move_recording_entry(self, rel: str, rec: Recording, path: Path, root: Path, name: str) -> None:
+        """Called under _lock, retaining user metadata across path/size changes."""
+        new_rel = path.resolve().relative_to(root).as_posix()
+        st = path.stat()
+        key = f'{new_rel}|{st.st_size}|{int(st.st_mtime)}'
+        if key != rec.key:
+            for cache in (self.quality, self.transcripts):
+                if rec.key in cache._data:
+                    cache._data[key] = cache._data.pop(rec.key)
+                    cache.mark_changed()
+            if self.favorites.is_favorite(rec.key):
+                self.favorites.remove(rec.key)
+                self.favorites.set_favorite(key, True)
+        if rel in self._requests:
+            self._requests[new_rel] = self._requests.pop(rel)
+        if rel in self._failed:
+            self._failed.discard(rel)
+            self._failed.add(new_rel)
+        self._leases.pop(rel, None)
+        self._mirrored.discard(rel)  # the new relative path must be verified by a worker
+        if rel in self._peaks:
+            self._peaks[new_rel] = self._peaks.pop(rel)
+        self._blobs.pop(rel, None)
+        self._recs.pop(rel, None)
+        rec.path, rec.key, rec.size, rec.station_name = path, key, st.st_size, name.strip()[:48]
+        self._recs[new_rel] = rec
+        self._dirty = True
+
+    def _rename_recordings(self) -> None:
+        try:
+            with self._rescan_lock:
+                self.rescan()
+                root = self.root.resolve()
+                names = self._freq_names()
+                with self._lock:
+                    items = list(self._recs.items())
+                    self._rename_status['total'] = len(items)
+                for rel, rec in items:
+                    if self._stop.is_set():
+                        break
+                    outcome = 'skipped'
+                    pinned = False
+                    try:
+                        open_now = {p.resolve() for p in self._open_paths()}
+                        with self._lock:
+                            self._rename_status['current'] = rec.path.name
+                            name = names.get(rec.freq_khz) or rec.station_name
+                            if self.root.resolve() != root:
+                                raise RuntimeError(tr('Recordings folder changed during renaming'))
+                            if (not name or not rec.freq_khz or rec.path.is_symlink()
+                                    or named_recording_path(rec.path, name) == rec.path):
+                                continue
+                            lease = self._leases.get(rel)
+                            busy = (rel in self._analyzing or (lease and lease[1] > time.monotonic())
+                                    or rec.path.resolve() in open_now)
+                            if busy:
+                                self._rename_status['busy'] += 1
+                                continue
+                            if self._recs.get(rel) is not rec:
+                                continue
+                            self._renaming.add(rel)
+                            pinned = True
+                        path = rename_recording(rec.path, rec.freq_khz * 1000, name)
+                        with self._lock:
+                            self._move_recording_entry(rel, rec, path, root, name)
+                        outcome = 'renamed'
+                    except FileExistsError:
+                        with self._lock:
+                            self._rename_status['collisions'] += 1
+                            if (pinned and self._recs.get(rel) is rec and rec.path.is_file()
+                                    and self._key(rec.path, rec.path.stat()) != rec.key):
+                                self._move_recording_entry(rel, rec, rec.path, root, rec.station_name)
+                    except Exception as exc:
+                        logger.warning('Could not rename recording %s: %s', rec.path, exc)
+                        outcome = 'failed'
+                        with self._lock:
+                            self._rename_status['error'] = str(exc)
+                            # A completed metadata write may precede a failed rename.
+                            if (pinned and self._recs.get(rel) is rec and rec.path.is_file()
+                                    and self._key(rec.path, rec.path.stat()) != rec.key):
+                                self._move_recording_entry(rel, rec, rec.path, root, rec.station_name)
+                    finally:
+                        with self._lock:
+                            self._renaming.discard(rel)
+                            self._rename_status['processed'] += 1
+                            self._rename_status[outcome] += 1
+                        self._stop.wait(0.001)
+                self._dir_mtimes.clear()
+                self.save(force=True)
+            with self._lock:
+                self._rename_status.update(state='cancelled' if self._stop.is_set() else 'completed', current='')
+        except Exception as exc:
+            logger.exception('Recording renaming failed')
+            with self._lock:
+                self._rename_status.update(state='failed', current='', error=str(exc))
+
     def favorite_count(self, rels: Iterable[str]) -> tuple[int, int]:
         """(favorites, listed) among ``rels`` - the Recordings page needs it for a selection it has not loaded."""
         with self._lock:
@@ -535,6 +668,8 @@ class Library:
         deleted = 0
         with self._lock:
             for rel in rels:
+                if rel in self._renaming:
+                    continue
                 rec = self._recs.pop(rel, None)
                 if rec is None:
                     continue
@@ -603,11 +738,11 @@ class Library:
         now = time.monotonic()
         with self._lock:
             self._leases = {rel: v for rel, v in self._leases.items() if v[1] > now}
-            rel = next((r for r in self._requests if r not in self._leases and r in self._recs), None)
+            rel = next((r for r in self._requests if r not in self._leases and r not in self._renaming and r in self._recs), None)
             if rel is None and self.config.transcription.enabled:
                 candidates = [
                     (r.dt_utc, rel) for rel, r in self._recs.items()
-                    if r.transcript is None and rel not in self._leases and rel not in self._failed
+                    if r.transcript is None and rel not in self._leases and rel not in self._failed and rel not in self._renaming
                 ]
                 rel = max(candidates)[1] if candidates else None
             if rel is None:

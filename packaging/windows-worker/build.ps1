@@ -21,7 +21,7 @@ try {
     [IO.Compression.ZipFile]::ExtractToDirectory($package, (Join-Path $temp 'python'))
     Move-Item -LiteralPath (Join-Path $temp 'python/tools') -Destination (Join-Path $bundle 'runtime')
     $python = Join-Path $bundle 'runtime/python.exe'
-    & $python -I -m pip install --disable-pip-version-check --no-cache-dir 'tzdata>=2024.1'
+    & $python -I -m pip install --disable-pip-version-check --no-cache-dir 'tzdata>=2024.1' 'mutagen>=1.47'
     if ($LASTEXITCODE -ne 0) { throw 'Could not install the worker runtime dependency.' }
 
     $source = Join-Path $repo 'alisdr'
