@@ -95,6 +95,8 @@ export function settingsView(root, hash, scope = 'settings') {
   let renamePollBusy = false;
   let renameStarting = false;
   let renameRevision = 0;
+  let renameActive = false;
+  let renameRenderedKey = '';
   const renameStatus = h('div.col', { role: 'status', 'aria-live': 'polite', style: { gap: '6px' } });
   const renameButton = h('button', { disabled: true, onclick: async () => {
     renameStarting = true;
@@ -107,7 +109,11 @@ export function settingsView(root, hash, scope = 'settings') {
   const renamePanel = h('div.col', { style: { gap: '8px' } }, renameButton, renameStatus);
   function renderRename(job) {
     if (renameClosed) return;
+    const key = JSON.stringify(job);
+    if (key === renameRenderedKey) return;
+    renameRenderedKey = key;
     const running = job.state === 'running';
+    renameActive = running;
     renameButton.disabled = running;
     renameButton.textContent = running ? t('Renaming…') : t('Rename existing recordings');
     const text = running ? t('Renaming recordings: {processed}/{total} checked, {renamed} renamed.', job)
@@ -130,7 +136,12 @@ export function settingsView(root, hash, scope = 'settings') {
       const job = await api.get('/api/library/rename');
       if (revision === renameRevision && !renameStarting) renderRename(job);
     }
-    catch (e) { if (!renameClosed && revision === renameRevision && !renameStarting) renameStatus.textContent = e.message; }
+    catch (e) {
+      if (!renameClosed && revision === renameRevision && !renameStarting) {
+        renameRenderedKey = '';
+        renameStatus.textContent = e.message;
+      }
+    }
     finally { renamePollBusy = false; }
   }
   function renderRecording() {
@@ -556,7 +567,11 @@ export function settingsView(root, hash, scope = 'settings') {
     renderStorage(); renderAccess(); renderAdvanced();
   }
   renderAll();
-  if (scope === 'settings') { loadRenameStatus(); timers.push(setInterval(loadRenameStatus, 1000)); }
+  if (scope === 'settings') {
+    let idleTick = 0;
+    loadRenameStatus();
+    timers.push(setInterval(() => { if (renameActive || ++idleTick % 5 === 0) loadRenameStatus(); }, 1000));
+  }
   // Every second while something is going on with a computer (so a click shows its effect), else every 3 s.
   let pollTick = 0;
   if (scope === 'addons') timers.push(setInterval(() => { pollTick += 1; if (fastPoll || pollTick % 3 === 0) loadWorkers(); }, 1000));

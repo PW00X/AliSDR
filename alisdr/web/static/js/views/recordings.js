@@ -250,8 +250,9 @@ export function recordingsView(root) {
   async function setFavorite(ids, favorite) {
     try {
       await api.post('/api/library/favorite', { ids, favorite });
-      items.filter((i) => ids.includes(i.id)).forEach((i) => { i.favorite = favorite; refreshRow(i); });
-      if (current && ids.includes(current.id)) renderPlayer();
+      const affected = new Set(ids);
+      for (const item of items) if (affected.has(item.id)) { item.favorite = favorite; refreshRow(item); }
+      if (current && affected.has(current.id)) renderPlayer();
       loadFacets();
       if (!favorite && F.sel.includes('fav')) reload();   // they no longer belong to the Favorites view
       else renderBulk();
@@ -272,9 +273,10 @@ export function recordingsView(root) {
   async function transcribe(ids, language) {
     try {
       await api.post('/api/library/transcribe', { ids, language: language || null });
-      items.filter((i) => ids.includes(i.id)).forEach((i) => { i.queued = true; refreshRow(i); });
+      const affected = new Set(ids);
+      for (const item of items) if (affected.has(item.id)) { item.queued = true; refreshRow(item); }
       toast(ids.length === 1 ? t('Queued for transcription') : t('{n} recordings queued for transcription', { n: ids.length }));
-      if (current && ids.includes(current.id)) { current.queued = true; renderPlayer(); }
+      if (current && affected.has(current.id)) { current.queued = true; renderPlayer(); }
     } catch (e) { errorToast(e); }
   }
 

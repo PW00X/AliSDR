@@ -50,17 +50,27 @@ function folders() {
 export async function editChannelDialog(ch, defaults = {}) {
   const isNew = !ch;
   const initial = ch || defaults;
+  const knownFolders = folders();
+  let newFolderValue = '__new_folder__';
+  while (knownFolders.includes(newFolderValue)) newFolderValue += '_';
   const v = await formDialog(isNew ? t('Add channel') : t('Edit channel'), [
     { key: 'freq', label: t('Frequency (MHz)'), type: 'number', value: initial.freq_hz ? fmtChannel(initial.freq_hz) : '',
       hint: t('Airband: type the channel as published, e.g. 126.805') },
     { key: 'name', label: t('Name'), value: isNew ? '' : initial.name || '', placeholder: t('e.g. Downtown Tower') },
     { key: 'mod', label: t('Modulation'), type: 'select', value: initial.modulation || 'AM', options: modOptions() },
     { key: 'folder', label: t('Folder'), type: 'select', value: initial.folder || '',
-      options: [['', t('(no folder)')], ...folders().map((f) => [f, f])] },
-    { key: 'newFolder', label: t('New folder'), hint: t('Optional - a name typed here is used instead of the folder above.') },
+      options: [['', t('(no folder)')], ...knownFolders.map((f) => [f, f]), [newFolderValue, t('New folder…')]] },
+    { key: 'newFolder', label: t('Folder name') },
     { key: 'weight', label: t('Priority weight'), type: 'number', value: initial.weight || 0,
       hint: t('0 = normal. Higher = checked more often.') },
-  ], t('Save'), { dismissible: false, autocomplete: 'off' });
+  ], t('Save'), { dismissible: false, autocomplete: 'off', onChange: ({ folder, newFolder }) => {
+    const creating = folder.value === newFolderValue;
+    newFolder.closest('label').style.display = creating ? '' : 'none';
+    newFolder.disabled = !creating;
+    newFolder.required = creating;
+    newFolder.setCustomValidity(creating && !newFolder.value.trim() ? t('Enter a folder name.') : '');
+    if (creating && document.activeElement === folder) newFolder.focus();
+  } });
   if (!v || !(v.freq > 0)) return false;
   const hz = carrierHz(v.freq);
   const channels = S.settings.channels;
@@ -68,7 +78,7 @@ export async function editChannelDialog(ch, defaults = {}) {
     toast(t('{f} MHz is already in the list', { f: fmtChannel(hz) }), 'bad');
     return false;
   }
-  const folder = v.newFolder.trim() || v.folder;
+  const folder = v.folder === newFolderValue ? v.newFolder.trim() : v.folder;
   const data = { freq_hz: hz, ch833: typedAs833(v.freq), name: v.name.trim(), modulation: v.mod, folder, weight: v.weight || 0 };
   if (folder && !cfg().channel_folders.includes(folder)) patchConfig({ channel_folders: [...cfg().channel_folders, folder] });
   await saveChannels(isNew ? [...channels, { ...data, enabled: true }]
@@ -300,7 +310,8 @@ export function channelsView(root) {
     const q = query.trim().toLowerCase();
     const match = (c) => !q || `${fmtChannel(c.freq_hz)} ${fmtMHz(c.freq_hz, 4)} ${c.name} ${c.modulation} ${c.folder}`.toLowerCase().includes(q);
     const channels = sorted('memory', S.settings.channels.filter(match));
-    const groups = [['', channels.filter((c) => !c.folder)], ...folders().map((f) => [f, channels.filter((c) => c.folder === f)])];
+    const groups = new Map([['', []], ...folders().map((f) => [f, []])]);
+    for (const channel of channels) groups.get(channel.folder || '').push(channel);
     const search = h('input', { type: 'search', placeholder: t('Search frequency, name, folder…'), value: query, oninput: (e) => { query = e.target.value; const pos = e.target.selectionStart; render(); const el = body.querySelector('input[type=search]'); el.focus(); el.setSelectionRange(pos, pos); } });
     const rows = [];
     for (const [folder, list] of groups) {

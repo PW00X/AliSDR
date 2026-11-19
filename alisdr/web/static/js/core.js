@@ -237,6 +237,7 @@ export function modal(title, body, buttons = [[t('Close'), null]], options = {})
     // Everything behind the dialog leaves the tab order and the screen reader's view.
     const behind = [...document.body.children].filter((el) => el.id !== 'toasts' && !el.inert);
     const close = (v) => {
+      if (v === true && options.validate && !options.validate()) return;
       back.remove(); document.removeEventListener('keydown', onKey);
       behind.forEach((el) => { el.inert = false; });
       if (opener && opener.isConnected) opener.focus();
@@ -274,7 +275,14 @@ export async function formDialog(title, fields, okLabel, options = {}) {
       inputs[f.key] = input;
       return h('label.field', f.label, input, f.hint ? h('span.hint', f.hint) : null);
     }));
-  const promise = modal(title, form, [[t('Cancel'), false, 'ghost'], [okLabel || t('Save'), true, 'primary']], options);
+  if (options.onChange) {
+    const changed = () => options.onChange(inputs);
+    form.addEventListener('change', changed);
+    form.addEventListener('input', changed);
+    changed();
+  }
+  const promise = modal(title, form, [[t('Cancel'), false, 'ghost'], [okLabel || t('Save'), true, 'primary']],
+    { ...options, validate: () => form.reportValidity() });
   const back = form.closest('.modal-back');
   if (!(await promise)) return null;
   const out = {};

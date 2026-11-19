@@ -1420,6 +1420,12 @@ msgstr "Automatycznie nagrywaj transmisje"
 msgid "Auto-record"
 msgstr "Automatyczne nagrywanie"
 
+msgid "New folder…"
+msgstr "Nowy folder…"
+
+msgid "Enter a folder name."
+msgstr "Wpisz nazwę folderu."
+
 msgid "Rename existing recordings"
 msgstr "Zmień nazwy istniejących nagrań"
 
