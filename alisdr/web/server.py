@@ -545,7 +545,7 @@ def make_handler(app: App):
             ids = self._body().get("ids")
             if not isinstance(ids, list) or not ids:
                 raise ValueError("ids must be a non-empty list")
-            selected: list[tuple[Path, tuple[int, str]]] = []
+            selected: list[tuple[Path, tuple[str, int, str]]] = []
             channel_names = ctl.freq_names()
             for rec_id in ids:
                 try:
@@ -553,30 +553,31 @@ def make_handler(app: App):
                     rec = lib.get(str(rec_id))
                     if rec is not None:
                         name = channel_names.get(rec.freq_khz) or rec.station_name or ''
-                        selected.append((path, (rec.freq_khz, name)))
+                        selected.append((path, (rec.dt_local.strftime('%Y%m%d'), rec.freq_khz, name)))
                 except FileNotFoundError:
                     pass                      # deleted meanwhile
             if not selected:
                 raise FileNotFoundError("none of the recordings exist")
             groups = {group for _path, group in selected}
-            folders: dict[tuple[int, str], str] = {}
-            if len(groups) > 1:
-                labels = {group: _zip_folder_name(group[1] or (f'{group[0] / 1000:.3f} MHz'
-                          if group[0] else i18n.tr('Manual recording'))) for group in groups}
-                label_counts: dict[str, int] = {}
-                for label in labels.values():
-                    label_counts[label.casefold()] = label_counts.get(label.casefold(), 0) + 1
-                used: set[str] = set()
+            folders: dict[tuple[str, int, str], str] = {}
+            if len(selected) > 1:
+                labels = {group: _zip_folder_name(group[2] or (f'{group[1] / 1000:.3f} MHz'
+                          if group[1] else i18n.tr('Manual recording'))) for group in groups}
+                label_counts: dict[tuple[str, str], int] = {}
+                for group, label in labels.items():
+                    key = (group[0], label.casefold())
+                    label_counts[key] = label_counts.get(key, 0) + 1
+                used: set[tuple[str, str]] = set()
                 for group in sorted(groups):
                     label = labels[group]
-                    if label_counts[label.casefold()] > 1:
-                        label += f' ({group[0] / 1000:.3f} MHz)'
+                    if label_counts[(group[0], label.casefold())] > 1:
+                        label += f' ({group[1] / 1000:.3f} MHz)'
                     folder, number = label, 1
-                    while folder.casefold() in used:
+                    while (group[0], folder.casefold()) in used:
                         number += 1
                         folder = f'{label}-{number}'
-                    used.add(folder.casefold())
-                    folders[group] = folder
+                    used.add((group[0], folder.casefold()))
+                    folders[group] = f'{group[0]}/{folder}'
             files = [(path, folders.get(group, '')) for path, group in selected]
             token = secrets.token_urlsafe(16)
             with zip_lock:
