@@ -2747,6 +2747,7 @@ class HttpTest(unittest.TestCase):
         import shutil
         import tempfile
         import zipfile
+        from types import SimpleNamespace
         from alisdr.web.server import App, make_handler
         from http.server import ThreadingHTTPServer
         tmp = Path(tempfile.mkdtemp())
@@ -2754,10 +2755,16 @@ class HttpTest(unittest.TestCase):
         (tmp / "a").mkdir()
         (tmp / "b").mkdir()
         files = {"a/x.mp3": b"A" * 3_000_000, "b/x.mp3": b"B" * 10, "a/y.wav": b""}   # two share a name; one is empty
+        names = {131000: 'Tower'}
+        frequencies = {'a/x.mp3': 131000, 'b/x.mp3': 132000, 'a/y.wav': 131000}
+        station_names = {}
         for rel, data in files.items():
             (tmp / rel).write_bytes(data)
 
         class Lib:
+            def get(self, rel):
+                return SimpleNamespace(freq_khz=frequencies[rel], station_name=station_names.get(rel, ''))
+
             def path_of(self, rel):
                 if rel not in files:
                     raise FileNotFoundError(rel)
@@ -2765,6 +2772,9 @@ class HttpTest(unittest.TestCase):
 
         class Ctl:
             library = Lib()
+
+            def freq_names(self):
+                return names
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(App(AppConfig(), Ctl(), "")))
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         self.addCleanup(httpd.server_close)
@@ -2784,9 +2794,28 @@ class HttpTest(unittest.TestCase):
             data = r.read()
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             self.assertIsNone(z.testzip())
-            self.assertEqual(sorted(z.namelist()), ["x-2.mp3", "x.mp3", "y.wav"])
-            self.assertEqual(z.read("x.mp3"), b"A" * 3_000_000)
-            self.assertEqual(z.read("x-2.mp3"), b"B" * 10)
+            self.assertEqual(sorted(z.namelist()), ['132.000 MHz/x.mp3', 'Tower/x.mp3', 'Tower/y.wav'])
+            self.assertEqual(z.read("Tower/x.mp3"), b"A" * 3_000_000)
+            self.assertEqual(z.read("132.000 MHz/x.mp3"), b"B" * 10)
+        single = post(['a/x.mp3', 'a/x.mp3', 'a/y.wav'])
+        with urlopen(url + '/api/library/zip?token=' + single['token'], timeout=10) as response:
+            with zipfile.ZipFile(io.BytesIO(response.read())) as archive:
+                self.assertEqual(sorted(archive.namelist()), ['x-2.mp3', 'x.mp3', 'y.wav'])
+        def archive_names():
+            prepared = post(['a/x.mp3', 'b/x.mp3'])
+            with urlopen(url + '/api/library/zip?token=' + prepared['token'], timeout=10) as response:
+                with zipfile.ZipFile(io.BytesIO(response.read())) as archive:
+                    self.assertIsNone(archive.testzip())
+                    return sorted(archive.namelist())
+        names[132000] = 'Tower'
+        self.assertEqual(archive_names(), ['Tower (131.000 MHz)/x.mp3', 'Tower (132.000 MHz)/x.mp3'])
+        names.update({131000: '../Escape\\Name', 132000: 'NUL'})
+        self.assertEqual(archive_names(), ['.._Escape_Name/x.mp3', '_NUL/x.mp3'])
+        # Two DAB services can share one frequency but still need separate folders.
+        names.clear()
+        frequencies['b/x.mp3'] = 131000
+        station_names.update({'a/x.mp3': 'Radio One', 'b/x.mp3': 'Radio Two'})
+        self.assertEqual(archive_names(), ['Radio One/x.mp3', 'Radio Two/x.mp3'])
         self.assertEqual(self._status(url + "/api/library/zip?token=" + job["token"]), 404)   # used once
         self.assertEqual(self._status(url + "/api/library/zip?token=nope"), 404)
         with self.assertRaises(HTTPError) as err:

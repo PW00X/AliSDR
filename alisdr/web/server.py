@@ -16,6 +16,7 @@ import json
 import mimetypes
 import os
 import queue
+import re
 import secrets
 import struct
 import threading
@@ -55,6 +56,19 @@ def may_change_command_line(token: str, client_ip: str) -> bool:
     """A program path plus arguments is a command line: only this computer, or somebody who has the access password."""
     return bool(token) or client_ip in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 _KEEPALIVE = bytes(250)  # 10 ms of silence at 12.5 kHz/16-bit: keeps idle streams alive, detects dead ones
+
+
+def _zip_folder_name(name: str, max_bytes: int = 180) -> str:
+    """A single portable folder component, never an extraction path."""
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f\x7f]', '_', name).strip().rstrip('. ')
+    if not name:
+        name = '_'
+    if name.split('.')[0].upper() in {'CON', 'PRN', 'AUX', 'NUL',
+                                    *(f'COM{i}' for i in range(1, 10)), *(f'LPT{i}' for i in range(1, 10))}:
+        name = '_' + name
+    while len(name.encode('utf-8')) > max_bytes:
+        name = name[:-1]
+    return name
 
 
 class App:
@@ -103,7 +117,7 @@ def make_handler(app: App):
     cfg = app.config
     # Prepared ZIP downloads: token -> (files, made at). The ids go in a POST body (a selection can be tens of
     # thousands, far beyond a URL); the download itself is a plain GET the browser can save.
-    zip_jobs: dict[str, tuple[list[Path], float]] = {}
+    zip_jobs: dict[str, tuple[list[tuple[Path, str]], float]] = {}
     zip_lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
@@ -531,21 +545,46 @@ def make_handler(app: App):
             ids = self._body().get("ids")
             if not isinstance(ids, list) or not ids:
                 raise ValueError("ids must be a non-empty list")
-            files: list[Path] = []
+            selected: list[tuple[Path, tuple[int, str]]] = []
+            channel_names = ctl.freq_names()
             for rec_id in ids:
                 try:
-                    files.append(lib.path_of(str(rec_id)))
+                    path = lib.path_of(str(rec_id))
+                    rec = lib.get(str(rec_id))
+                    if rec is not None:
+                        name = channel_names.get(rec.freq_khz) or rec.station_name or ''
+                        selected.append((path, (rec.freq_khz, name)))
                 except FileNotFoundError:
                     pass                      # deleted meanwhile
-            if not files:
+            if not selected:
                 raise FileNotFoundError("none of the recordings exist")
+            groups = {group for _path, group in selected}
+            folders: dict[tuple[int, str], str] = {}
+            if len(groups) > 1:
+                labels = {group: _zip_folder_name(group[1] or (f'{group[0] / 1000:.3f} MHz'
+                          if group[0] else i18n.tr('Manual recording'))) for group in groups}
+                label_counts: dict[str, int] = {}
+                for label in labels.values():
+                    label_counts[label.casefold()] = label_counts.get(label.casefold(), 0) + 1
+                used: set[str] = set()
+                for group in sorted(groups):
+                    label = labels[group]
+                    if label_counts[label.casefold()] > 1:
+                        label += f' ({group[0] / 1000:.3f} MHz)'
+                    folder, number = label, 1
+                    while folder.casefold() in used:
+                        number += 1
+                        folder = f'{label}-{number}'
+                    used.add(folder.casefold())
+                    folders[group] = folder
+            files = [(path, folders.get(group, '')) for path, group in selected]
             token = secrets.token_urlsafe(16)
             with zip_lock:
                 now = time.monotonic()
                 for old in [t for t, (_f, made) in zip_jobs.items() if now - made > 120]:
                     del zip_jobs[old]
                 zip_jobs[token] = (files, now)
-            self._json({"token": token, "count": len(files), "bytes": sum(f.stat().st_size for f in files if f.exists())})
+            self._json({"token": token, "count": len(files), "bytes": sum(f.stat().st_size for f, _folder in files if f.exists())})
 
         def lib_zip(self, query: dict) -> None:
             token = str(_qs(query, "token", ""))
@@ -565,18 +604,27 @@ def make_handler(app: App):
                 return
             seen: set[str] = set()
             with zipfile.ZipFile(self.wfile, "w", zipfile.ZIP_STORED) as zf:
-                for path in files:
-                    name, n = path.name, 1
-                    while name in seen:
+                for path, folder in files:
+                    stem = _zip_folder_name(path.stem, max_bytes=240)
+                    name, n = stem + path.suffix, 1
+                    archive_name = f'{folder}/{name}' if folder else name
+                    while archive_name.casefold() in seen:
                         n += 1
-                        name = f"{path.stem}-{n}{path.suffix}"
-                    seen.add(name)
+                        name = f"{stem}-{n}{path.suffix}"
+                        archive_name = f'{folder}/{name}' if folder else name
+                    seen.add(archive_name.casefold())
                     try:
                         src = path.open("rb")
                     except OSError:
                         continue              # deleted since it was prepared
                     with src:
-                        info = zipfile.ZipInfo.from_file(path, name)
+                        st = os.fstat(src.fileno())
+                        stamp = time.localtime(st.st_mtime)[:6]
+                        if stamp[0] < 1980 or stamp[0] > 2107:
+                            stamp = (1980, 1, 1, 0, 0, 0)
+                        info = zipfile.ZipInfo(archive_name, stamp)
+                        info.file_size = st.st_size
+                        info.external_attr = (st.st_mode & 0xFFFF) << 16
                         info.compress_type = zipfile.ZIP_STORED
                         with zf.open(info, "w", force_zip64=True) as out:
                             while chunk := src.read(1 << 20):

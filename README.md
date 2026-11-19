@@ -1,6 +1,6 @@
 # AliSDR
 
-Current version: **[1.1.5](docs/releases/1.1.5.md)**
+Current version: **[1.2.0](docs/releases/1.2.0.md)**
 
 <img src="alisdr/web/static/icon.svg" width="96" align="right" alt="AliSDR logo">
 
@@ -68,6 +68,8 @@ headless receiver you listen to from any phone or PC on your network.
   **Settings → Recording → Rename existing recordings** applies names to the
   existing library and shows progress. Frequency stays in embedded metadata;
   transcripts, favourites and quality results are retained.
+- Multi-channel ZIP downloads group recordings into channel-name folders,
+  with frequency folders (for example `131.000 MHz`) for unnamed channels.
 - Skip, skip + blacklist, solo a single band, listen to a single frequency.
 - Works on phones, with play/pause/next controls on the lock screen and
   headset.
