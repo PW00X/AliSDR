@@ -291,6 +291,10 @@ td.pick input, th.pick input { width: 18px; height: 18px; cursor: pointer; }
 .tuner-readout .manual-station-summary { justify-content: flex-end; }
 .hero .others { display: flex; flex-wrap: wrap; gap: 6px; min-height: 0; }
 .hero .others .chip b { color: var(--amber); }
+.scan-frequency-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; }
+.scan-frequency-detail .freq-name { margin-top: 0; margin-left: auto; min-width: 0; }
+.scan-frequency-detail .others { flex: 1 1 12rem; text-align: left; }
+.scan-frequency-detail .others:empty { display: none; }
 .meter { position: relative; height: 6px; border-radius: 3px; background: var(--instrument-line); overflow: visible; }
 .meter .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 3px; background: linear-gradient(90deg, #2c5c8a, #64d2ff 60%, #30d158 85%, #ff9f0a); transition: width .18s linear; }
 .meter .mark { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 1px; background: #ff9f0a; }

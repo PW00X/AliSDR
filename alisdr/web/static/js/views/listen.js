@@ -312,7 +312,8 @@ export function listenView(root, modes) {
   const dongleRow = h('div.row.wrap', { style: { gap: '6px' } });
   // Bands/channels that no dongle's antenna range reaches (live.uncovered, antenna_range.py).
   const rangeNotice = h('div.notice.hidden', { role: 'status' }, icon('ban'), h('span', { style: { flex: '1 1 260px' } }));
-  const tunerHeader = h('div.tuner-header', modes, h('div.tuner-readout', freqEl, nameEl));
+  const tunerHeader = h('div.tuner-header', modes,
+    h('div.tuner-readout', freqEl, h('div.scan-frequency-detail', others, nameEl)));
   const hero = h('section.card.hero',
     h('div.row', stateChip, h('span.spacer'), cycleText),
     tunerHeader,
@@ -320,7 +321,6 @@ export function listenView(root, modes) {
     driverHint,
     methodHint,
     rangeNotice,
-    others,
     h('div.col', { style: { gap: '4px' } },
       h('div.meter', meterFill, meterMark),
       h('div.meter-legend', h('span', '-100'), levelText, h('span', '0 dBFS'))),
