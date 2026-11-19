@@ -184,6 +184,9 @@ export const liveAudio = {
         const length = u.length - u.length % frameBytes;
         if (length < u.length) rest = u.slice(length);
         if (!length) continue;
+        // A catch-up burst can arrive while older sources are still scheduled.
+        // Keep their timeline intact. Rewinding it mixes two moments of audio.
+        if (this.t > this.ctx.currentTime + MAX_AHEAD_S) continue;
         const pcm = new DataView(u.buffer, u.byteOffset, length);
         const frames = length / frameBytes;
         const buf = this.ctx.createBuffer(channels, frames, rate);
@@ -195,8 +198,7 @@ export const liveAudio = {
         src.buffer = buf;
         src.connect(channels === 2 ? this.gain : this.chain.input);
         const now = this.ctx.currentTime;
-        // Really ran dry (or a new transmission after silence) / far too far ahead: start over.
-        if (this.t <= now || this.t > now + MAX_AHEAD_S) this.t = now + LATENCY_S;
+        if (this.t <= now) this.t = now + LATENCY_S;
         src.onended = () => this.sources.delete(src);
         src.start(this.t);
         this.sources.add(src);
