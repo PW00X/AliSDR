@@ -1,6 +1,7 @@
 // "Statistics": what was heard, when and how well.
 import { api, errorToast, fmtAgo, fmtChannel, fmtDate, fmtDuration, h, mount, prefs, qs, qualityBadge, t, tabs, toggle } from '../core.js';
 import { addonsInUse } from '../state.js';
+import { openChannelForFrequency } from './channels.js';
 import { addonStats } from './stats-addons.js';
 
 // Two scopes: what was heard on the air (recordings) and what the add-ons decoded. #/stats is the first,
@@ -54,7 +55,7 @@ export function statsView(root, hash = '') {
       h('section.card',
         h('div.card-head', h('h2', t('Frequencies')), h('span.faint.small', t('Click a row to open its recordings'))),
         h('div.table-wrap', h('table',
-          h('thead', h('tr', h('th', t('MHz')), h('th', t('Name')), h('th.num', t('Count')), h('th', t('Quality')), h('th', t('Total time')), h('th', t('Last heard')))),
+          h('thead', h('tr', h('th', t('MHz')), h('th', t('Name')), h('th.num', t('Count')), h('th', t('Quality')), h('th', t('Total time')), h('th', t('Last heard')), h('th', ''))),
           h('tbody', s.frequencies.map((f) => h('tr', {
             style: { cursor: 'pointer' },
             onclick: () => { sessionStorage.setItem('openFreq', `freq:${f.freq_khz}`); location.hash = '#/recordings'; },
@@ -64,7 +65,11 @@ export function statsView(root, hash = '') {
           h('td.num', f.count.toLocaleString()),
           h('td', qualityBadge(f.quality)),
           h('td.mono', fmtDuration(f.duration)),
-          h('td.small.muted', fmtAgo(f.last)))))))));
+          h('td.small.muted', fmtAgo(f.last)),
+          h('td', f.freq_khz ? h('button', { onclick: async (event) => {
+            event.stopPropagation();
+            if (await openChannelForFrequency(f.freq_khz * 1000)) load();
+          } }, f.name ? t('Edit') : t('Add')) : null))))))));
   }
   load();
   return {};

@@ -7,12 +7,8 @@
 
 const LATENCY_S = 0.4;
 const MAX_AHEAD_S = 1.2;
-// The lead is held near LATENCY_S by playing up to 1 % slower/faster, never by jumping: a resync
-// used to fire while the lead was merely low (< 20 ms, audio still playing) and inserted 250 ms of
-// silence - after a server hiccup, again and again (measured: 6 such gaps in 4 s at the headphones).
-// 1 %, not more: playbackRate shifts the pitch (3 % = a quarter tone, heard as a bent voice for seconds
-// after every hiccup; measured with tests/live_audio: max pitch error 1.4 % -> 0.5 %, still 0 silences).
-const MAX_RATE_CHANGE = 0.01;
+// Keep the receiver sample clock unchanged: playbackRate correction bends tuned audio.
+// The jitter reserve handles bursts; only a genuine underrun resets the timeline.
 
 // Listening aids, in the browser so they work for every device (a phone has no louder setting than
 // its maximum). Chain: source -> boost -> compressor -> volume. The compressor is a safety net (a loud
@@ -201,13 +197,10 @@ export const liveAudio = {
         const now = this.ctx.currentTime;
         // Really ran dry (or a new transmission after silence) / far too far ahead: start over.
         if (this.t <= now || this.t > now + MAX_AHEAD_S) this.t = now + LATENCY_S;
-        const lead = this.t - now;
-        const speed = 1 + Math.max(-MAX_RATE_CHANGE, Math.min(MAX_RATE_CHANGE, (lead - LATENCY_S) * 0.5));
-        src.playbackRate.value = speed;
         src.onended = () => this.sources.delete(src);
         src.start(this.t);
         this.sources.add(src);
-        this.t += buf.duration / speed;
+        this.t += buf.duration;
       }
     } catch (e) {
       if (!ctrl.signal.aborted) console.warn('live audio stream:', e);  // dropped - reconnect below
