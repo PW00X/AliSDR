@@ -87,7 +87,8 @@ export function manualView(root, modes) {
   const stations = h('section.card.col', { hidden: true },
     h('div.card-head.row.wrap', stationHeading, unnamedFmToggle), stationRows, noFmStations);
   const stationInfo = h('div.col');
-  const info = h('section.col', { hidden: true }, h('h2', t('Station information')), stationInfo);
+  const infoHeading = h('h2.manual-station-heading', { id: 'manual-station-title', hidden: true }, t('Station information'));
+  const info = h('section.col', { hidden: true, 'aria-labelledby': 'manual-station-title' }, stationInfo);
   const canvas = h('canvas', { height: 260, role: 'img', 'aria-label': t('Live spectrum and waterfall around the tuned frequency.') });
   const axis = h('div.spectrum-axis');
   const spectrumHint = h('span.faint.small', t('Click the spectrum to select a frequency'));
@@ -346,6 +347,7 @@ export function manualView(root, modes) {
     const dab = active?.mode === 'DAB';
     const fm = active?.mode === 'WFM' && !latest.fm_scan;
     info.hidden = !dab && !fm;
+    infoHeading.hidden = info.hidden;
     frequencyDisplay.hidden = !info.hidden;
     const meta = latest.station_info || {};
     const service = dab && latest.stations.find(({ id }) => id === playingStation);
@@ -513,8 +515,7 @@ export function manualView(root, modes) {
     h('div.page-head', h('h1', t('Listen'))),
     h('div.grid.listen',
     h('div.col',
-    h('section.card.hero', h('div.row', status),
-      h('div.tuner-header', modes, h('div.tuner-readout', frequencyDisplay, info)), meter,
+    h('section.card.hero', h('div.row.manual-hero-heading', status, infoHeading),
       h('form.col', { onsubmit: (event) => {
         event.preventDefault();
         if (!tune.disabled) {
@@ -522,8 +523,11 @@ export function manualView(root, modes) {
           change('/api/manual/tune', tuneValues());
         }
       } },
-      h('div.row.wrap', h('label.field', t('Modulation'), mode),
-        frequencyField, channelField),
+      h('div.tuner-header',
+        h('div.col.manual-tuner-inputs', modes,
+          h('div.row.wrap.manual-tuner-fields', h('label.field', t('Modulation'), mode), frequencyField, channelField)),
+        h('div.tuner-readout', frequencyDisplay, info)),
+      meter,
       h('div.controls', tune, audio, scanFm, stop, record))),
     spectrumCard, stations),
     h('div.col', favouritesCard, deviceCard))));

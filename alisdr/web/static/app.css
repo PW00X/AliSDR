@@ -177,6 +177,14 @@ label.field > span.hint { color: var(--secondary); font-weight: 400; }
 .manual-tuning [hidden] { display: none; }
 .manual-station-summary { align-items: center; gap: .75rem; overflow-wrap: anywhere; }
 .manual-station-summary > .col { gap: .25rem; }
+.manual-station-heading { margin-left: auto; text-align: right; }
+.manual-hero-heading { justify-content: space-between; align-items: baseline; }
+.manual-tuner-inputs { flex: 1 1 16rem; align-items: flex-start; min-width: 0; }
+.tuner-header .manual-tuner-inputs .tuner-mode { align-self: flex-start; }
+.manual-tuner-fields { width: 100%; }
+.manual-tuner-fields > .field { flex: 1 1 7rem; min-width: 0; }
+.manual-tuner-fields > .field:first-child { flex-basis: 10rem; }
+.manual-tuner-fields input, .manual-tuner-fields select { width: 100%; min-width: 0; }
 .manual-station-summary strong { font-size: 1.4rem; }
 .manual-station-art { display: grid; place-items: center; width: 120px; height: 120px; flex: none; object-fit: contain; border-radius: .6rem; background: var(--surface2, #222326); }
 .manual-station-art svg { width: 2rem; height: 2rem; }
