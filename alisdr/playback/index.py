@@ -462,6 +462,13 @@ class Library:
             by_freq.setdefault(r.freq_khz, []).append(r)
             lang = r.transcript.language if r.transcript and r.transcript.language else ""
             by_lang.setdefault(lang, []).append(r)
+        def frequency_label(freq: int, group: list[Recording]) -> str:
+            # A DAB multiplex carries several separately named services on one frequency.
+            labels = {rec.station_name for rec in group if rec.station_name}
+            channel = names.get(freq, "")
+            labels.discard(channel)
+            return ", ".join(filter(None, [channel, *sorted(labels, key=str.casefold)]))
+
         bands = []
         for preset in get_all_presets():
             members = [r for r in recs if preset.start_hz <= r.freq_khz * 1000 <= preset.stop_hz]
@@ -471,7 +478,7 @@ class Library:
         return {
             "total": len(recs),
             "favorites": sum(1 for r in recs if r.is_favorite),
-            "frequencies": [{"key": f"freq:{f}", "freq_khz": f, "name": names.get(f, ""), **agg(g)}
+            "frequencies": [{"key": f"freq:{f}", "freq_khz": f, "name": frequency_label(f, g), **agg(g)}
                             for f, g in by_freq.items()],
             "bands": bands,
             "languages": [{"key": f"lang:{lang}", "language": lang, **agg(g)} for lang, g in by_lang.items()],
