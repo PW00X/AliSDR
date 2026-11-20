@@ -138,20 +138,12 @@ def _acars_block(text: bytes, registration: str = ".SP-LWA", label: str = "H1", 
     return chars + bytes([crc & 0xFF, crc >> 8])
 
 
-def _acars_audio(block: bytes, mapping: str) -> np.ndarray:
+def _acars_audio(block: bytes, initial_bit: int = 1) -> np.ndarray:
     from alisdr.addons import acars
     head = [b for c in (0x2B, 0x2A, acars.SYN, acars.SYN, acars.SOH) for b in acars.char_bits(acars.with_parity(c))]
-    bits = [1] * 16 + head + [b for byte in block for b in acars.char_bits(byte)] + [b for b in acars.char_bits(acars.DEL)]
-    tones, tone = [], 1
-    for b in bits:
-        if mapping == "direct":
-            tone = b
-        elif mapping == "inverted":
-            tone = 1 - b
-        elif mapping == "diff":              # no change = 1
-            tone = tone if b else 1 - tone
-        tones.append(tone)
-    freqs = _per_symbol([2400.0 if t else 1200.0 for t in tones], 2400)
+    bits = [1] * (16 * 8) + head + [b for byte in block for b in acars.char_bits(byte)] + [b for b in acars.char_bits(acars.DEL)]
+    previous = [initial_bit, *bits[:-1]]
+    freqs = _per_symbol([2400.0 if a == b else 1200.0 for a, b in zip(previous, bits)], 2400)
     return np.concatenate([np.zeros(300, np.float32), _fm(freqs), np.zeros(300, np.float32)])
 
 
@@ -165,14 +157,14 @@ def _decode_acars(audio: np.ndarray, **kw) -> list[dict]:
 
 
 class AcarsTest(unittest.TestCase):
-    def test_a_block_is_decoded_whatever_the_tone_mapping(self) -> None:
+    def test_acars_line_code_across_audio_blocks(self) -> None:
         block = _acars_block(b"M01AAB1234HELLO FROM THE COCKPIT\r\n")
-        for mapping in ("direct", "inverted", "diff"):
-            ev = _decode_acars(_acars_audio(block, mapping))
-            self.assertEqual(len(ev), 1, mapping)
+        for initial_bit in (0, 1):
+            ev = _decode_acars(_acars_audio(block, initial_bit))
+            self.assertEqual(len(ev), 1, initial_bit)
             e = ev[0]
-            self.assertTrue(e["crc_ok"], mapping)
-            self.assertEqual((e["registration"], e["label"], e["msg_no"], e["flight"]), ("SP-LWA", "H1", "M01A", "AB1234"), mapping)
+            self.assertTrue(e["crc_ok"], initial_bit)
+            self.assertEqual((e["registration"], e["label"], e["msg_no"], e["flight"]), ("SP-LWA", "H1", "M01A", "AB1234"), initial_bit)
             self.assertIn("HELLO FROM THE COCKPIT", e["text"])
 
     def test_noise_and_a_damaged_block_give_nothing(self) -> None:
@@ -181,10 +173,10 @@ class AcarsTest(unittest.TestCase):
         block = bytearray(_acars_block(b"M01AAB1234TEXT"))
         parity = bytearray(block)
         parity[20] ^= 0x01                                       # a character with a parity error: not a block
-        self.assertEqual(_decode_acars(_acars_audio(bytes(parity), "direct"), check_crc=False), [])
+        self.assertEqual(_decode_acars(_acars_audio(bytes(parity)), check_crc=False), [])
         block[-1] ^= 0x01                                        # only the check sequence is wrong
-        self.assertEqual(_decode_acars(_acars_audio(bytes(block), "direct")), [])
-        shown = _decode_acars(_acars_audio(bytes(block), "direct"), check_crc=False)    # kept when asked (diagnostics)
+        self.assertEqual(_decode_acars(_acars_audio(bytes(block))), [])
+        shown = _decode_acars(_acars_audio(bytes(block)), check_crc=False)    # kept when asked (diagnostics)
         self.assertEqual((len(shown), shown[0]["crc_ok"]), (1, False))
 
     def test_crc16_matches_the_known_check_value(self) -> None:
