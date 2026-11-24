@@ -1,6 +1,6 @@
 # AliSDR
 
-Current source version: **1.2.2** (unreleased)
+Current source version: **[1.2.2](https://github.com/PW00X/AliSDR/releases/tag/v1.2.2)**
 
 On the Channels page, use **Export** to download an XML backup of the complete
 Memory List and its folders. Use **Import** on another AliSDR install to restore

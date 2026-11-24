@@ -6,13 +6,14 @@ import { api, fmtTime, h, icon, mount, select, seg, t } from '../core.js';
 import { S, cfg, on } from '../state.js';
 
 export const NAMES = () => ({ acars: 'ACARS', aprs: 'APRS', rtl_433: t('Sensors'), vdl2: 'VDL2' });
-const MAX_ROWS = 800;
+const PAGE_SIZE = 100;
+const MAX_ROWS = 3600;
 const REPEAT_WINDOW_S = 180;
 
 // How much of VDL2 to show: only ACARS messages (the text), those and other data frames, or everything
 // including the acknowledgements and polls that make up most of the traffic.
 const LEVELS = () => [['acars', t('Messages')], ['data', t('Messages and data')], ['all', t('All frames')]];
-export const vdl2Level = () => { try { return localStorage.getItem('vdl2Level') || 'acars'; } catch { return 'acars'; } };
+export const vdl2Level = () => { try { return localStorage.getItem('vdl2Level') || 'data'; } catch { return 'data'; } };
 export const passes = (e) => e.kind !== 'vdl2' || vdl2Level() === 'all' || (vdl2Level() === 'data' ? e.layer !== 'link' : e.layer === 'acars');
 export function levelControl(onchange) {
   return seg(LEVELS(), vdl2Level(), (v) => { try { localStorage.setItem('vdl2Level', v); } catch { /* private window */ } onchange(); });
@@ -57,7 +58,8 @@ function body(e) {
     return [h('b', e.registration || ''), e.flight ? h('span.muted', e.flight) : null, e.label ? h('span.chip', e.label) : null,
       e.text ? h('span.mono.msg-text', e.text) : null];
   }
-  if (e.kind === 'vdl2') return [h('span.muted', `${e.src || '?'} → ${e.dst || '?'}`), h('span.chip', e.frame_type || '?')];
+  if (e.kind === 'vdl2') return [h('b', e.src || '?'), h('span.muted', `→ ${e.dst || '?'}`),
+    h('span.chip', e.protocol || e.command || e.frame_type || '?')];
   if (e.kind === 'aprs') {
     const where = e.lat !== undefined ? `${(+e.lat).toFixed(4)}, ${(+e.lon).toFixed(4)}` : '';
     return [h('b', e.source), h('span.muted', e.type || ''), where ? h('span', where) : null, e.comment || e.text ? h('span', e.comment || e.text) : null, mapLink(e)];
@@ -91,7 +93,9 @@ export function fold(events) {
   const open = new Map();
   const groups = [];
   for (const e of events) {   // oldest first
-    const key = `${e.addon}|${e.summary}`;
+    const key = e.kind === 'vdl2'
+      ? JSON.stringify([e.addon, e.freq_hz, e.src, e.dst, e.summary, e.fields])
+      : `${e.addon}|${e.summary}`;
     const g = open.get(key);
     if (g && e.ts - g.last.ts <= REPEAT_WINDOW_S) { g.count += 1; g.last = e; g.times.push(e.ts); continue; }
     const fresh = { last: e, count: 1, times: [e.ts] };
@@ -117,6 +121,9 @@ export function messagesView(root) {
   let view = prefS('msgView', 'items');          // items | who
   let freq = '';
   let clearedAt = +prefS('msgClearedAt', '0');   // "Clear list" hides what came before, here only - nothing is deleted
+  let clearedId = +prefS('msgClearedId', '0');
+  let visibleCount = PAGE_SIZE;
+  const isCleared = e => e.id <= clearedId || e.ts * 1000 <= clearedAt;
   let freqSig = '';
   const open = new Set();
 
@@ -127,7 +134,9 @@ export function messagesView(root) {
   const search = h('input', { type: 'search', placeholder: t('Search…'), oninput: (e) => { query = e.target.value.toLowerCase(); draw(); } });
   const pauseBtn = h('button.ghost', { onclick: () => { paused = !paused; pauseBtn.textContent = paused ? t('Resume') : t('Pause'); } }, t('Pause'));
   const clearBtn = h('button.ghost', { title: t('Hides the messages received so far from this list. Nothing is deleted.'),
-    onclick: () => { clearedAt = Date.now(); setPrefS('msgClearedAt', String(clearedAt)); draw(); } }, t('Clear list'));
+    onclick: () => { clearedId = lastId; clearedAt = Math.max(0, ...rows.map(e => e.ts * 1000));
+      setPrefS('msgClearedId', String(clearedId)); setPrefS('msgClearedAt', String(clearedAt));
+      visibleCount = PAGE_SIZE; open.clear(); draw(); } }, t('Clear list'));
   const rangeSel = select([['300', t('Last 5 minutes')], ['3600', t('Last hour')], ['86400', t('Last 24 hours')], ['0', t('Everything')]], String(range),
     (v) => { range = +v; setPrefS('msgRange', v); draw(); }, { style: { width: 'auto' }, 'aria-label': t('Time range') });
   const sortSel = select([['new', t('Newest first')], ['old', t('Oldest first')], ['count', t('Most messages first')]], sort,
@@ -164,7 +173,7 @@ export function messagesView(root) {
   // -- what is shown ---------------------------------------------------------------------------------------
   function selected() {
     const since = range ? Date.now() / 1000 - range : 0;
-    return rows.filter((e) => passes(e) && e.ts * 1000 > clearedAt && e.ts >= since && (!filter || e.addon === filter)
+    return rows.filter((e) => passes(e) && !isCleared(e) && e.ts >= since && (!filter || e.addon === filter)
       && (!freq || String(e.freq_hz) === freq) && (!query || JSON.stringify(e).toLowerCase().includes(query)));
   }
 
@@ -192,9 +201,9 @@ export function messagesView(root) {
     const hasVdl2 = rows.some((r) => r.kind === 'vdl2') && (!filter || filter === 'vdl2');
     mount(levelRow, hasVdl2 ? h('div.row', h('span.small.muted', 'VDL2'), levelControl(draw)) : null);
     foldBox.classList.toggle('hidden', filter === 'rtl_433' || view === 'who');
-    const n = rows.filter((e) => e.ts * 1000 <= clearedAt).length;
+    const n = rows.filter(isCleared).length;
     mount(hidden, n ? h('p.small.muted', { style: { margin: '8px 0 0' } }, t('{n} earlier messages are hidden.', { n }), ' ',
-      h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); clearedAt = 0; setPrefS('msgClearedAt', '0'); draw(); } }, t('Show them'))) : null);
+      h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); clearedAt = clearedId = 0; setPrefS('msgClearedId', '0'); setPrefS('msgClearedAt', '0'); draw(); } }, t('Show them'))) : null);
   }
 
   function sensorCards(events) {
@@ -253,7 +262,7 @@ export function messagesView(root) {
     intro.classList.toggle('hidden', !empty);
     if (empty) { drawIntro(); mount(list); return; }
     const base = selected();
-    drawChips(rows.filter((e) => passes(e) && e.ts * 1000 > clearedAt));
+    drawChips(rows.filter((e) => !isCleared(e)));
     drawToolbar();
     if (!base.length) {
       mount(list, h('div.empty', rows.length ? t('Nothing matches the filters.') : t('Nothing decoded yet. Turn an add-on on in Add-ons and scan a band that contains its channels.')));
@@ -263,8 +272,9 @@ export function messagesView(root) {
     if (view === 'who') { mount(list, ...whoRows(base)); return; }
     let groups = fold_ ? fold(base) : base.map((e) => ({ last: e, count: 1, times: [e.ts] }));
     if (sort === 'count') groups = [...groups].sort((a, b) => b.count - a.count || b.last.ts - a.last.ts);
-    else if (sort === 'new') groups = [...groups].reverse();
-    groups = groups.slice(0, MAX_ROWS);
+    else if (sort === 'new') groups.sort((a, b) => b.last.ts - a.last.ts);
+    const more = groups.length > visibleCount;
+    groups = groups.slice(0, visibleCount);
     mount(list, ...groups.map((g) => {
       const e = g.last;
       const toggleOpen = () => { if (open.has(e.id)) open.delete(e.id); else open.add(e.id); draw(); };
@@ -274,26 +284,28 @@ export function messagesView(root) {
       return h('div.msg', { class: open.has(e.id) ? 'open' : '', tabindex: 0, role: 'button', onclick: toggleOpen,
         onkeydown: (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleOpen(); } } },
       eventLine(e, g.count, pick), detail);
-    }));
+    }), more ? h('button.ghost', { onclick: () => { visibleCount += PAGE_SIZE; draw(); } }, t('Show more messages')) : null);
   }
 
   let pendingDraw = false;
+  let polling = false;
   async function poll() {
-    if (paused) return;
+    if (paused || polling) return;
+    polling = true;
     if (pendingDraw) {            // the selection was let go: show what arrived meanwhile
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || !list.contains(sel.anchorNode)) { pendingDraw = false; draw(); }
     }
     try {
-      const r = await api.get(`/api/addons/events?since=${lastId}`);
+      const r = await api.get(`/api/addons/events?since=${lastId}&limit=${MAX_ROWS}`);
       if (r.events.length) {
-        rows = rows.concat(r.events).slice(-MAX_ROWS * 3);
+        rows = rows.concat(r.events).slice(-MAX_ROWS);
         lastId = r.events[r.events.length - 1].id;
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed && list.contains(sel.anchorNode)) pendingDraw = true;      // a redraw would drop what is being selected/copied
         else draw();
       }
-    } catch { /* the next poll tries again */ }
+    } catch { /* the next poll tries again */ } finally { polling = false; }
   }
 
   const drawBanner = () => mount(banner, S.live && S.live.addon

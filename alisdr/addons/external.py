@@ -184,6 +184,12 @@ def parse_vdl2(line: str) -> tuple[dict, str] | None:
     layer = "acars" if acars else ("data" if any(k not in control for k in avlc) else "link")
     event = {"kind": "vdl2", "layer": layer, "freq_hz": v.get("freq"), "src": src, "dst": dst, "frame_type": avlc.get("frame_type"),
              "sig_level": v.get("sig_level"), "fields": {k: acars[k] for k in acars}}
+    if layer == "data":
+        payload = {k: value for k, value in avlc.items() if k not in control}
+        event["fields"] = payload
+        event["protocol"] = " / ".join(k.upper() for k in payload)
+    if avlc.get("cmd"):
+        event["command"] = avlc["cmd"]
     if acars:
         event.update(registration=acars.get("reg", "").lstrip("."), label=acars.get("label"), flight=acars.get("flight"),
                      text=acars.get("msg_text"))
@@ -191,4 +197,5 @@ def parse_vdl2(line: str) -> tuple[dict, str] | None:
         if acars.get("msg_text"):
             summary += " " + str(acars["msg_text"]).replace("\n", " ")[:120]
         return event, summary
-    return event, f"{src} → {dst} {avlc.get('frame_type', '')}".strip()
+    description = event.get("protocol") or event.get("command") or event["frame_type"] or ""
+    return event, f"{src} → {dst} {description}".strip()

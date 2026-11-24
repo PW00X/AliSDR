@@ -285,6 +285,10 @@ class ExternalTest(unittest.TestCase):
         self.assertIn("LO123", summary)
         event, summary = parse_vdl2('{"vdl2":{"freq":136725000,"avlc":{"src":{"addr":"AAAAAA"},"dst":{"addr":"BBBBBB"},"frame_type":"S"}}}')
         self.assertEqual(summary, "AAAAAA → BBBBBB S")
+        event, summary = parse_vdl2('{"vdl2":{"avlc":{"frame_type":"U","cmd":"XID","xid":{"parameters":[1,2]}}}}')
+        self.assertEqual((event["layer"], event["protocol"], event["command"]), ("data", "XID", "XID"))
+        self.assertEqual(event["fields"]["xid"]["parameters"], [1, 2])
+        self.assertIn("XID", summary)
 
 
 class EngineSlotTest(unittest.TestCase):

@@ -4249,3 +4249,6 @@ msgstr "Dekoduj VDL2 podczas skanowania"
 
 msgid "Monitoring"
 msgstr "Monitorowanie"
+
+msgid "Show more messages"
+msgstr "Pokaż więcej wiadomości"

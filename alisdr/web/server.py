@@ -443,7 +443,8 @@ def make_handler(app: App):
                 self._json(ctl.addons.stats.snapshot(int((query.get("days") or ["7"])[0])))
                 return
             if action == "events":
-                rows = ctl.addons.hub.since(int((query.get("since") or ["0"])[0]), (query.get("addon") or [""])[0])
+                limit = max(1, min(3600, int(_qs(query, "limit", 500))))
+                rows = ctl.addons.hub.since(int(_qs(query, "since", 0)), _qs(query, "addon", ""), limit)
                 self._json({"events": rows})
                 return
             if self.command == "POST":
