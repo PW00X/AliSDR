@@ -97,8 +97,8 @@ export function fold(events) {
       ? JSON.stringify([e.addon, e.freq_hz, e.src, e.dst, e.summary, e.fields])
       : `${e.addon}|${e.summary}`;
     const g = open.get(key);
-    if (g && e.ts - g.last.ts <= REPEAT_WINDOW_S) { g.count += 1; g.last = e; g.times.push(e.ts); continue; }
-    const fresh = { last: e, count: 1, times: [e.ts] };
+    if (g && e.ts - g.last.ts <= REPEAT_WINDOW_S) { g.count += 1; g.last = e; g.times.push(e.ts); g.ids.push(e.id); continue; }
+    const fresh = { last: e, count: 1, times: [e.ts], ids: [e.id] };
     open.set(key, fresh);
     groups.push(fresh);
   }
@@ -131,6 +131,12 @@ export function messagesView(root) {
   const levelRow = h('div.row.wrap');
   const search = h('input', { type: 'search', placeholder: t('Search…'), oninput: (e) => { query = e.target.value.toLowerCase(); draw(); } });
   const pauseBtn = h('button.ghost', { onclick: () => { paused = !paused; pauseBtn.textContent = paused ? t('Resume') : t('Pause'); } }, t('Pause'));
+  let pageIds = new Set();
+  const clearPage = h('button.ghost', { onclick: () => {
+    rows = rows.filter(e => !pageIds.has(e.id));
+    open.clear(); visibleCount = PAGE_SIZE;
+    draw();
+  } }, t('Clear page'));
   const clearAll = h('button.ghost.danger', { onclick: async () => {
     if (!(await confirmDialog(t('Clear all messages'), t('Permanently delete all decoded messages, including hidden messages and earlier days, for all devices?'), t('Clear all messages'), true))) return;
     clearAll.disabled = true;
@@ -154,7 +160,7 @@ export function messagesView(root) {
     h('span.label', t('Fold repeats')));
   const banner = h('div');
   const toolbar = h('div.row.wrap', { style: { gap: '10px' } }, viewSeg, rangeSel, sortSel, freqSel, foldBox, levelRow);
-  const controls = h('div.col', { style: { gap: '12px' } }, h('div.row.wrap', chips, h('span.spacer'), search, pauseBtn, clearAll), toolbar);
+  const controls = h('div.col', { style: { gap: '12px' } }, h('div.row.wrap', chips, h('span.spacer'), search, pauseBtn, clearPage, clearAll), toolbar);
   const intro = h('div.msg-intro');
   mount(root, h('div.page', h('div.page-head', h('h1', t('Messages'))),
     h('section.card', banner, controls, intro, list)));
@@ -261,12 +267,14 @@ export function messagesView(root) {
   }
 
   function draw() {
+    const base = selected();
+    pageIds = new Set(base.map(e => e.id));
+    clearPage.disabled = !pageIds.size;
     const empty = !rows.length;
     toolbar.classList.toggle('hidden', empty);
     for (const control of [chips, search, pauseBtn]) control.classList.toggle('hidden', empty);
     intro.classList.toggle('hidden', !empty);
     if (empty) { drawIntro(); mount(list); return; }
-    const base = selected();
     drawChips(rows);
     drawToolbar();
     if (!base.length) {
@@ -275,11 +283,12 @@ export function messagesView(root) {
     }
     if (filter === 'rtl_433') { mount(list, sensorCards(base)); return; }
     if (view === 'who') { mount(list, ...whoRows(base)); return; }
-    let groups = fold_ ? fold(base) : base.map((e) => ({ last: e, count: 1, times: [e.ts] }));
+    let groups = fold_ ? fold(base) : base.map((e) => ({ last: e, count: 1, times: [e.ts], ids: [e.id] }));
     if (sort === 'count') groups = [...groups].sort((a, b) => b.count - a.count || b.last.ts - a.last.ts);
     else if (sort === 'new') groups.sort((a, b) => b.last.ts - a.last.ts);
     const more = groups.length > visibleCount;
     groups = groups.slice(0, visibleCount);
+    pageIds = new Set(groups.flatMap(g => g.ids));
     mount(list, ...groups.map((g) => {
       const e = g.last;
       const toggleOpen = () => { if (open.has(e.id)) open.delete(e.id); else open.add(e.id); draw(); };
