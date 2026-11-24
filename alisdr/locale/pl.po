@@ -4258,3 +4258,6 @@ msgstr "Wyczyść wszystkie wiadomości"
 
 msgid "Permanently delete all decoded messages, including hidden messages and earlier days, for all devices?"
 msgstr "Trwale usunąć wszystkie zdekodowane wiadomości na wszystkich urządzeniach, w tym ukryte wiadomości i wiadomości z poprzednich dni?"
+
+msgid "Clear all"
+msgstr "Wyczyść wszystko"

@@ -122,23 +122,15 @@ export function messagesView(root) {
   let sort = prefS('msgSort', 'new');            // new | old | count
   let view = prefS('msgView', 'items');          // items | who
   let freq = '';
-  let clearedAt = +prefS('msgClearedAt', '0');   // "Clear list" hides what came before, here only - nothing is deleted
-  let clearedId = +prefS('msgClearedId', '0');
   let visibleCount = PAGE_SIZE;
-  const isCleared = e => e.id <= clearedId || e.ts * 1000 <= clearedAt;
   let freqSig = '';
   const open = new Set();
 
   const list = h('div.msg-list');
   const chips = h('div.row.wrap');
   const levelRow = h('div.row.wrap');
-  const hidden = h('div');
   const search = h('input', { type: 'search', placeholder: t('Search…'), oninput: (e) => { query = e.target.value.toLowerCase(); draw(); } });
   const pauseBtn = h('button.ghost', { onclick: () => { paused = !paused; pauseBtn.textContent = paused ? t('Resume') : t('Pause'); } }, t('Pause'));
-  const clearBtn = h('button.ghost', { title: t('Hides the messages received so far from this list. Nothing is deleted.'),
-    onclick: () => { clearedId = lastId; clearedAt = Math.max(0, ...rows.map(e => e.ts * 1000));
-      setPrefS('msgClearedId', String(clearedId)); setPrefS('msgClearedAt', String(clearedAt));
-      visibleCount = PAGE_SIZE; open.clear(); draw(); } }, t('Clear list'));
   const clearAll = h('button.ghost.danger', { onclick: async () => {
     if (!(await confirmDialog(t('Clear all messages'), t('Permanently delete all decoded messages, including hidden messages and earlier days, for all devices?'), t('Clear all messages'), true))) return;
     clearAll.disabled = true;
@@ -146,13 +138,12 @@ export function messagesView(root) {
       const result = await api.post('/api/addons/clear-events');
       revision++;
       generation = result.generation;
-      rows = []; lastId = clearedId = clearedAt = 0;
-      setPrefS('msgClearedId', '0'); setPrefS('msgClearedAt', '0');
+      rows = []; lastId = 0;
       visibleCount = PAGE_SIZE; open.clear(); pendingDraw = false;
       draw();
     } catch (err) { errorToast(err); }
     finally { clearAll.disabled = false; }
-  } }, t('Clear all messages'));
+  } }, t('Clear all'));
   const rangeSel = select([['300', t('Last 5 minutes')], ['3600', t('Last hour')], ['86400', t('Last 24 hours')], ['0', t('Everything')]], String(range),
     (v) => { range = +v; setPrefS('msgRange', v); draw(); }, { style: { width: 'auto' }, 'aria-label': t('Time range') });
   const sortSel = select([['new', t('Newest first')], ['old', t('Oldest first')], ['count', t('Most messages first')]], sort,
@@ -163,9 +154,9 @@ export function messagesView(root) {
     h('span.label', t('Fold repeats')));
   const banner = h('div');
   const toolbar = h('div.row.wrap', { style: { gap: '10px' } }, viewSeg, rangeSel, sortSel, freqSel, foldBox, levelRow);
-  const controls = h('div.col', { style: { gap: '12px' } }, h('div.row.wrap', chips, h('span.spacer'), search, pauseBtn, clearBtn), toolbar, hidden);
+  const controls = h('div.col', { style: { gap: '12px' } }, h('div.row.wrap', chips, h('span.spacer'), search, pauseBtn, clearAll), toolbar);
   const intro = h('div.msg-intro');
-  mount(root, h('div.page', h('div.page-head', h('h1', t('Messages')), clearAll),
+  mount(root, h('div.page', h('div.page-head', h('h1', t('Messages'))),
     h('section.card', banner, controls, intro, list)));
 
   // Nothing received yet: say what this page is and where to switch the decoders on.
@@ -189,7 +180,7 @@ export function messagesView(root) {
   // -- what is shown ---------------------------------------------------------------------------------------
   function selected() {
     const since = range ? Date.now() / 1000 - range : 0;
-    return rows.filter((e) => passes(e) && !isCleared(e) && e.ts >= since && (!filter || e.addon === filter)
+    return rows.filter((e) => passes(e) && e.ts >= since && (!filter || e.addon === filter)
       && (!freq || String(e.freq_hz) === freq) && (!query || JSON.stringify(e).toLowerCase().includes(query)));
   }
 
@@ -217,9 +208,6 @@ export function messagesView(root) {
     const hasVdl2 = rows.some((r) => r.kind === 'vdl2') && (!filter || filter === 'vdl2');
     mount(levelRow, hasVdl2 ? h('div.row', h('span.small.muted', 'VDL2'), levelControl(draw)) : null);
     foldBox.classList.toggle('hidden', filter === 'rtl_433' || view === 'who');
-    const n = rows.filter(isCleared).length;
-    mount(hidden, n ? h('p.small.muted', { style: { margin: '8px 0 0' } }, t('{n} earlier messages are hidden.', { n }), ' ',
-      h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); clearedAt = clearedId = 0; setPrefS('msgClearedId', '0'); setPrefS('msgClearedAt', '0'); draw(); } }, t('Show them'))) : null);
   }
 
   function sensorCards(events) {
@@ -274,11 +262,12 @@ export function messagesView(root) {
 
   function draw() {
     const empty = !rows.length;
-    controls.classList.toggle('hidden', empty);
+    toolbar.classList.toggle('hidden', empty);
+    for (const control of [chips, search, pauseBtn]) control.classList.toggle('hidden', empty);
     intro.classList.toggle('hidden', !empty);
     if (empty) { drawIntro(); mount(list); return; }
     const base = selected();
-    drawChips(rows.filter((e) => !isCleared(e)));
+    drawChips(rows);
     drawToolbar();
     if (!base.length) {
       mount(list, h('div.empty', rows.length ? t('Nothing matches the filters.') : t('Nothing decoded yet. Turn an add-on on in Add-ons and scan a band that contains its channels.')));
