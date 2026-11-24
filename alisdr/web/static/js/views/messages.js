@@ -2,7 +2,7 @@
 // from their programs. Newest first; repeats are folded into one row with a counter; VDL2 link-layer chatter
 // is hidden unless asked for; sensors are shown as one card per device. Also used by the Listen page while an
 // external program holds the receiver (eventLine).
-import { api, fmtTime, h, icon, mount, select, seg, t } from '../core.js';
+import { api, confirmDialog, errorToast, fmtTime, h, icon, mount, select, seg, t } from '../core.js';
 import { S, cfg, on } from '../state.js';
 
 export const NAMES = () => ({ acars: 'ACARS', aprs: 'APRS', rtl_433: t('Sensors'), vdl2: 'VDL2' });
@@ -111,6 +111,8 @@ const setPrefS = (k, v) => { try { localStorage.setItem(k, v); } catch { /* priv
 export function messagesView(root) {
   let rows = [];
   let lastId = 0;
+  let generation = '';
+  let revision = 0;
   let filter = '';
   let query = '';
   let paused = false;
@@ -137,6 +139,20 @@ export function messagesView(root) {
     onclick: () => { clearedId = lastId; clearedAt = Math.max(0, ...rows.map(e => e.ts * 1000));
       setPrefS('msgClearedId', String(clearedId)); setPrefS('msgClearedAt', String(clearedAt));
       visibleCount = PAGE_SIZE; open.clear(); draw(); } }, t('Clear list'));
+  const clearAll = h('button.ghost.danger', { onclick: async () => {
+    if (!(await confirmDialog(t('Clear all messages'), t('Permanently delete all decoded messages, including hidden messages and earlier days, for all devices?'), t('Clear all messages'), true))) return;
+    clearAll.disabled = true;
+    try {
+      const result = await api.post('/api/addons/clear-events');
+      revision++;
+      generation = result.generation;
+      rows = []; lastId = clearedId = clearedAt = 0;
+      setPrefS('msgClearedId', '0'); setPrefS('msgClearedAt', '0');
+      visibleCount = PAGE_SIZE; open.clear(); pendingDraw = false;
+      draw();
+    } catch (err) { errorToast(err); }
+    finally { clearAll.disabled = false; }
+  } }, t('Clear all messages'));
   const rangeSel = select([['300', t('Last 5 minutes')], ['3600', t('Last hour')], ['86400', t('Last 24 hours')], ['0', t('Everything')]], String(range),
     (v) => { range = +v; setPrefS('msgRange', v); draw(); }, { style: { width: 'auto' }, 'aria-label': t('Time range') });
   const sortSel = select([['new', t('Newest first')], ['old', t('Oldest first')], ['count', t('Most messages first')]], sort,
@@ -149,7 +165,7 @@ export function messagesView(root) {
   const toolbar = h('div.row.wrap', { style: { gap: '10px' } }, viewSeg, rangeSel, sortSel, freqSel, foldBox, levelRow);
   const controls = h('div.col', { style: { gap: '12px' } }, h('div.row.wrap', chips, h('span.spacer'), search, pauseBtn, clearBtn), toolbar, hidden);
   const intro = h('div.msg-intro');
-  mount(root, h('div.page', h('div.page-head', h('h1', t('Messages'))),
+  mount(root, h('div.page', h('div.page-head', h('h1', t('Messages')), clearAll),
     h('section.card', banner, controls, intro, list)));
 
   // Nothing received yet: say what this page is and where to switch the decoders on.
@@ -297,12 +313,17 @@ export function messagesView(root) {
       if (!sel || sel.isCollapsed || !list.contains(sel.anchorNode)) { pendingDraw = false; draw(); }
     }
     try {
-      const r = await api.get(`/api/addons/events?since=${lastId}&limit=${MAX_ROWS}`);
-      if (r.events.length) {
+      const requested = revision;
+      const r = await api.get(`/api/addons/events?since=${lastId}&limit=${MAX_ROWS}&generation=${generation}`);
+      if (requested !== revision) return;
+      const reset = generation && generation !== r.generation;
+      if (reset) { rows = []; open.clear(); lastId = 0; visibleCount = PAGE_SIZE; }
+      generation = r.generation || '';
+      if (r.events.length || reset) {
         rows = rows.concat(r.events).slice(-MAX_ROWS);
-        lastId = r.events[r.events.length - 1].id;
+        if (r.events.length) lastId = r.events[r.events.length - 1].id;
         const sel = window.getSelection();
-        if (sel && !sel.isCollapsed && list.contains(sel.anchorNode)) pendingDraw = true;      // a redraw would drop what is being selected/copied
+        if (!reset && sel && !sel.isCollapsed && list.contains(sel.anchorNode)) pendingDraw = true;      // a redraw would drop what is being selected/copied
         else draw();
       }
     } catch { /* the next poll tries again */ } finally { polling = false; }

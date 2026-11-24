@@ -205,6 +205,26 @@ class HubTest(unittest.TestCase):
         self.assertEqual([e["summary"] for e in again.since(0)], ["one", "two"])
 
 
+    def test_clear_removes_history_beyond_ring_and_allows_new_messages(self):
+        from alisdr.addons.events import EventHub
+        with tempfile.TemporaryDirectory(dir=_HOME) as directory:
+            folder = Path(directory)
+            hub = EventHub(folder, keep_days=7, ring=2)
+            for i in range(4):
+                hub.publish("acars", {"kind": "acars"}, str(i))
+            hub.publish("vdl2", {"kind": "vdl2", "layer": "link"}, "ack")
+            old = hub.snapshot(0, "", 500)
+            (folder / "events-2020-01-01.jsonl").write_text("{}\n", encoding="utf-8")
+            hub.clear()
+            self.assertEqual(list(folder.glob("events-*.jsonl")), [])
+            self.assertEqual(hub.since(), [])
+            self.assertEqual(EventHub(folder, 7).since(), [])
+            fresh = hub.publish("acars", {"kind": "acars"}, "new")
+            updated = hub.snapshot(old["events"][-1]["id"], "", 500, old["generation"])
+            self.assertNotEqual(updated["generation"], old["generation"])
+            self.assertEqual(updated["events"], [fresh])
+
+
 class ManagerTest(unittest.TestCase):
     def _manager(self):
         from alisdr.addons.manager import AddonManager

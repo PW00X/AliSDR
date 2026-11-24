@@ -444,11 +444,14 @@ def make_handler(app: App):
                 return
             if action == "events":
                 limit = max(1, min(3600, int(_qs(query, "limit", 500))))
-                rows = ctl.addons.hub.since(int(_qs(query, "since", 0)), _qs(query, "addon", ""), limit)
-                self._json({"events": rows})
+                self._json(ctl.addons.hub.snapshot(int(_qs(query, "since", 0)), _qs(query, "addon", ""),
+                                                   limit, _qs(query, "generation", "")))
                 return
             if self.command == "POST":
                 body = self._body()
+                if action == "clear-events":
+                    self._json({"generation": ctl.addons.hub.clear()})
+                    return
                 if action == "configure":
                     if ("path" in body or "extra_args" in body) and not may_change_command_line(app.token, self.client_address[0]):
                         # A program path plus arguments is a command line: with no password on the network anyone could run anything.
@@ -796,6 +799,7 @@ def make_handler(app: App):
         ("GET", "/api/addons/metrics"): Handler.addons,
         ("POST", "/api/addons/configure"): Handler.addons,
         ("POST", "/api/addons/run"): Handler.addons,
+        ("POST", "/api/addons/clear-events"): Handler.addons,
         ("POST", "/api/addons/stop"): Handler.addons,
         ("POST", "/api/addons/install"): Handler.addons,
         ("POST", "/api/addons/uninstall"): Handler.addons,

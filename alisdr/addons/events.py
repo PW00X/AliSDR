@@ -7,6 +7,7 @@ import time
 from collections import deque
 from datetime import date, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 
 class EventHub:
@@ -20,6 +21,7 @@ class EventHub:
         self._link_ring: deque[dict] = deque(maxlen=600)    # link-layer frames flood the ring: they get a small one of their own
         self._next_id = int(time.time() * 1000)      # a page open across a restart must not wait for the new numbers to pass its old ones
         self._pruned_on: date | None = None
+        self._generation = uuid4().hex
         self._load_today()
 
     def _load_today(self) -> None:
@@ -50,8 +52,9 @@ class EventHub:
             event["id"] = self._next_id
             self._next_id += 1
             (self._ring if persist else self._link_ring).append(event)
+            if persist:
+                self._append(event)
         if persist:
-            self._append(event)
             if self.on_event is not None:
                 try:
                     self.on_event(event)
@@ -60,10 +63,27 @@ class EventHub:
         return event
 
     def since(self, after_id: int = 0, addon: str = "", limit: int = 500) -> list[dict]:
+        return self.snapshot(after_id, addon, limit)["events"]
+
+    def clear(self) -> str:
+        """Clear all retained event logs and both live buffers as one operation with respect to publishers."""
         with self._lock:
+            if self._dir is not None:
+                for path in self._dir.glob("events-????-??-??.jsonl"):
+                    path.unlink(missing_ok=True)
+            self._ring.clear()
+            self._link_ring.clear()
+            self._generation = uuid4().hex
+            return self._generation
+
+    def snapshot(self, after_id: int, addon: str, limit: int, generation: str = "") -> dict:
+        with self._lock:
+            if generation and generation != self._generation:
+                after_id = 0
+            current = self._generation
             rows = [e for e in (*self._ring, *self._link_ring) if e["id"] > after_id and (not addon or e["addon"] == addon)]
         rows.sort(key=lambda e: e["id"])
-        return rows[-limit:]
+        return {"events": rows[-limit:], "generation": current}
 
     def _append(self, event: dict) -> None:
         if self._dir is None:
