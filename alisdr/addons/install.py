@@ -53,7 +53,14 @@ _states: dict[str, dict] = {}
 
 
 def can_install(addon_id: str) -> bool:
-    """vdl2: built from source (Linux, macOS); rtl_433: the author's ready build (Windows, macOS)."""
+    """vdl2: built from source (Linux, macOS); rtl_433: the author's ready build (Windows, macOS);
+    tetra: built locally from tetra-rs/ via cargo."""
+    if addon_id == "tetra_codec":
+        from . import tetra_codec
+        return tetra_codec.can_install()
+    if addon_id == "tetra":
+        from . import tetra
+        return tetra.can_build_tetra()
     if addon_id == "vdl2":
         return sys.platform != "win32"
     return addon_id == "rtl_433" and _rtl433_asset() is not None
@@ -64,12 +71,26 @@ def install_dir(addon_id: str) -> Path:
 
 
 def state(addon_id: str) -> dict:
+    if addon_id == "tetra_codec":
+        from . import tetra_codec
+        return tetra_codec.install_state()
+    if addon_id == "tetra":
+        from . import tetra
+        return tetra.install_state()
     with _lock:
         s = _states.get(addon_id) or {"running": False, "log": [], "error": "", "hint": ""}
         return {**s, "log": list(s["log"][-12:])}
 
 
 def start(addon_id: str) -> None:
+    if addon_id == "tetra_codec":
+        from . import tetra_codec
+        tetra_codec.start()
+        return
+    if addon_id == "tetra":
+        from . import tetra
+        tetra.start_build()
+        return
     if not can_install(addon_id):
         raise RuntimeError(tr("AliSDR cannot install this one on this computer: put the program in {folder} or set its path below.").format(folder=install_dir(addon_id)))
     with _lock:
@@ -80,6 +101,14 @@ def start(addon_id: str) -> None:
 
 
 def uninstall(addon_id: str) -> None:
+    if addon_id == "tetra_codec":
+        from . import tetra_codec
+        tetra_codec.uninstall()
+        return
+    if addon_id == "tetra":
+        from . import tetra
+        tetra.uninstall_tetra()
+        return
     shutil.rmtree(install_dir(addon_id), ignore_errors=True)
     with _lock:
         _states.pop(addon_id, None)
@@ -107,7 +136,7 @@ def install_hint() -> str:
 
 
 def _download(addon_id: str, name: str, url: str, sha256: str, dest: Path) -> None:
-    _say(addon_id, f"Downloading {name}…")
+    _say(addon_id, f"Downloading {name}â€¦")
     with _urlopen(url) as resp, open(dest, "wb") as out:
         shutil.copyfileobj(resp, out)
     digest = hashlib.sha256()
@@ -162,7 +191,7 @@ def _install_vdl2() -> None:
                     else:
                         tar.extractall(work)
                 src = work / top
-                _say(addon_id, f"Building {name} (a few minutes)…")
+                _say(addon_id, f"Building {name} (a few minutes)â€¦")
                 _run(addon_id, ["cmake", "-S", str(src), "-B", str(src / "build"), "-DCMAKE_BUILD_TYPE=Release",
                                 f"-DCMAKE_INSTALL_PREFIX={prefix}", "-DCMAKE_INSTALL_LIBDIR=lib",
                                 f"-DCMAKE_PREFIX_PATH={prefix}", f"-DCMAKE_INSTALL_RPATH={prefix / 'lib'}",
@@ -191,14 +220,14 @@ def _install_rtl433() -> None:
         shutil.rmtree(folder, ignore_errors=True)
         folder.mkdir(parents=True)
         archive = folder / "download.zip"
-        _say(addon_id, "Downloading rtl_433…")
+        _say(addon_id, "Downloading rtl_433â€¦")
         with _urlopen(url) as resp, open(archive, "wb") as out:
             shutil.copyfileobj(resp, out)
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         if digest != sha256:
             archive.unlink(missing_ok=True)
             raise RuntimeError("rtl_433: the download is not the tested version (checksum mismatch) - not installed")
-        _say(addon_id, "Unpacking…")
+        _say(addon_id, "Unpackingâ€¦")
         with zipfile.ZipFile(archive) as z:
             z.extractall(folder)
         archive.unlink()

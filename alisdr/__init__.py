@@ -1,5 +1,5 @@
 # The one place the version lives - shown in Settings and `--version`.
-__version__ = "1.2.3"
+__version__ = "1.2.4"
 
 
 # Existing service overrides and scripts can still pass the former variables.

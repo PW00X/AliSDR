@@ -456,7 +456,7 @@ def make_handler(app: App):
                     self._json({"generation": ctl.addons.hub.clear(body.get("addon"))})
                     return
                 if action == "configure":
-                    if ("path" in body or "extra_args" in body) and not may_change_command_line(app.token, self.client_address[0]):
+                    if ("path" in body or "extra_args" in body or "codec_path" in body) and not may_change_command_line(app.token, self.client_address[0]):
                         # A program path plus arguments is a command line: with no password on the network anyone could run anything.
                         return self._error(403, i18n.tr("Changing a program's path or options needs an access password (Settings) or this computer."))
                     ctl.addons.configure(str(body.get("id", "")), body)

@@ -18,6 +18,8 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: python -m pip install -r requirements.txt
+      - run: cargo test --locked --manifest-path tetra-rs/Cargo.toml
+      - run: cargo build --locked --release --manifest-path tetra-rs/Cargo.toml
       - run: python -m compileall -q main.py alisdr tests
       - run: python -m unittest tests/test_core.py tests/test_addons.py -v
       - if: runner.os == 'Linux'
