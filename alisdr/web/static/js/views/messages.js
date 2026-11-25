@@ -1,6 +1,6 @@
 // "Messages": what the add-on decoders found - ACARS and APRS from the scanner, rtl_433 sensors and VDL2
 // from their programs. Newest first; repeats are folded into one row with a counter; VDL2 link-layer chatter
-// is hidden unless asked for; sensors are shown as one card per device. Also used by the Listen page while an
+// can be filtered out; sensors are shown as one card per device. Also used by the Listen page while an
 // external program holds the receiver (eventLine).
 import { api, confirmDialog, errorToast, fmtTime, h, icon, mount, select, seg, t } from '../core.js';
 import { S, cfg, on } from '../state.js';
@@ -13,8 +13,12 @@ const REPEAT_WINDOW_S = 180;
 // How much of VDL2 to show: only ACARS messages (the text), those and other data frames, or everything
 // including the acknowledgements and polls that make up most of the traffic.
 const LEVELS = () => [['acars', t('Messages')], ['data', t('Messages and data')], ['all', t('All frames')]];
-export const vdl2Level = () => { try { return localStorage.getItem('vdl2Level') || 'data'; } catch { return 'data'; } };
-export const passes = (e) => e.kind !== 'vdl2' || vdl2Level() === 'all' || (vdl2Level() === 'data' ? e.layer !== 'link' : e.layer === 'acars');
+export const vdl2Level = () => {
+  const level = prefS('vdl2Level', 'all');
+  return ['acars', 'data'].includes(level) ? level : 'all';
+};
+const matchesLevel = (e, level) => e.kind !== 'vdl2' || level === 'all' || (level === 'data' ? e.layer !== 'link' : e.layer === 'acars');
+export const passes = (e) => matchesLevel(e, vdl2Level());
 export function levelControl(onchange) {
   return seg(LEVELS(), vdl2Level(), (v) => { try { localStorage.setItem('vdl2Level', v); } catch { /* private window */ } onchange(); });
 }
@@ -196,7 +200,8 @@ export function messagesView(root) {
   // -- what is shown ---------------------------------------------------------------------------------------
   function selected() {
     const since = range ? Date.now() / 1000 - range : 0;
-    return rows.filter((e) => passes(e) && e.ts >= since && (!filter || e.addon === filter)
+    const level = vdl2Level();
+    return rows.filter((e) => matchesLevel(e, level) && e.ts >= since
       && (!freq || String(e.freq_hz) === freq) && (!query || JSON.stringify(e).toLowerCase().includes(query)));
   }
 
@@ -204,7 +209,8 @@ export function messagesView(root) {
     const names = NAMES();
     const counts = {};
     for (const r of base) counts[r.addon] = (counts[r.addon] || 0) + 1;
-    const ids = Object.keys(names).filter((id) => counts[id] || cfg().addons.enabled.includes(id) || filter === id);
+    const received = new Set(rows.map(e => e.addon));
+    const ids = Object.keys(names).filter((id) => received.has(id) || cfg().addons.enabled.includes(id) || filter === id);
     mount(chips, ...['', ...ids].map((id) => h('button', { class: id === filter ? 'primary' : 'ghost', onclick: () => { filter = id; draw(); } },
       id ? `${names[id]}${counts[id] ? ` · ${counts[id]}` : ''}` : t('All'))));
   }
@@ -277,7 +283,9 @@ export function messagesView(root) {
   }
 
   function draw() {
-    const base = selected();
+    if (freq && !rows.some(e => String(e.freq_hz) === freq)) freq = '';
+    const matching = selected();
+    const base = filter ? matching.filter(e => e.addon === filter) : matching;
     pageIds = new Set(base.map(e => e.id));
     clearPage.disabled = !pageIds.size;
     const empty = !rows.length;
@@ -285,7 +293,7 @@ export function messagesView(root) {
     for (const control of [chips, search, pauseBtn]) control.classList.toggle('hidden', empty);
     intro.classList.toggle('hidden', !empty);
     if (empty) { drawIntro(); mount(list); return; }
-    drawChips(rows);
+    drawChips(matching);
     drawToolbar();
     if (!base.length) {
       mount(list, h('div.empty', rows.length ? t('Nothing matches the filters.') : t('Nothing decoded yet. Turn an add-on on in Add-ons and scan a band that contains its channels.')));
