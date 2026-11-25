@@ -4253,6 +4253,9 @@ msgstr "Monitorowanie"
 msgid "Show more messages"
 msgstr "Pokaż więcej wiadomości"
 
+msgid "Permanently delete all {type} messages for all devices, including earlier days?"
+msgstr "Trwale usunąć wszystkie wiadomości typu {type} dla wszystkich urządzeń, również z wcześniejszych dni?"
+
 msgid "Clear all messages"
 msgstr "Wyczyść wszystkie wiadomości"
 

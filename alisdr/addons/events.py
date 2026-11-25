@@ -72,14 +72,21 @@ class EventHub:
     def since(self, after_id: int = 0, addon: str = "", limit: int = 500) -> list[dict]:
         return self.snapshot(after_id, addon, limit)["events"]
 
-    def clear(self) -> str:
-        """Clear all retained event logs and both live buffers as one operation with respect to publishers."""
+    def clear(self, addon: str = "all") -> str:
+        """Clear the selected decoder history while serializing deletions with publishers."""
+        if not isinstance(addon, str) or not addon:
+            raise ValueError("A message type is required")
         with self._lock:
             if self._dir is not None:
                 for path in self._dir.glob("events-????-??-??.jsonl"):
-                    path.unlink(missing_ok=True)
-            self._ring.clear()
-            self._link_ring.clear()
+                    if addon == "all":
+                        path.unlink(missing_ok=True)
+                    else:
+                        self._delete_from_log(path, path.stem[7:], lambda event, key: event.get("addon") == addon)
+            for ring in (self._ring, self._link_ring):
+                remaining = [event for event in ring if addon != "all" and event.get("addon") != addon]
+                ring.clear()
+                ring.extend(remaining)
             self._generation = uuid4().hex
             return self._generation
 
@@ -94,7 +101,7 @@ class EventHub:
         with self._lock:
             for day, selected in by_day.items():
                 if self._dir is not None:
-                    self._delete_from_log(self._dir / f"events-{day}.jsonl", day, selected)
+                    self._delete_from_log(self._dir / f"events-{day}.jsonl", day, lambda event, key: key in selected)
                 for ring in (self._ring, self._link_ring):
                     remaining = [event for event in ring if event["message_key"] not in selected]
                     ring.clear()
@@ -103,7 +110,7 @@ class EventHub:
             return self._generation
 
     @staticmethod
-    def _delete_from_log(path: Path, day: str, selected: set) -> None:
+    def _delete_from_log(path: Path, day: str, matches) -> None:
         try:
             lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         except FileNotFoundError:
@@ -119,7 +126,7 @@ class EventHub:
             if isinstance(event, dict):
                 # Older logs have no key. Preserve the original line identity when compacting.
                 key = event.get("message_key", f"{day}/old-{index}")
-                if key in selected:
+                if matches(event, key):
                     removed = True
                     continue
                 if "message_key" not in event:

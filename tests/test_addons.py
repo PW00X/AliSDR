@@ -225,6 +225,24 @@ class HubTest(unittest.TestCase):
             self.assertEqual(updated["events"], [fresh])
 
 
+    def test_clear_decoder_preserves_other_decoders_across_days_and_restart(self):
+        import json
+        from alisdr.addons.events import EventHub
+        with tempfile.TemporaryDirectory(dir=_HOME) as directory:
+            folder = Path(directory)
+            hub = EventHub(folder, ring=2)
+            hub.publish("vdl2", {"kind": "vdl2"}, "evicted")
+            keep = hub.publish("acars", {"kind": "acars"}, "keep")
+            hub.publish("vdl2", {"kind": "vdl2", "layer": "acars"}, "decoded")
+            hub.publish("vdl2", {"kind": "vdl2", "layer": "link"}, "ack")
+            older = folder / "events-2020-01-01.jsonl"
+            older.write_text('{"addon":"vdl2"}\n{"addon":"aprs"}\n', encoding="utf-8")
+            generation = hub.snapshot(0, "", 500)["generation"]
+            hub.clear("vdl2")
+            self.assertEqual(hub.snapshot(keep["id"], "", 500, generation)["events"], [keep])
+            self.assertEqual(json.loads(older.read_text())["addon"], "aprs")
+            self.assertEqual([e["message_key"] for e in EventHub(folder).since()], [keep["message_key"]])
+
     def test_page_deletion_survives_restart_and_preserves_other_rows(self):
         import json
         from datetime import date

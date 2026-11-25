@@ -145,13 +145,16 @@ export function messagesView(root) {
     } catch (err) { errorToast(err); }
   } }, t('Clear page'));
   const clearAll = h('button.ghost.danger', { onclick: async () => {
-    if (!(await confirmDialog(t('Clear all messages'), t('Permanently delete all decoded messages, including hidden messages and earlier days, for all devices?'), t('Clear all messages'), true))) return;
+    const addon = filter || 'all';
+    const message = filter
+      ? t('Permanently delete all {type} messages for all devices, including earlier days?', { type: NAMES()[addon] || addon })
+      : t('Permanently delete all decoded messages, including hidden messages and earlier days, for all devices?');
+    if (!(await confirmDialog(t('Clear all messages'), message, t('Clear all messages'), true))) return;
     clearAll.disabled = true;
     try {
-      const result = await api.post('/api/addons/clear-events');
+      await api.post('/api/addons/clear-events', { addon });
       revision++;
-      generation = result.generation;
-      rows = []; lastId = 0;
+      rows = addon === 'all' ? [] : rows.filter(e => e.addon !== addon);
       visibleCount = PAGE_SIZE; open.clear(); pendingDraw = false;
       draw();
     } catch (err) { errorToast(err); }

@@ -453,7 +453,7 @@ def make_handler(app: App):
                     self._json({"generation": ctl.addons.hub.delete_page(body.get("keys"))})
                     return
                 if action == "clear-events":
-                    self._json({"generation": ctl.addons.hub.clear()})
+                    self._json({"generation": ctl.addons.hub.clear(body.get("addon"))})
                     return
                 if action == "configure":
                     if ("path" in body or "extra_args" in body) and not may_change_command_line(app.token, self.client_address[0]):
