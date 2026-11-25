@@ -515,6 +515,9 @@ def make_handler(app: App):
         def facets(self, _query: dict) -> None:
             self._json(lib.facets())
 
+        def music_stats(self, query: dict) -> None:
+            self._json({"tracks": ctl.music.snapshot()})
+
         def stats(self, query: dict) -> None:
             self._json(lib.stats(sel=query.get("sel", []), utc=_qs(query, "utc") == "1"))
 
@@ -813,6 +816,7 @@ def make_handler(app: App):
         ("GET", "/api/library"): Handler.library,
         ("GET", "/api/library/ids"): Handler.library_ids,
         ("GET", "/api/library/facets"): Handler.facets,
+        ("GET", "/api/music/stats"): Handler.music_stats,
         ("GET", "/api/library/stats"): Handler.stats,
         ("GET", "/api/library/storage"): Handler.storage,
         ("GET", "/api/library/rename"): Handler.lib_rename_recordings,

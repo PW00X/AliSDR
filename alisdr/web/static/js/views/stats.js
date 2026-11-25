@@ -1,5 +1,5 @@
 // "Statistics": what was heard, when and how well.
-import { api, errorToast, fmtAgo, fmtChannel, fmtDate, fmtDuration, h, mount, prefs, qs, qualityBadge, t, tabs, toggle } from '../core.js';
+import { api, errorToast, fmtAgo, fmtChannel, fmtDate, fmtTime, fmtDuration, h, mount, prefs, qs, qualityBadge, t, tabs, toggle } from '../core.js';
 import { addonsInUse } from '../state.js';
 import { openChannelForFrequency } from './channels.js';
 import { addonStats } from './stats-addons.js';
@@ -9,14 +9,16 @@ import { addonStats } from './stats-addons.js';
 export function statsView(root, hash = '') {
   const m = hash.match(/^#\/stats\/addons(?:\/(\w+))?/);
   const hasAddons = addonsInUse();
-  const scope = m && hasAddons ? 'addons' : 'voice';
+  const scope = m && hasAddons ? 'addons' : hash === '#/stats/music' ? 'music' : 'voice';
+  const sections = [['voice', t('Voice: what was heard')], ['music', t("Music: what's heard")]];
+  if (hasAddons) sections.push(['addons', t('Add-ons: what was decoded')]);
   const body = h('div.col', { style: { gap: '16px' } }, h('div.empty', t('Loading…')));
   let utc = prefs.utc;
   let addons = null;
   mount(root, h('div.page',
     h('div.page-head', h('h1', t('Statistics')),
       toggle(t('UTC'), utc, (v) => { utc = prefs.utc = v; if (addons) { addons.destroy(); addons = addonStats({ body, sub: m && m[1], utc }); } else load(); })),
-    hasAddons ? tabs([['voice', t('Voice: what was heard')], ['addons', t('Add-ons: what was decoded')]], scope, (v) => { location.hash = v === 'addons' ? '#/stats/addons' : '#/stats'; }) : null,
+    tabs(sections, scope, (v) => { location.hash = v === 'voice' ? '#/stats' : '#/stats/' + v; }),
     body));
   if (scope === 'addons') {
     addons = addonStats({ body, sub: m[1], utc });
@@ -34,6 +36,19 @@ export function statsView(root, hash = '') {
   }
 
   async function load() {
+    if (scope === 'music') {
+      try {
+        const { tracks } = await api.get('/api/music/stats');
+        mount(body, h('section.card', tracks.length ? h('div.table-wrap', h('table',
+          h('thead', h('tr', [t('Track'), t('Station'), t('Plays'), t('Last heard')].map(label => h('th', label)))),
+          h('tbody', tracks.map(row => {
+            const heard = new Date(row.last_heard * 1000).toISOString();
+            return h('tr', h('td', row.track), h('td', row.station), h('td', row.plays),
+              h('td', fmtDate(heard) + ' ' + fmtTime(heard)));
+          })))) : h('div.empty', t('Tracks appear when a tuned FM or DAB station broadcasts song information.'))));
+      } catch (e) { errorToast(e); }
+      return;
+    }
     let s;
     try { s = await api.get('/api/library/stats' + qs({ utc: utc ? 1 : '' })); } catch (e) { errorToast(e); return; }
     const sum = s.summary;
@@ -72,5 +87,6 @@ export function statsView(root, hash = '') {
           } }, f.name ? t('Edit') : t('Add')) : null))))))));
   }
   load();
-  return {};
+  const timer = scope === 'music' ? setInterval(load, 15000) : null;
+  return { destroy() { clearInterval(timer); } };
 }

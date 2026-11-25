@@ -19,6 +19,7 @@ from .dsp import Demodulator, StreamResampler, WFM_DISCRIMINATOR_RATE, level_dbf
 from .i18n import tr
 from .models import Modulation, resolve_ssb_sideband
 from .rds import RDSDecoder
+from .music import track_label
 from .scanner_engine import AUDIO_RATE, SpectrumWorker
 from .sdr_backend import AcquisitionThread, create_backend, open_real_backend
 
@@ -77,6 +78,8 @@ class ManualSession(threading.Thread):
         self.pending_station = 0
         self.station_info = {}
         self.station_image = None
+        self.on_music = None
+        self._last_track = None
         self.on_broadcast_audio = lambda _pcm: None
         self.fm_scan = None
         self.fm_stations = None
@@ -86,6 +89,14 @@ class ManualSession(threading.Thread):
         self.spectrum = None
         self.level = None
         self.gain_range = None
+
+    def _music_text(self, station_id, station, text):
+        track = track_label(text)
+        if track and self.on_music:
+            key = (station_id, track.casefold())
+            if key != self._last_track:
+                self._last_track = key
+                self.on_music(station_id, station, track, time.time())
 
     def _update_spectrum(self, freqs, db, _trigger, _custom):
         self.spectrum = {"f0": float(freqs[0]), "f1": float(freqs[-1]), "db": np.round(db, 1).tolist()}
@@ -225,6 +236,8 @@ class ManualSession(threading.Thread):
                     mode = resolve_ssb_sideband(Modulation(tuning.mode), freq)
                     demod = Demodulator(rate, AUDIO_RATE)
                     self.station_info = {}
+                    self._last_track = None
+                    previous_text = None
                     fm_audio = None
                     if mode == Modulation.WFM:
                         rds = RDSDecoder()
@@ -246,6 +259,10 @@ class ManualSession(threading.Thread):
                     composite, fm_rate = demod.fm_composite(iq, offset)
                     if fm_rate > 120_000:
                         rds.feed(composite, fm_rate)
+                        text = rds.info.get("text")
+                        if text and text != previous_text:
+                            previous_text = text
+                            self._music_text(f"FM:{freq}", rds.info.get("name") or f"{freq / 1e6:g} MHz", text)
                     stereo = fm_audio.process(composite)
                     if stereo.size:
                         self.on_broadcast_audio((np.clip(stereo, -1.0, 1.0) * 32767).astype("<i2").tobytes())
@@ -267,6 +284,7 @@ class ManualSession(threading.Thread):
         self.pending_station = 0
         if self.station != sid:
             self.station = sid
+            self._last_track = None
             self.station_info.pop("text", None)
             self.station_image = None
 
@@ -279,7 +297,10 @@ class ManualSession(threading.Thread):
 
     def _dab_metadata(self, sid, label):
         if label and (sid == 0 or sid == self.station):
-            self.station_info["ensemble" if sid == 0 else "text"] = label.decode("utf-8", errors="replace").strip()
+            text = label.decode("utf-8", errors="replace").strip()
+            self.station_info["ensemble" if sid == 0 else "text"] = text
+            if sid:
+                self._music_text(f"DAB:{self.tuning.channel}:{sid}", self.stations[sid]["name"], text)
 
     def _dab_image(self, sid, data):
         if data.startswith(b"\x89PNG\r\n\x1a\n"):

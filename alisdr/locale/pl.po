@@ -3437,6 +3437,18 @@ msgstr "Dotąd zapisano: {n} dni."
 msgid "Click to see its messages"
 msgstr "Kliknij, żeby zobaczyć jego wiadomości"
 
+msgid "Music: what's heard"
+msgstr "Muzyka: czego słuchano"
+
+msgid "Track"
+msgstr "Utwór"
+
+msgid "Plays"
+msgstr "Odtworzenia"
+
+msgid "Tracks appear when a tuned FM or DAB station broadcasts song information."
+msgstr "Utwory pojawią się, gdy odbierana stacja FM lub DAB nada informacje o utworze."
+
 msgid "Voice: what was heard"
 msgstr "Głos: co było słychać"
 

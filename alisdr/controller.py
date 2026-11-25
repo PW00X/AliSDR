@@ -29,6 +29,7 @@ from .audio_transcode import ffmpeg_available, transcode_to_mp3
 from .channelizer import plan_windows
 from .config import DEFAULT_RECORDINGS_DIR, AppConfig, ScheduleEntry, VfoRangeConfig, _from_dict
 from .dab import AUDIO_RATE as BROADCAST_AUDIO_RATE, load_decoder
+from .music import MusicStats
 from .manual_tuning import DAB_CHANNELS, FM_FREQUENCIES, ManualSession, Tuning
 from .models import BlacklistEntry, Channel, Modulation, snap_airband_hz
 from .playback.index import Library
@@ -188,6 +189,7 @@ class Controller:
         self._manual_recording: _ManualRecording | None = None
         self._manual_recording_revision = 0
         self._manual_finishing: set[Path] = set()
+        self.music = MusicStats()
         self._manual_record_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="manual-recording")
         self.log(i18n.tr("Ready."))
 
@@ -408,6 +410,7 @@ class Controller:
             self._manual_error = ""
             session = ManualSession(tuning, device, self.config.debug_mode, self._publish_manual_audio, self._manual_ended, library)
             session.pending_station = wanted
+            session.on_music = self._queue_music
             if scan_fm:
                 self._fm_stations = {}
                 session.fm_stations = self._fm_stations
@@ -566,6 +569,14 @@ class Controller:
         self.manual_session = None
         if release:
             self._held.discard(session.tuning.receiver)
+
+    def _queue_music(self, *play):
+        def save():
+            try:
+                self.music.record(*play)
+            except Exception as exc:
+                self.log(str(exc))
+        self._manual_record_pool.submit(save)
 
     def _manual_ended(self, session: ManualSession, error: str) -> None:
         def release() -> None:
