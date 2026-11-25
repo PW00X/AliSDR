@@ -516,6 +516,10 @@ def make_handler(app: App):
             self._json(lib.facets())
 
         def music_stats(self, query: dict) -> None:
+            if self.command == "POST":
+                ctl.clear_music_stats()
+                self._json({"ok": True})
+                return
             self._json({"tracks": ctl.music.snapshot()})
 
         def stats(self, query: dict) -> None:
@@ -816,6 +820,7 @@ def make_handler(app: App):
         ("GET", "/api/library"): Handler.library,
         ("GET", "/api/library/ids"): Handler.library_ids,
         ("GET", "/api/library/facets"): Handler.facets,
+        ("POST", "/api/music/stats/clear"): Handler.music_stats,
         ("GET", "/api/music/stats"): Handler.music_stats,
         ("GET", "/api/library/stats"): Handler.stats,
         ("GET", "/api/library/storage"): Handler.storage,

@@ -1,5 +1,5 @@
 // "Statistics": what was heard, when and how well.
-import { api, errorToast, fmtAgo, fmtChannel, fmtDate, fmtTime, fmtDuration, h, mount, prefs, qs, qualityBadge, t, tabs, toggle } from '../core.js';
+import { api, confirmDialog, errorToast, fmtAgo, fmtChannel, fmtDate, fmtTime, fmtDuration, h, mount, prefs, qs, qualityBadge, t, tabs, toggle } from '../core.js';
 import { addonsInUse } from '../state.js';
 import { openChannelForFrequency } from './channels.js';
 import { addonStats } from './stats-addons.js';
@@ -15,8 +15,18 @@ export function statsView(root, hash = '') {
   const body = h('div.col', { style: { gap: '16px' } }, h('div.empty', t('Loading…')));
   let utc = prefs.utc;
   let addons = null;
+  let musicRevision = 0;
+  const clearMusic = scope === 'music' ? h('button.ghost.danger', { onclick: async () => {
+    if (!(await confirmDialog(t('Clear statistics'), t('Permanently delete music statistics for all stations?'), t('Clear statistics'), true))) return;
+    clearMusic.disabled = true;
+    try {
+      await api.post('/api/music/stats/clear');
+      await load();
+    } catch (e) { errorToast(e); }
+    finally { clearMusic.disabled = false; }
+  } }, t('Clear statistics')) : null;
   mount(root, h('div.page',
-    h('div.page-head', h('h1', t('Statistics')),
+    h('div.page-head', h('h1', t('Statistics')), clearMusic,
       toggle(t('UTC'), utc, (v) => { utc = prefs.utc = v; if (addons) { addons.destroy(); addons = addonStats({ body, sub: m && m[1], utc }); } else load(); })),
     tabs(sections, scope, (v) => { location.hash = v === 'voice' ? '#/stats' : '#/stats/' + v; }),
     body));
@@ -38,7 +48,9 @@ export function statsView(root, hash = '') {
   async function load() {
     if (scope === 'music') {
       try {
+        const revision = ++musicRevision;
         const { tracks } = await api.get('/api/music/stats');
+        if (revision !== musicRevision) return;
         mount(body, h('section.card', tracks.length ? h('div.table-wrap', h('table',
           h('thead', h('tr', [t('Track'), t('Station'), t('Plays'), t('Last heard')].map(label => h('th', label)))),
           h('tbody', tracks.map(row => {

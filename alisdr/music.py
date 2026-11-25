@@ -29,6 +29,11 @@ class MusicStats:
                 station=excluded.station, plays=plays+1, last_heard=excluded.last_heard""",
                 (station_id, track.casefold(), station, track, heard))
 
+    def clear(self):
+        if self.path.exists():
+            with closing(sqlite3.connect(self.path)) as db, db:
+                db.execute("DELETE FROM music")
+
     def snapshot(self):
         if not self.path.exists():
             return []

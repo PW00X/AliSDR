@@ -3437,6 +3437,12 @@ msgstr "Dotąd zapisano: {n} dni."
 msgid "Click to see its messages"
 msgstr "Kliknij, żeby zobaczyć jego wiadomości"
 
+msgid "Clear statistics"
+msgstr "Wyczyść statystyki"
+
+msgid "Permanently delete music statistics for all stations?"
+msgstr "Trwale usunąć statystyki muzyki dla wszystkich stacji?"
+
 msgid "Music: what's heard"
 msgstr "Muzyka: czego słuchano"
 

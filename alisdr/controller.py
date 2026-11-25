@@ -570,6 +570,10 @@ class Controller:
         if release:
             self._held.discard(session.tuning.receiver)
 
+    def clear_music_stats(self):
+        # Finish already queued plays before clearing. Later plays start the new history.
+        self._manual_record_pool.submit(self.music.clear).result()
+
     def _queue_music(self, *play):
         def save():
             try:

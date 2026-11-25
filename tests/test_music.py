@@ -24,3 +24,7 @@ class MusicHistoryTest(unittest.TestCase):
             counts = {(r["station"], r["track"]): r["plays"] for r in MusicStats(path).snapshot()}
             self.assertEqual(counts, {("StuBru", "Artist - First"): 2, ("StuBru", "Artist - Second"): 1,
                                       ("FM station", "Artist - First"): 1})
+            stats.clear()
+            self.assertEqual(MusicStats(path).snapshot(), [])
+            session._music_text("FM:100000000", "FM station", "Artist - New")
+            self.assertEqual(stats.snapshot()[0]["plays"], 1)
