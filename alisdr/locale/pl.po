@@ -4264,3 +4264,6 @@ msgstr "Wyczyść wszystko"
 
 msgid "Clear page"
 msgstr "Wyczyść stronę"
+
+msgid "Permanently delete the messages on this page, including folded repeats, for all devices?"
+msgstr "Trwale usunąć wiadomości z tej strony, w tym zgrupowane powtórzenia, dla wszystkich urządzeń?"

@@ -449,6 +449,9 @@ def make_handler(app: App):
                 return
             if self.command == "POST":
                 body = self._body()
+                if action == "delete-events":
+                    self._json({"generation": ctl.addons.hub.delete_page(body.get("keys"))})
+                    return
                 if action == "clear-events":
                     self._json({"generation": ctl.addons.hub.clear()})
                     return
@@ -799,6 +802,7 @@ def make_handler(app: App):
         ("GET", "/api/addons/metrics"): Handler.addons,
         ("POST", "/api/addons/configure"): Handler.addons,
         ("POST", "/api/addons/run"): Handler.addons,
+        ("POST", "/api/addons/delete-events"): Handler.addons,
         ("POST", "/api/addons/clear-events"): Handler.addons,
         ("POST", "/api/addons/stop"): Handler.addons,
         ("POST", "/api/addons/install"): Handler.addons,

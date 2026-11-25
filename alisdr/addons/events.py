@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from collections import deque
 from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
+
+from ..config import atomic_write_text
 
 
 class EventHub:
@@ -29,14 +32,17 @@ class EventHub:
             return
         path = self._dir / f"events-{date.today().isoformat()}.jsonl"
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()[-self._ring.maxlen:]
+            lines = path.read_text(encoding="utf-8").splitlines()
         except OSError:
             return
-        for line in lines:
+        start = max(0, len(lines) - self._ring.maxlen)
+        day = path.stem[7:]
+        for index, line in enumerate(lines[start:], start):
             try:
                 event = json.loads(line)
             except ValueError:
                 continue
+            event.setdefault("message_key", f"{day}/old-{index}")
             event["id"] = self._next_id
             self._next_id += 1
             self._ring.append(event)
@@ -49,6 +55,7 @@ class EventHub:
         # counted in the statistics but neither kept on disk nor shown beyond the live ring.
         persist = not (event.get("kind") == "vdl2" and event.get("layer") == "link")
         with self._lock:
+            event["message_key"] = f"{date.today().isoformat()}/{uuid4().hex}"
             event["id"] = self._next_id
             self._next_id += 1
             (self._ring if persist else self._link_ring).append(event)
@@ -76,6 +83,52 @@ class EventHub:
             self._generation = uuid4().hex
             return self._generation
 
+    def delete_page(self, keys: list) -> str:
+        if not isinstance(keys, list) or not 1 <= len(keys) <= 3600:
+            raise ValueError("Invalid message selection")
+        by_day = {}
+        for key in keys:
+            if not isinstance(key, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}/(?:[0-9a-f]{32}|old-[0-9]{1,12})", key):
+                raise ValueError("Invalid message key")
+            by_day.setdefault(key.split("/", 1)[0], set()).add(key)
+        with self._lock:
+            for day, selected in by_day.items():
+                if self._dir is not None:
+                    self._delete_from_log(self._dir / f"events-{day}.jsonl", day, selected)
+                for ring in (self._ring, self._link_ring):
+                    remaining = [event for event in ring if event["message_key"] not in selected]
+                    ring.clear()
+                    ring.extend(remaining)
+                self._generation = uuid4().hex
+            return self._generation
+
+    @staticmethod
+    def _delete_from_log(path: Path, day: str, selected: set) -> None:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        except FileNotFoundError:
+            return
+        kept = []
+        removed = False
+        for index, line in enumerate(lines):
+            try:
+                event = json.loads(line)
+            except ValueError:
+                kept.append(line)
+                continue
+            if isinstance(event, dict):
+                # Older logs have no key. Preserve the original line identity when compacting.
+                key = event.get("message_key", f"{day}/old-{index}")
+                if key in selected:
+                    removed = True
+                    continue
+                if "message_key" not in event:
+                    event["message_key"] = key
+                    line = json.dumps(event, ensure_ascii=False) + "\n"
+            kept.append(line)
+        if removed:
+            atomic_write_text(path, "".join(kept))
+
     def snapshot(self, after_id: int, addon: str, limit: int, generation: str = "") -> dict:
         with self._lock:
             if generation and generation != self._generation:
@@ -90,7 +143,8 @@ class EventHub:
             return
         try:
             self._dir.mkdir(parents=True, exist_ok=True)
-            with open(self._dir / f"events-{date.today().isoformat()}.jsonl", "a", encoding="utf-8") as f:
+            day = event["message_key"].split("/", 1)[0]
+            with open(self._dir / f"events-{day}.jsonl", "a", encoding="utf-8") as f:
                 f.write(json.dumps({k: v for k, v in event.items() if k != "id"}, ensure_ascii=False) + "\n")
             self._prune()
         except OSError:

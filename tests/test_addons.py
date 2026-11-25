@@ -225,6 +225,27 @@ class HubTest(unittest.TestCase):
             self.assertEqual(updated["events"], [fresh])
 
 
+    def test_page_deletion_survives_restart_and_preserves_other_rows(self):
+        import json
+        from datetime import date
+        from alisdr.addons.events import EventHub
+        with tempfile.TemporaryDirectory(dir=_HOME) as directory:
+            folder = Path(directory)
+            path = folder / f"events-{date.today().isoformat()}.jsonl"
+            path.write_text('{"summary":"same"}\n' * 3, encoding="utf-8")
+            hub = EventHub(folder, 7, ring=2)
+            first, second = hub.since()
+            new = hub.publish("acars", {"kind": "acars"}, "new")
+            link = hub.publish("vdl2", {"kind": "vdl2", "layer": "link"}, "ack")
+            hub.delete_page([first["message_key"], new["message_key"], link["message_key"]])
+            self.assertEqual(hub.since(), [second])
+            hub.delete_page([first["message_key"]])  # retry after the legacy log was compacted
+            again = EventHub(folder, 7)
+            self.assertEqual(len(again.since()), 2)
+            again.delete_page([second["message_key"]])
+            self.assertEqual([json.loads(line)["summary"] for line in path.read_text().splitlines()], ["same"])
+
+
 class ManagerTest(unittest.TestCase):
     def _manager(self):
         from alisdr.addons.manager import AddonManager

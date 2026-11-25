@@ -131,24 +131,18 @@ export function messagesView(root) {
   const levelRow = h('div.row.wrap');
   const search = h('input', { type: 'search', placeholder: t('Search…'), oninput: (e) => { query = e.target.value.toLowerCase(); draw(); } });
   const pauseBtn = h('button.ghost', { onclick: () => { paused = !paused; pauseBtn.textContent = paused ? t('Resume') : t('Pause'); } }, t('Pause'));
-  const dismissedKey = 'msgDismissedPage';
-  function readDismissed() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(dismissedKey));
-      return new Set(saved?.generation === generation && Array.isArray(saved.ids) ? saved.ids : []);
-    } catch { return new Set(); }
-  }
-  function saveDismissed(ids) {
-    setPrefS(dismissedKey, JSON.stringify({ generation, ids: [...ids] }));
-  }
   let pageIds = new Set();
-  const clearPage = h('button.ghost', { onclick: () => {
-    const dismissed = readDismissed();
-    for (const id of pageIds) dismissed.add(id);
-    saveDismissed(dismissed);
-    rows = rows.filter(e => !dismissed.has(e.id));
-    open.clear(); visibleCount = PAGE_SIZE;
-    draw();
+  const clearPage = h('button.ghost', { onclick: async () => {
+    const keys = rows.filter(e => pageIds.has(e.id)).map(e => e.message_key);
+    if (!keys.length || !(await confirmDialog(t('Clear page'), t('Permanently delete the messages on this page, including folded repeats, for all devices?'), t('Clear page'), true))) return;
+    try {
+      await api.post('/api/addons/delete-events', { keys });
+      revision++;
+      const deleted = new Set(keys);
+      rows = rows.filter(e => !deleted.has(e.message_key));
+      open.clear(); visibleCount = PAGE_SIZE; pendingDraw = false;
+      draw();
+    } catch (err) { errorToast(err); }
   } }, t('Clear page'));
   const clearAll = h('button.ghost.danger', { onclick: async () => {
     if (!(await confirmDialog(t('Clear all messages'), t('Permanently delete all decoded messages, including hidden messages and earlier days, for all devices?'), t('Clear all messages'), true))) return;
@@ -157,7 +151,6 @@ export function messagesView(root) {
       const result = await api.post('/api/addons/clear-events');
       revision++;
       generation = result.generation;
-      saveDismissed([]);
       rows = []; lastId = 0;
       visibleCount = PAGE_SIZE; open.clear(); pendingDraw = false;
       draw();
@@ -332,14 +325,7 @@ export function messagesView(root) {
       if (reset) { rows = []; open.clear(); lastId = 0; visibleCount = PAGE_SIZE; }
       generation = r.generation || '';
       if (r.events.length || reset) {
-        const dismissed = readDismissed();
-        if (lastId === 0 && dismissed.size) {
-          // The first poll contains the retained history. Drop IDs that have expired.
-          const retained = new Set(r.events.map(e => e.id));
-          for (const id of dismissed) if (!retained.has(id)) dismissed.delete(id);
-          saveDismissed(dismissed);
-        }
-        rows = rows.concat(r.events.filter(e => !dismissed.has(e.id))).slice(-MAX_ROWS);
+        rows = rows.concat(r.events).slice(-MAX_ROWS);
         if (r.events.length) lastId = r.events[r.events.length - 1].id;
         const sel = window.getSelection();
         if (!reset && sel && !sel.isCollapsed && list.contains(sel.anchorNode)) pendingDraw = true;      // a redraw would drop what is being selected/copied
