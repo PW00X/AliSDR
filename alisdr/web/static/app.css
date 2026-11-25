@@ -535,3 +535,8 @@ details summary { cursor: pointer; color: var(--accent); font-size: 14px; }
   th button.sort { min-height: 44px; }  /* `all: unset` on the header button would drop the 44pt target */
   .seg button { min-height: 40px; }  /* + the 2px track padding = 44 */
 }
+
+button.stats-sort { background: transparent; border: 0; padding: 2px 0; color: inherit; font: inherit; text-align: inherit; cursor: pointer; }
+.stats-sort::after { content: ' ↕'; opacity: .55; }
+th[aria-sort=ascending] .stats-sort::after { content: ' ↑'; opacity: 1; }
+th[aria-sort=descending] .stats-sort::after { content: ' ↓'; opacity: 1; }

@@ -41,5 +41,15 @@ class MusicStats:
             db.row_factory = sqlite3.Row
             if not db.execute("SELECT 1 FROM sqlite_master WHERE name='music'").fetchone():
                 return []
-            return [dict(row) for row in db.execute("""SELECT station, track, plays, last_heard
-                FROM music ORDER BY last_heard DESC, station, track""")]
+            tracks = {}
+            for row in db.execute("""SELECT track_key, station, track, plays, last_heard
+                    FROM music ORDER BY last_heard DESC, station, track"""):
+                entry = tracks.setdefault(row["track_key"], {
+                    "track": row["track"], "plays": 0, "last_heard": row["last_heard"], "stations": {},
+                })
+                entry["plays"] += row["plays"]
+                entry["stations"].setdefault(row["station"].casefold(), row["station"])
+            for entry in tracks.values():
+                names = sorted(entry.pop("stations").values(), key=str.casefold)
+                entry["station"] = ", ".join(names)
+            return list(tracks.values())

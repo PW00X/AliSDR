@@ -2,6 +2,7 @@
 import { api, confirmDialog, errorToast, fmtAgo, fmtChannel, fmtDate, fmtTime, fmtDuration, h, mount, prefs, qs, qualityBadge, t, tabs, toggle } from '../core.js';
 import { addonsInUse } from '../state.js';
 import { openChannelForFrequency } from './channels.js';
+import { numericCell, statisticsSorter } from './stats-sort.js';
 import { addonStats } from './stats-addons.js';
 
 // Two scopes: what was heard on the air (recordings) and what the add-ons decoded. #/stats is the first,
@@ -13,6 +14,7 @@ export function statsView(root, hash = '') {
   const sections = [['voice', t('Voice: what was heard')], ['music', t("Music: what's heard")]];
   if (hasAddons) sections.push(['addons', t('Add-ons: what was decoded')]);
   const body = h('div.col', { style: { gap: '16px' } }, h('div.empty', t('Loading…')));
+  const sortTables = statisticsSorter();
   let utc = prefs.utc;
   let addons = null;
   let musicRevision = 0;
@@ -27,11 +29,11 @@ export function statsView(root, hash = '') {
   } }, t('Clear statistics')) : null;
   mount(root, h('div.page',
     h('div.page-head', h('h1', t('Statistics')), clearMusic,
-      toggle(t('UTC'), utc, (v) => { utc = prefs.utc = v; if (addons) { addons.destroy(); addons = addonStats({ body, sub: m && m[1], utc }); } else load(); })),
+      toggle(t('UTC'), utc, (v) => { utc = prefs.utc = v; if (addons) { addons.destroy(); addons = addonStats({ body, sub: m && m[1], utc, sortTables }); } else load(); })),
     tabs(sections, scope, (v) => { location.hash = v === 'voice' ? '#/stats' : '#/stats/' + v; }),
     body));
   if (scope === 'addons') {
-    addons = addonStats({ body, sub: m[1], utc });
+    addons = addonStats({ body, sub: m[1], utc, sortTables });
     return { destroy() { addons.destroy(); } };
   }
 
@@ -52,12 +54,13 @@ export function statsView(root, hash = '') {
         const { tracks } = await api.get('/api/music/stats');
         if (revision !== musicRevision) return;
         mount(body, h('section.card', tracks.length ? h('div.table-wrap', h('table',
-          h('thead', h('tr', [t('Track'), t('Station'), t('Plays'), t('Last heard')].map(label => h('th', label)))),
+          h('thead', h('tr', [t('Track'), t('Stations'), t('Plays'), t('Last heard')].map(label => h('th', label)))),
           h('tbody', tracks.map(row => {
             const heard = new Date(row.last_heard * 1000).toISOString();
-            return h('tr', h('td', row.track), h('td', row.station), h('td', row.plays),
-              h('td', fmtDate(heard) + ' ' + fmtTime(heard)));
+            return h('tr', h('td', row.track), h('td', row.station), h('td', numericCell(row.plays), row.plays),
+              h('td', numericCell(row.last_heard), fmtDate(heard) + ' ' + fmtTime(heard)));
           })))) : h('div.empty', t('Tracks appear when a tuned FM or DAB station broadcasts song information.'))));
+        sortTables(body);
       } catch (e) { errorToast(e); }
       return;
     }
@@ -87,16 +90,17 @@ export function statsView(root, hash = '') {
             style: { cursor: 'pointer' },
             onclick: () => { sessionStorage.setItem('openFreq', `freq:${f.freq_khz}`); location.hash = '#/recordings'; },
           },
-          h('td.mono', f.freq_khz ? fmtChannel(f.freq_khz * 1000) : t('Manual recording')),
+          h('td.mono', numericCell(f.freq_khz), f.freq_khz ? fmtChannel(f.freq_khz * 1000) : t('Manual recording')),
           h('td', f.name || h('span.faint', '–')),
-          h('td.num', f.count.toLocaleString()),
-          h('td', qualityBadge(f.quality)),
-          h('td.mono', fmtDuration(f.duration)),
-          h('td.small.muted', fmtAgo(f.last)),
+          h('td.num', numericCell(f.count), f.count.toLocaleString()),
+          h('td', numericCell(f.quality), qualityBadge(f.quality)),
+          h('td.mono', numericCell(f.duration), fmtDuration(f.duration)),
+          h('td.small.muted', numericCell(Date.parse(f.last)), fmtAgo(f.last)),
           h('td', f.freq_khz ? h('button', { onclick: async (event) => {
             event.stopPropagation();
             if (await openChannelForFrequency(f.freq_khz * 1000)) load();
           } }, f.name ? t('Edit') : t('Add')) : null))))))));
+    sortTables(body);
   }
   load();
   const timer = scope === 'music' ? setInterval(load, 15000) : null;

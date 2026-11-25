@@ -2,6 +2,7 @@
 // something - an aircraft and a thermometer are not alike), and one page per add-on with figures that fit its data.
 import { api, errorToast, fmtAgo, h, icon, mount, select, t } from '../core.js';
 import { cfg } from '../state.js';
+import { numericCell } from './stats-sort.js';
 import { NAMES } from './messages.js';
 
 const ORDER = ['vdl2', 'acars', 'aprs', 'rtl_433'];
@@ -10,7 +11,7 @@ const iso = (ts) => new Date(ts * 1000).toISOString();
 const num = (n) => Number(n).toLocaleString();
 const pad = (n) => String(n).padStart(2, '0');
 
-export function addonStats({ body, sub, utc }) {
+export function addonStats({ body, sub, utc, sortTables }) {
   let days = +(localStorage.getItem('statsDays') || 7);
   let snap = null;
   let reloadTimer = null;
@@ -121,11 +122,11 @@ export function addonStats({ body, sub, utc }) {
     if (id === 'vdl2' || id === 'acars') {
       out.push(h('div.grid.two',
         h('section.card', h('div.card-head', h('h2', t('Aircraft')), h('span.faint.small', t('Click a row to see its messages'))),
-          table([[t('Aircraft')], [t('Messages'), 'num'], [t('Last heard')]], a.who.slice(0, 30).map(([name, n, last]) => ({ name, cells: [h('td.mono', name), h('td.num', num(n)), h('td.small.muted', fmtAgo(iso(last)))] })),
+          table([[t('Aircraft')], [t('Messages'), 'num'], [t('Last heard')]], a.who.map(([name, n, last]) => ({ name, cells: [h('td.mono', name), h('td.num', numericCell(n), num(n)), h('td.small.muted', numericCell(last), fmtAgo(iso(last)))] })),
             (r) => toMessages(r.name)())),
         h('section.card', h('div.card-head', h('h2', t('Frequencies'))),
-          table([[t('MHz')], [t('Messages'), 'num'], [t('Share')], [t('Level')]], a.freq.map(([f, n, lvl]) => ({ cells: [h('td.mono', (f / 1e6).toFixed(4)), h('td.num', num(n)),
-            h('td', h('div.chan-bar', h('div', { style: { width: `${Math.max(3, 100 * n / a.freq[0][1])}%` } }))), h('td.small.muted', lvl === null ? '–' : `${lvl} dB`)] }))))));
+          table([[t('MHz')], [t('Messages'), 'num'], [t('Share')], [t('Level')]], a.freq.map(([f, n, lvl]) => ({ cells: [h('td.mono', numericCell(f), (f / 1e6).toFixed(4)), h('td.num', numericCell(n), num(n)),
+            h('td', numericCell(n), h('div.chan-bar', h('div', { style: { width: `${Math.max(3, 100 * n / a.freq[0][1])}%` } }))), h('td.small.muted', numericCell(lvl), lvl === null ? '–' : `${lvl} dB`)] }))))));
       if (a.labels.length) {
         out.push(h('section.card', h('div.card-head', h('h2', t('Message labels')), h('span.faint.small', t('The two-character ACARS label says what kind of message it is'))),
           h('div.row.wrap', a.labels.map(([label, n]) => h('span.chip', `${label} · ${num(n)}`)))));
@@ -133,19 +134,19 @@ export function addonStats({ body, sub, utc }) {
     } else if (id === 'aprs') {
       out.push(h('div.grid.two',
         h('section.card', h('div.card-head', h('h2', t('Stations')), h('span.faint.small', t('Click a row to see its messages'))),
-          table([[t('Station')], [t('Packets'), 'num'], [t('Last heard')]], a.who.slice(0, 30).map(([name, n, last]) => ({ name, cells: [h('td.mono', name), h('td.num', num(n)), h('td.small.muted', fmtAgo(iso(last)))] })),
+          table([[t('Station')], [t('Packets'), 'num'], [t('Last heard')]], a.who.map(([name, n, last]) => ({ name, cells: [h('td.mono', name), h('td.num', numericCell(n), num(n)), h('td.small.muted', numericCell(last), fmtAgo(iso(last)))] })),
             (r) => toMessages(r.name)())),
         h('section.card', h('div.card-head', h('h2', t('Packet types'))),
-          table([[t('Type')], [t('Packets'), 'num']], a.types.map(([ty, n]) => ({ cells: [h('td', ty), h('td.num', num(n))] }))))));
+          table([[t('Type')], [t('Packets'), 'num']], a.types.map(([ty, n]) => ({ cells: [h('td', ty), h('td.num', numericCell(n), num(n))] }))))));
     } else {
       const cat = { thermometer: t('Thermometer'), weather: t('Weather station'), tpms: t('Tyre pressure'), energy: t('Power and energy'), meter: t('Utility meter'),
         security: t('Door, motion or alarm'), remote: t('Remote control'), tank: t('Tank level'), soil: t('Soil'), air: t('Air quality'), lightning: t('Lightning'), other: t('Device') };
       out.push(h('section.card', h('div.card-head', h('h2', t('Devices')), h('span.faint.small', t('Click a row to see its readings'))),
         table([[t('Device')], [t('Kind')], [t('Readings'), 'num'], [t('Main reading: min / average / max')], [t('Battery')], [t('Last heard')]],
-          a.sensors.map((s) => ({ name: s.device, cells: [h('td.mono', s.device), h('td.small.muted', cat[s.category] || ''), h('td.num', num(s.n)),
-            h('td.mono', s.vmin === null ? '–' : `${s.label ? t(s.label) + ': ' : ''}${s.vmin} / ${s.vavg} / ${s.vmax}${s.unit ? ' ' + s.unit : ''}`),
-            h('td', s.batt === null || s.batt === undefined ? '–' : h('span.chip', { class: s.batt ? 'good' : 'warn' }, s.batt ? t('battery OK') : t('battery low'))),
-            h('td.small.muted', fmtAgo(iso(s.last)))] })), (r) => toMessages(r.name)())));
+          a.sensors.map((s) => ({ name: s.device, cells: [h('td.mono', s.device), h('td.small.muted', cat[s.category] || ''), h('td.num', numericCell(s.n), num(s.n)),
+            h('td.mono', numericCell(s.vmin), s.vmin === null ? '–' : `${s.label ? t(s.label) + ': ' : ''}${s.vmin} / ${s.vavg} / ${s.vmax}${s.unit ? ' ' + s.unit : ''}`),
+            h('td', numericCell(s.batt == null ? null : Number(s.batt)), s.batt === null || s.batt === undefined ? '–' : h('span.chip', { class: s.batt ? 'good' : 'warn' }, s.batt ? t('battery OK') : t('battery low'))),
+            h('td.small.muted', numericCell(s.last), fmtAgo(iso(s.last)))] })), (r) => toMessages(r.name)())));
     }
     return out;
   }
@@ -168,6 +169,7 @@ export function addonStats({ body, sub, utc }) {
         : current ? detail(current) : overview(ids)),
       h('p.faint.small', { style: { margin: 0 } }, t('Counts of what was decoded, kept for up to {n} days (the messages themselves for a few days).', { n: 90 }),
         snap.days_available ? ' ' + t('Stored so far: {n} days.', { n: snap.days_available }) : ''));
+    sortTables(body);
   }
 
   async function load() {
