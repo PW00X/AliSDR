@@ -365,7 +365,7 @@ function dtParts(iso) {
 
 export function fmtTime(iso, withSeconds = true) {
   const { d, opts } = dtParts(iso);
-  return d.toLocaleTimeString(lang, { ...opts, hour: '2-digit', minute: '2-digit', second: withSeconds ? '2-digit' : undefined });
+  return d.toLocaleTimeString(lang, { ...opts, hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: withSeconds ? '2-digit' : undefined });
 }
 
 export function fmtDate(iso) {

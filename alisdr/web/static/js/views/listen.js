@@ -2,7 +2,7 @@
 // settings, the scanned bands and the activity feed.
 import { openChannelForFrequency } from './channels.js';
 import { NETWORK, groupDevices, groupOf, groupOfExtra, heldGroups, isTwice, nextGroup, takenByExtra, usableFor } from './dongles.js';
-import { api, confirmDialog, errorToast, fmtChannel, fmtMHz, h, icon, modal, mount, select, seg, slider, t, toast, toggle } from '../core.js';
+import { api, confirmDialog, errorToast, fmtChannel, fmtMHz, fmtTime, h, icon, modal, mount, select, seg, slider, t, toast, toggle } from '../core.js';
 import { BOOST_STEPS_DB, liveAudio } from '../live-audio.js';
 import { S, cfg, confirmRecording, on, patchConfig, setFastPolling, syncConfig } from '../state.js';
 import { NAMES, eventLine, fold, levelControl, passes } from './messages.js';
@@ -537,7 +537,7 @@ export function listenView(root, modes) {
     if (last === lastFeedId) return;
     lastFeedId = last;
     mount(feed, [...S.log].reverse().slice(0, 40).map((e) =>
-      h('div', h('time', new Date(e.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })), h('span', e.text))));
+      h('div', h('time', fmtTime(e.time * 1000)), h('span', e.text))));
   }
 
   // ---------------------------------------------------------- quick settings

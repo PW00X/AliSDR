@@ -189,8 +189,13 @@ export function scheduleView(root) {
       renderList();
     };
     const time = (key) => h('input.time', {
-      type: 'time', value: e[key], 'aria-label': key === 'start' ? t('From') : t('To'),
-      onchange: (ev) => { if (ev.target.value) { e[key] = ev.target.value; save(); renderList(); } },
+      type: 'text', value: e[key], placeholder: 'HH:MM', maxLength: 5, required: true,
+      pattern: '([01][0-9]|2[0-3]):[0-5][0-9]', 'aria-label': key === 'start' ? t('From') : t('To'),
+      onchange: ({ target }) => {
+        target.value = target.value.trim().replace(/^([0-9]):/, '0$1:');
+        if (!target.reportValidity()) { target.value = e[key]; return; }
+        e[key] = target.value; save(); renderList();
+      },
     });
     const clash = sched().entries.filter((o, j) => j !== i && overlaps(e, o) && competes(e, o, Object.fromEntries(addons.map((a) => [a.id, a.receiver]))));
     const channels = S.settings.channels.filter((ch) => ch.enabled).length;
