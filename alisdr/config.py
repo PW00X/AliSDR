@@ -156,7 +156,7 @@ class DeviceConfig:
     # Shared Tune/Scan gain mode: "manual", "auto" (hardware AGC) or "sw_auto".
     gain_mode: str = "auto"
 
-    gain_db: float = 30.0
+    gain_db: float = 20.0
     # DC power on the antenna input for an LNA/active antenna.
     # Off by default; only while scanning - sdr_backend switches it off on close.
     bias_tee: bool = False

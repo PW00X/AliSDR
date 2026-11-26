@@ -1239,7 +1239,13 @@ class Controller:
             for locked in ("paths", "extra_args"):               # a command line: only /api/addons/configure, which checks who asks
                 patch["addons"].pop(locked, None)
         merge_patch(copy.deepcopy(self.config), patch)  # rejects a bad value before anything is applied
-        merge_patch(self.config, patch)
+        with self._start_lock:
+            merge_patch(self.config, patch)
+            device_patch = patch.get("device")
+            if isinstance(device_patch, dict) and _READ_LIVE_DEVICE_KEYS.intersection(device_patch):
+                session = self.manual_session
+                if session and session.fm_scan is None:
+                    session.request_gain(self.config.device.gain_mode, self.config.device.gain_db)
         # An emptied folder field would otherwise mean "the current directory".
         self.config.recording.output_dir = self.config.recording.output_dir.strip() or DEFAULT_RECORDINGS_DIR
         self.config.save()

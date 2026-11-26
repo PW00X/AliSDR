@@ -90,6 +90,20 @@ class ManualSession(threading.Thread):
         self.level = None
         self.gain_range = None
 
+    def request_gain(self, mode, db):
+        # Publish the pair together. Only the tuning thread sends hardware commands.
+        if (mode, db) != (self.device["gain_mode"], self.device["gain_db"]):
+            self.device = {**self.device, "gain_mode": mode, "gain_db": db}
+
+    @staticmethod
+    def _apply_live_gain(acquisition, device):
+        mode = device["gain_mode"]
+        lo, hi = acquisition.gain_range_db
+        gain = max(lo, min(hi, device["gain_db"]))
+        software = SoftwareAgc(gain) if mode == "sw_auto" else None
+        acquisition.set_gain("manual" if software else mode, gain)
+        return gain, software
+
     def _music_text(self, station_id, station, text):
         track = track_label(text)
         if track and self.on_music:
@@ -223,6 +237,13 @@ class ManualSession(threading.Thread):
             current = None
             next_frame = 0
             while not self.stop_requested.is_set():
+                requested = self.device
+                if requested is not dev:
+                    previous_gain = gain_db
+                    dev = requested
+                    gain_db, software_gain = self._apply_live_gain(acquisition, dev)
+                    if current is not None and dev["gain_mode"] != "auto":
+                        demod.notify_rf_gain_change(10 ** ((gain_db - previous_gain) / 20))
                 tuning = self.tuning
                 if tuning != current:
                     current = tuning
@@ -363,12 +384,22 @@ class ManualSession(threading.Thread):
             next_meter = started
             retried = False
             ever_synced = False
+            live_agc = SoftwareAgc(gain) if software_gain else None
             previous_sid = previous_rate = 0
             last_audio = started
             audio_resampler = None
             while not self.stop_requested.is_set():
                 iq = acquisition.read(chunk)
                 now = time.monotonic()
+                requested = self.device
+                if requested is not dev:
+                    dev = requested
+                    gain, live_agc = self._apply_live_gain(acquisition, dev)
+                elif live_agc and iq.size:
+                    step = live_agc.step(float(np.max(np.abs(iq))), acquisition.gain_range_db)
+                    if step is not None:
+                        gain = step
+                        acquisition.set_gain("manual", gain)
                 conditioned = channel.process(iq)
                 if now >= next_meter:
                     self.level = level_dbfs(conditioned)

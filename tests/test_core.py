@@ -3392,7 +3392,7 @@ class ManualTuningTest(unittest.TestCase):
                 super().set_frequency(frequency)
 
             def set_gain(self, mode, gain):
-                events.append(("gain", mode))
+                events.append(("gain", mode, gain))
                 super().set_gain(mode, gain)
 
         class Decoder:
@@ -3452,7 +3452,15 @@ class ManualTuningTest(unittest.TestCase):
                     ("frequency", 223_936_000), ("decoder", 1), ("close", 1),
                     ("frequency", 223_936_000), ("decoder", 2), ("select", sid),
                 ])
-                self.assertIn(("gain", "manual"), events)
+                self.assertTrue(any(e[:2] == ("gain", "manual") for e in events))
+                for mode, db in [("manual", 20), ("manual", 15), ("auto", 15)]:
+                    ctl.patch_config({"device": {"gain_mode": mode, "gain_db": db}})
+                    deadline = time.monotonic() + 2
+                    while ("gain", mode, db) not in events and time.monotonic() < deadline:
+                        time.sleep(.01)
+                    self.assertIn(("gain", mode, db), events)
+                self.assertEqual(ctl.manual_status()["tune_id"], tune_id)
+                self.assertEqual([event for event in events if event[0] != "gain"], transitions)
             finally:
                 ctl.unsubscribe_audio(audio, True)
                 ctl.shutdown()
