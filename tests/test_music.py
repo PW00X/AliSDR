@@ -47,7 +47,10 @@ class MusicHistoryTest(unittest.TestCase):
             self.assertEqual(len(stats.history("Another track")), 1)
             with closing(sqlite3.connect(stats.path)) as db:
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM music_history").fetchone()[0], 51)
+            self.assertEqual(stats.latest_tracks(["0", "1", "unknown"]), {
+                "0": {"track": "Track", "heard": 54}, "1": {"track": "Track", "heard": 53}})
             stats.clear()
+            self.assertEqual(stats.latest_tracks(["0"]), {})
             self.assertEqual(stats.history("track"), [])
 
     def test_monitor_rotates_without_selecting_foreground_or_emitting_audio(self):

@@ -1,4 +1,4 @@
-import { api, errorToast, fmtMHz, h, icon, mount, t, toast, toggle } from '../core.js';
+import { api, errorToast, fmtDateShort, fmtTime, fmtMHz, h, icon, mount, t, toast, toggle } from '../core.js';
 import { liveAudio } from '../live-audio.js';
 import { S, cfg, confirmRecording, on, patchConfig, syncConfig } from '../state.js';
 import { liveListenButton, receiverGainControl, receiverPanel, spectrumPainter } from './listen.js';
@@ -108,6 +108,10 @@ export function manualView(root, modes) {
   let requestedStation = null;
   let stationKey = '';
   let infoKey = '';
+  let latestTracks = {};
+  let trackQuery = '';
+  let nextTrackPoll = 0;
+  const stationId = entry => entry.mode === 'DAB' ? `DAB:${entry.channel}:${entry.id}` : `FM:${entry.frequency_hz}`;
   let latest;
   let favourites = [];
   let receiverKey = '';
@@ -327,7 +331,7 @@ export function manualView(root, modes) {
     }
     stationHeading.textContent = showingFM ? t('FM stations') : t('DAB/DAB+ stations');
     stationEmpty.hidden = saved.length > 0;
-    const nextStationKey = JSON.stringify([found, saved, active, playingStation, liveAudio.playing]);
+    const nextStationKey = JSON.stringify([found, saved, saved.map(entry => latestTracks[stationId(entry)]), active, playingStation, liveAudio.playing]);
     if (nextStationKey !== stationKey) {
       stationKey = nextStationKey;
       const row = (entry, index = -1) => {
@@ -338,12 +342,16 @@ export function manualView(root, modes) {
         const label = entry.name || (dab ? String(entry.id) : formatFM(entry.frequency_hz));
         const sub = dab ? [entry.channel, entry.codec].filter(Boolean).join(' · ')
           : entry.name && formatFM(entry.frequency_hz);
+        const detected = index >= 0 && latestTracks[stationId(entry)];
+        const when = detected && new Date(detected.heard * 1000).toISOString();
         const playing = current && liveAudio.playing;
         return h('li.manual-station', h('button.manual-station-play', {
           type: 'button', 'aria-label': `${playing ? t('Stop listening') : t('Play station')}: ${label}`,
           onclick: () => playEntry(entry, current, index >= 0),
         }, icon(playing ? 'stop' : 'play'), h('span.col', h('strong', label),
-          sub ? h('small.muted', sub) : null)), favouriteButton(entry), index >= 0 ? dragHandle(entry, index) : null);
+          sub ? h('small.muted', sub) : null,
+          detected ? h('small.muted', { title: `${t('Last heard')} · ${fmtDateShort(when)} ${fmtTime(when)}` },
+            t('Last track: {track}', { track: detected.track })) : null)), favouriteButton(entry), index >= 0 ? dragHandle(entry, index) : null);
       };
       mount(favouriteRows, ...saved.map(row));
       mount(stationRows, ...found.map((entry) => row(entry)));
@@ -458,6 +466,17 @@ export function manualView(root, modes) {
         const startedAt = revision;
         const data = await api.get('/api/manual');
         if (!destroyed && !busy && startedAt === revision) render(data);
+        const params = new URLSearchParams();
+        favourites.filter(entry => entry.mode === mode.value).forEach(entry => params.append('station', stationId(entry)));
+        const query = params.toString();
+        if (!destroyed && query && (query !== trackQuery || Date.now() >= nextTrackPoll)) {
+          trackQuery = query;
+          nextTrackPoll = Date.now() + 5000;
+          try {
+            const result = await api.get('/api/music/stats?' + query);
+            if (!destroyed) { latestTracks = result.latest; updateStationCards(); }
+          } catch { /* Retry on the next track poll. */ }
+        }
       }
     } catch (e) {
       if (!destroyed) status.textContent = e.message;

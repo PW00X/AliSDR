@@ -520,7 +520,9 @@ def make_handler(app: App):
                 ctl.clear_music_stats()
                 self._json({"ok": True})
                 return
-            if "track" in query:
+            if "station" in query:
+                self._json({"latest": ctl.music.latest_tracks(query["station"])})
+            elif "track" in query:
                 self._json({"history": ctl.music.history(_qs(query, "track", ""))})
             else:
                 self._json({"tracks": ctl.music.snapshot()})

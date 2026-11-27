@@ -47,6 +47,19 @@ class MusicStats:
     def _has_history(db):
         return db.execute("SELECT 1 FROM sqlite_master WHERE name='music_history'").fetchone()
 
+    def latest_tracks(self, stations):
+        if not stations or not self.path.exists():
+            return {}
+        with closing(sqlite3.connect(self.path)) as db:
+            # One indexed station lookup per favourite; names can change or coincide.
+            result = {}
+            for station in set(stations):
+                row = db.execute("""SELECT track, last_heard FROM music WHERE station_id=?
+                    ORDER BY last_heard DESC, rowid DESC LIMIT 1""", (station,)).fetchone()
+                if row:
+                    result[station] = {"track": row[0], "heard": row[1]}
+            return result
+
     def history(self, track):
         if not self.path.exists():
             return []
