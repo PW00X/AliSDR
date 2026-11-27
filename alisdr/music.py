@@ -21,18 +21,49 @@ class MusicStats:
     def record(self, station_id, station, track, heard):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("BEGIN IMMEDIATE")
             db.execute("""CREATE TABLE IF NOT EXISTS music (
                 station_id TEXT, track_key TEXT, station TEXT, track TEXT,
                 plays INTEGER, last_heard REAL, PRIMARY KEY (station_id, track_key))""")
+            if not self._has_history(db):
+                db.execute("""CREATE TABLE music_history (
+                    id INTEGER PRIMARY KEY, track_key TEXT NOT NULL, station TEXT NOT NULL, heard REAL NOT NULL)""")
+                db.execute("CREATE INDEX music_history_track ON music_history(track_key, heard DESC, id DESC)")
+                # Recover the last known play per station from older installations.
+                db.execute("""INSERT INTO music_history(track_key, station, heard)
+                    SELECT track_key, station, last_heard FROM (
+                        SELECT *, row_number() OVER (PARTITION BY track_key ORDER BY last_heard DESC, station_id) AS n
+                        FROM music) WHERE n <= 50""")
+            key = track.casefold()
+            db.execute("INSERT INTO music_history(track_key, station, heard) VALUES (?, ?, ?)", (key, station, heard))
+            db.execute("""DELETE FROM music_history WHERE id IN
+                (SELECT id FROM music_history WHERE track_key=? ORDER BY heard DESC, id DESC LIMIT -1 OFFSET 50)""", (key,))
             db.execute("""INSERT INTO music VALUES (?, ?, ?, ?, 1, ?)
                 ON CONFLICT(station_id, track_key) DO UPDATE SET
                 station=excluded.station, plays=plays+1, last_heard=excluded.last_heard""",
                 (station_id, track.casefold(), station, track, heard))
 
+    @staticmethod
+    def _has_history(db):
+        return db.execute("SELECT 1 FROM sqlite_master WHERE name='music_history'").fetchone()
+
+    def history(self, track):
+        if not self.path.exists():
+            return []
+        with closing(sqlite3.connect(self.path)) as db:
+            db.row_factory = sqlite3.Row
+            if self._has_history(db):
+                query = "SELECT station, heard FROM music_history WHERE track_key=? ORDER BY heard DESC, id DESC LIMIT 50"
+            else:
+                query = "SELECT station, last_heard AS heard FROM music WHERE track_key=? ORDER BY last_heard DESC, station_id LIMIT 50"
+            return [dict(row) for row in db.execute(query, (track.casefold(),))]
+
     def clear(self):
         if self.path.exists():
             with closing(sqlite3.connect(self.path)) as db, db:
                 db.execute("DELETE FROM music")
+                if self._has_history(db):
+                    db.execute("DELETE FROM music_history")
 
     def snapshot(self):
         if not self.path.exists():

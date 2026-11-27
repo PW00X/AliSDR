@@ -1,5 +1,5 @@
 // "Statistics": what was heard, when and how well.
-import { api, confirmDialog, errorToast, fmtAgo, fmtChannel, fmtDate, fmtTime, fmtDuration, h, mount, prefs, qs, qualityBadge, t, tabs, toggle } from '../core.js';
+import { api, confirmDialog, errorToast, fmtAgo, fmtChannel, fmtDate, fmtTime, fmtDuration, h, modal, mount, prefs, qs, qualityBadge, t, tabs, toggle } from '../core.js';
 import { addonsInUse } from '../state.js';
 import { openChannelForFrequency } from './channels.js';
 import { numericCell, statisticsSorter } from './stats-sort.js';
@@ -47,6 +47,19 @@ export function statsView(root, hash = '') {
       h('div.bars-axis', { style: { gridTemplateColumns: cols } }, labels.map((l, i) => h('span', values.length > 24 && i % 5 ? '' : l))));
   }
 
+  async function showHistory(track) {
+    try {
+      const { history } = await api.get('/api/music/stats' + qs({ track }));
+      const list = h('div.table-wrap', h('table',
+        h('thead', h('tr', h('th', t('Last heard')), h('th', t('Station')))),
+        h('tbody', history.map(play => {
+          const time = new Date(play.heard * 1000).toISOString();
+          return h('tr', h('td', fmtDate(time) + ' ' + fmtTime(time)), h('td', play.station));
+        }))));
+      modal(track, list);
+    } catch (e) { errorToast(e); }
+  }
+
   async function load() {
     if (scope === 'music') {
       try {
@@ -57,7 +70,7 @@ export function statsView(root, hash = '') {
           h('thead', h('tr', [t('Track'), t('Stations'), t('Plays'), t('Last heard')].map(label => h('th', label)))),
           h('tbody', tracks.map(row => {
             const heard = new Date(row.last_heard * 1000).toISOString();
-            return h('tr', h('td', row.track), h('td', row.station), h('td', numericCell(row.plays), row.plays),
+            return h('tr', h('td', h('button.ghost', { onclick: () => showHistory(row.track) }, row.track)), h('td', row.station), h('td', numericCell(row.plays), row.plays),
               h('td', numericCell(row.last_heard), fmtDate(heard) + ' ' + fmtTime(heard)));
           })))) : h('div.empty', t('Tracks appear when a tuned FM or DAB station broadcasts song information.'))));
         sortTables(body);

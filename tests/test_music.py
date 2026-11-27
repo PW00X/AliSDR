@@ -28,3 +28,24 @@ class MusicHistoryTest(unittest.TestCase):
             self.assertEqual(MusicStats(path).snapshot(), [])
             session._music_text("FM:100000000", "FM station", "Artist - New")
             self.assertEqual(stats.snapshot()[0]["plays"], 1)
+
+    def test_history_retention_and_legacy_rows(self):
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            stats = MusicStats(Path(tmp) / "music.sqlite3")
+            stats.record("one", "One", "Track", 0)
+            stats.record("other", "Other", "Another track", 1)
+            with closing(sqlite3.connect(stats.path)) as db, db:
+                db.execute("DROP TABLE music_history")
+            self.assertEqual(stats.history("track"), [{"station": "One", "heard": 0}])
+            for i in range(1, 55):
+                stats.record(str(i % 2), str(i % 2), "Track", i)
+            self.assertEqual(stats.history("TRACK"), [
+                {"station": str(i % 2), "heard": i} for i in range(54, 4, -1)])
+            self.assertEqual(stats.snapshot()[0]["plays"], 55)
+            self.assertEqual(len(stats.history("Another track")), 1)
+            with closing(sqlite3.connect(stats.path)) as db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM music_history").fetchone()[0], 51)
+            stats.clear()
+            self.assertEqual(stats.history("track"), [])

@@ -520,7 +520,10 @@ def make_handler(app: App):
                 ctl.clear_music_stats()
                 self._json({"ok": True})
                 return
-            self._json({"tracks": ctl.music.snapshot()})
+            if "track" in query:
+                self._json({"history": ctl.music.history(_qs(query, "track", ""))})
+            else:
+                self._json({"tracks": ctl.music.snapshot()})
 
         def stats(self, query: dict) -> None:
             self._json(lib.stats(sel=query.get("sel", []), utc=_qs(query, "utc") == "1"))
