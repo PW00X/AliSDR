@@ -49,3 +49,59 @@ class MusicHistoryTest(unittest.TestCase):
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM music_history").fetchone()[0], 51)
             stats.clear()
             self.assertEqual(stats.history("track"), [])
+
+    def test_monitor_rotates_without_selecting_foreground_or_emitting_audio(self):
+        import threading
+        from unittest.mock import patch
+        from alisdr import manual_tuning
+        from alisdr.sdr_backend import SimulatedBackend
+
+        session = ManualSession(Tuning(0, "DAB", 223936000, "12A"),
+                                {"driver": "simulated", "gain_mode": "auto", "gain_db": 20,
+                                 "async_read": False}, False, lambda _: None, lambda *_: None)
+        session.pending_station = 1
+        session.monitor_enabled = lambda: True
+        heard = {}
+        session.on_music = lambda sid, name, track, ts: heard.setdefault(name, []).append(track)
+        selected = []
+        closed = []
+        class FakeDecoder:
+            def __init__(self, library, station, reception, metadata, image=None, *, metadata_only=False):
+                self.background = metadata_only
+                self.metadata = metadata
+                self.sid = 0
+                if not metadata_only:
+                    for sid in range(1, 4):
+                        station(sid, str(sid).encode(), 63)
+
+            def select(self, sid):
+                self.sid = sid
+                if not self.background:
+                    selected.append(sid)
+
+            def push(self, iq):
+                if self.sid:
+                    self.metadata(self.sid, b"Artist - Song")
+                if len(heard) == 3:
+                    session.stop_requested.set()
+
+            def drain_audio(self):
+                assert not self.background
+                return []
+
+            def close(self):
+                closed.append(self.background)
+
+        with patch.object(manual_tuning, "Decoder", FakeDecoder), \
+                patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2048000)), \
+                patch.object(manual_tuning, "DAB_MONITOR_DWELL_S", .1):
+            timer = threading.Timer(4, session.stop_requested.set)
+            timer.start()
+            try:
+                session._dab()
+            finally:
+                timer.cancel()
+        self.assertEqual(selected, [1])
+        self.assertEqual(heard, {str(i): ["Artist - Song"] for i in range(1, 4)})
+        self.assertCountEqual(closed, [True, False])
+

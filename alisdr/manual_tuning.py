@@ -30,6 +30,7 @@ FM_SCAN_SNR_DB = 10
 FM_RDS_DWELL_S = 4
 DAB_DISCOVERY_TIMEOUT = 20
 DAB_RETRY_AFTER_S = 8
+DAB_MONITOR_DWELL_S = 15
 DAB_TUNER_SETTLE_S = 0.35
 DAB_GAIN_SETTLE_S = 5
 ANALOG_MODES = ("AM", "NFM", "WFM", "SSB", "USB", "LSB")
@@ -79,7 +80,9 @@ class ManualSession(threading.Thread):
         self.station_info = {}
         self.station_image = None
         self.on_music = None
-        self._last_track = None
+        self.monitor_enabled = lambda: False
+        self._last_tracks = {}
+        self._music_lock = threading.Lock()
         self.on_broadcast_audio = lambda _pcm: None
         self.fm_scan = None
         self.fm_stations = None
@@ -107,9 +110,10 @@ class ManualSession(threading.Thread):
     def _music_text(self, station_id, station, text):
         track = track_label(text)
         if track and self.on_music:
-            key = (station_id, track.casefold())
-            if key != self._last_track:
-                self._last_track = key
+            with self._music_lock:
+                if self._last_tracks.get(station_id) == track.casefold():
+                    return
+                self._last_tracks[station_id] = track.casefold()
                 self.on_music(station_id, station, track, time.time())
 
     def _update_spectrum(self, freqs, db, _trigger, _custom):
@@ -257,7 +261,7 @@ class ManualSession(threading.Thread):
                     mode = resolve_ssb_sideband(Modulation(tuning.mode), freq)
                     demod = Demodulator(rate, AUDIO_RATE)
                     self.station_info = {}
-                    self._last_track = None
+                    self._last_tracks.clear()
                     previous_text = None
                     fm_audio = None
                     if mode == Modulation.WFM:
@@ -305,7 +309,6 @@ class ManualSession(threading.Thread):
         self.pending_station = 0
         if self.station != sid:
             self.station = sid
-            self._last_track = None
             self.station_info.pop("text", None)
             self.station_image = None
 
@@ -322,6 +325,12 @@ class ManualSession(threading.Thread):
             self.station_info["ensemble" if sid == 0 else "text"] = text
             if sid:
                 self._music_text(f"DAB:{self.tuning.channel}:{sid}", self.stations[sid]["name"], text)
+
+    def _monitor_label(self, sid, label):
+        station = self.stations.get(sid)
+        if station and sid != self.station and label and self.monitor_enabled():
+            self._music_text(f"DAB:{self.tuning.channel}:{sid}", station["name"],
+                             label.decode("utf-8", errors="replace").strip())
 
     def _dab_image(self, sid, data):
         if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -357,7 +366,10 @@ class ManualSession(threading.Thread):
             "manual" if software_gain else dev["gain_mode"], gain,
             bias_tee=bool(dev.get("bias_tee")), async_read=dev["async_read"],
         )
-        acquisition = decoder = None
+        acquisition = decoder = monitor = None
+        monitor_sid = 0
+        next_monitor = 0.0
+        monitor_failed = False
         spectrum = SpectrumWorker(self._update_spectrum)
         try:
             rate = float(getattr(raw, "sample_rate", 0) or SAMPLE_RATE)
@@ -406,6 +418,27 @@ class ManualSession(threading.Thread):
                     spectrum.submit(iq, rate, frequency, 0)
                     next_meter = now + 0.35
                 decoder.push(conditioned)
+                enabled = self.monitor_enabled()
+                if not enabled:
+                    monitor_failed = False
+                if enabled and not monitor_failed and len(self.stations) > 1:
+                    try:
+                        if monitor is None:
+                            monitor = Decoder(self.dab_library, lambda *_: None, lambda *_: None,
+                                              self._monitor_label, metadata_only=True)
+                        if now >= next_monitor or monitor_sid == self.station:
+                            choices = sorted(self.stations.keys() - {self.station})
+                            monitor_sid = next((sid for sid in choices if sid > monitor_sid), choices[0])
+                            monitor.select(monitor_sid)
+                            next_monitor = now + DAB_MONITOR_DWELL_S
+                        monitor.push(conditioned)
+                    except RuntimeError:
+                        _log.exception("DAB music monitoring stopped on %s", self.tuning.channel)
+                        monitor_failed = True
+                if monitor is not None and (not enabled or monitor_failed):
+                    monitor.close()
+                    monitor = None
+                    next_monitor = 0.0
                 ever_synced |= self.synced
                 if self.stations:
                     self.state = "listening"
@@ -477,6 +510,8 @@ class ManualSession(threading.Thread):
                     self.dab_error = tr("The DAB station is selected, but no audio is being decoded.")
         finally:
             spectrum.stop()
+            if monitor is not None:
+                monitor.close()
             if decoder is not None:
                 decoder.close()
             (acquisition if acquisition is not None else raw).close()

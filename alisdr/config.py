@@ -363,6 +363,7 @@ class NotifyConfig:
 
 @dataclass
 class AppConfig:
+    dab_music_monitor: bool = False
     device: DeviceConfig = field(default_factory=DeviceConfig)
     # Bands scanned together with the Memory List: presets, custom ranges and
     # single frequencies (start_hz == stop_hz).

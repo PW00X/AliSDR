@@ -65,7 +65,7 @@ def _coerce(current: Any, value: Any) -> Any:
 # Lists of dataclasses sent whole: field name -> item type.
 _LIST_TYPES = {"bands": VfoRangeConfig, "entries": ScheduleEntry}
 # Settings the engine reads from the config on every tick: changing them needs no new scan plan.
-_READ_LIVE_KEYS = {"trigger_level_dbfs", "squelch_enabled", "squelch_offset_db"}
+_READ_LIVE_KEYS = {"trigger_level_dbfs", "squelch_enabled", "squelch_offset_db", "dab_music_monitor"}
 _READ_LIVE_DEVICE_KEYS = {"gain_mode", "gain_db"}
 _ACTIVE = ("SIGNAL_DETECTED", "LINGER")
 # With several dongles the status shown is the most telling of their states.
@@ -411,6 +411,7 @@ class Controller:
             self._manual_error = ""
             session = ManualSession(tuning, device, self.config.debug_mode, self._publish_manual_audio, self._manual_ended, library)
             session.pending_station = wanted
+            session.monitor_enabled = lambda: self.config.dab_music_monitor
             session.on_music = self._queue_music
             if scan_fm:
                 self._fm_stations = {}

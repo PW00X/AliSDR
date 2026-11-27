@@ -80,10 +80,10 @@ def load_decoder():
 
 
 class Decoder:
-    def __init__(self, library, on_station, on_reception, on_metadata=None, on_image=None):
+    def __init__(self, library, on_station, on_reception, on_metadata=None, on_image=None, *, metadata_only=False):
         self.library = library
         self.audio: Queue = Queue(maxsize=12)
-        self.callbacks = (_STATION(on_station), _AUDIO(self._audio), _RECEPTION(on_reception))
+        self.callbacks = (_STATION(on_station), _AUDIO((lambda *_: None) if metadata_only else self._audio), _RECEPTION(on_reception))
         self.handle = library.falcon_dab_open(*self.callbacks)
         if not self.handle:
             raise RuntimeError(tr("The DAB decoder could not start."))

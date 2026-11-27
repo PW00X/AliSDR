@@ -1,6 +1,6 @@
 import { api, errorToast, fmtMHz, h, icon, mount, t, toast, toggle } from '../core.js';
 import { liveAudio } from '../live-audio.js';
-import { S, cfg, confirmRecording, on, syncConfig } from '../state.js';
+import { S, cfg, confirmRecording, on, patchConfig, syncConfig } from '../state.js';
 import { liveListenButton, receiverGainControl, receiverPanel, spectrumPainter } from './listen.js';
 
 const analogModes = ['AM', 'NFM', 'WFM', 'SSB', 'USB', 'LSB'];
@@ -83,9 +83,11 @@ export function manualView(root, modes) {
     showUnnamedFm = checked;
     updateStationCards();
   });
+  const monitor = toggle(t('Monitor DAB stations for track information'), cfg().dab_music_monitor,
+    checked => patchConfig({ dab_music_monitor: checked }));
   const noFmStations = h('p.muted', { hidden: true }, t('No FM stations found.'));
   const stations = h('section.card.col', { hidden: true },
-    h('div.card-head.row.wrap', stationHeading, unnamedFmToggle), stationRows, noFmStations);
+    h('div.card-head.row.wrap', stationHeading, monitor, unnamedFmToggle), stationRows, noFmStations);
   const stationInfo = h('div.col');
   const infoHeading = h('h2.manual-station-heading', { id: 'manual-station-title', hidden: true }, t('Station information'));
   const info = h('section.col', { hidden: true, 'aria-labelledby': 'manual-station-title' }, stationInfo);
@@ -314,7 +316,9 @@ export function manualView(root, modes) {
         .map((entry) => ({ ...entry, mode: 'WFM' })) : [];
     const saved = favourites.filter((entry) => entry.mode === mode.value);
     favouritesCard.hidden = !showingDab && !showingFM;
-    stations.hidden = !found.length && !(fmResults && (latest.fm_stations.length || !latest.fm_scan));
+    monitor.hidden = !showingDab;
+    monitor.querySelector('input').checked = cfg().dab_music_monitor;
+    stations.hidden = !showingDab && !found.length && !(fmResults && (latest.fm_stations.length || !latest.fm_scan));
     unnamedFmToggle.hidden = !fmResults;
     noFmStations.hidden = !fmResults || Boolean(latest.fm_scan) || found.length > 0;
     if (!noFmStations.hidden) {

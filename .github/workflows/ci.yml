@@ -21,7 +21,7 @@ jobs:
       - run: cargo test --locked --manifest-path tetra-rs/Cargo.toml
       - run: cargo build --locked --release --manifest-path tetra-rs/Cargo.toml
       - run: python -m compileall -q main.py alisdr tests
-      - run: python -m unittest tests/test_core.py tests/test_addons.py -v
+      - run: python -m unittest tests/test_core.py tests/test_addons.py tests/test_music.py -v
       - if: runner.os == 'Linux'
         run: for f in alisdr/web/static/js/*.js alisdr/web/static/js/views/*.js; do node --check "$f"; done
       - if: runner.os == 'Linux'
