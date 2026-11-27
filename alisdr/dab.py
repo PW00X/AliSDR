@@ -70,6 +70,9 @@ def load_decoder():
         if hasattr(library, "falcon_dab_set_metadata"):
             library.falcon_dab_set_metadata.argtypes = [C.c_void_p, _METADATA]
             library.falcon_dab_set_metadata.restype = None
+        if hasattr(library, "alisdr_dab_monitor"):
+            library.alisdr_dab_monitor.argtypes = [C.c_void_p, C.c_uint32]
+            library.alisdr_dab_monitor.restype = None
         if hasattr(library, "falcon_dab_set_image"):
             library.falcon_dab_set_image.argtypes = [C.c_void_p, _IMAGE]
             library.falcon_dab_set_image.restype = None
@@ -114,6 +117,12 @@ class Decoder:
                 yield self.audio.get_nowait()
             except Empty:
                 return
+
+    def monitor(self, sid):
+        setter = getattr(self.library, "alisdr_dab_monitor", None)
+        if setter:
+            setter(self.handle, sid)
+        return setter is not None
 
     def select(self, sid):
         self.library.falcon_dab_select(self.handle, sid)

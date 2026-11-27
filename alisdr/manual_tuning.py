@@ -320,7 +320,10 @@ class ManualSession(threading.Thread):
         self.synced = synced
 
     def _dab_metadata(self, sid, label):
-        if label and (sid == 0 or sid == self.station):
+        if sid and sid != self.station:
+            self._monitor_label(sid, label)
+            return
+        if label:
             text = label.decode("utf-8", errors="replace").strip()
             self.station_info["ensemble" if sid == 0 else "text"] = text
             if sid:
@@ -366,7 +369,7 @@ class ManualSession(threading.Thread):
             "manual" if software_gain else dev["gain_mode"], gain,
             bias_tee=bool(dev.get("bias_tee")), async_read=dev["async_read"],
         )
-        acquisition = decoder = monitor = None
+        acquisition = decoder = None
         monitor_sid = 0
         next_monitor = 0.0
         monitor_failed = False
@@ -419,26 +422,19 @@ class ManualSession(threading.Thread):
                     next_meter = now + 0.35
                 decoder.push(conditioned)
                 enabled = self.monitor_enabled()
-                if not enabled:
-                    monitor_failed = False
                 if enabled and not monitor_failed and len(self.stations) > 1:
-                    try:
-                        if monitor is None:
-                            monitor = Decoder(self.dab_library, lambda *_: None, lambda *_: None,
-                                              self._monitor_label, metadata_only=True)
-                        if now >= next_monitor or monitor_sid == self.station:
-                            choices = sorted(self.stations.keys() - {self.station})
-                            monitor_sid = next((sid for sid in choices if sid > monitor_sid), choices[0])
-                            monitor.select(monitor_sid)
-                            next_monitor = now + DAB_MONITOR_DWELL_S
-                        monitor.push(conditioned)
-                    except RuntimeError:
-                        _log.exception("DAB music monitoring stopped on %s", self.tuning.channel)
-                        monitor_failed = True
-                if monitor is not None and (not enabled or monitor_failed):
-                    monitor.close()
-                    monitor = None
+                    if now >= next_monitor or monitor_sid == self.station:
+                        choices = sorted(self.stations.keys() - {self.station})
+                        monitor_sid = next((sid for sid in choices if sid > monitor_sid), choices[0])
+                        monitor_failed = not decoder.monitor(monitor_sid)
+                        if monitor_failed:
+                            _log.warning("Update the native DAB library to enable shared music monitoring")
+                        next_monitor = now + DAB_MONITOR_DWELL_S
+                elif not enabled and monitor_sid:
+                    decoder.monitor(0)
+                    monitor_sid = 0
                     next_monitor = 0.0
+                    monitor_failed = False
                 ever_synced |= self.synced
                 if self.stations:
                     self.state = "listening"
@@ -510,8 +506,6 @@ class ManualSession(threading.Thread):
                     self.dab_error = tr("The DAB station is selected, but no audio is being decoded.")
         finally:
             spectrum.stop()
-            if monitor is not None:
-                monitor.close()
             if decoder is not None:
                 decoder.close()
             (acquisition if acquisition is not None else raw).close()

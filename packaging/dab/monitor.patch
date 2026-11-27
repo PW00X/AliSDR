@@ -1,0 +1,132 @@
+--- a/dab-api.h
++++ b/dab-api.h
+@@ -245,4 +245,5 @@
+ //	for handling the audiodata as described in the parameter
+ //	to the list of active handlers
++void DAB_API set_monitorChannel(void *, audiodata *, API_struct *, void *);
+ void DAB_API	set_audioChannel	(void *, audiodata &);
+ //
+--- a/library/dab-api.cpp
++++ b/library/dab-api.cpp
+@@ -79,4 +79,8 @@
+ }
+ 
++void set_monitorChannel(void *handle, audiodata *data, API_struct *api, void *ctx) {
++    static_cast<dabProcessor *>(handle)->set_monitorChannel(data, api, ctx);
++}
++
+ void    set_audioChannel        (void *Handle, audiodata &ad) {
+ 	((dabProcessor *)Handle) -> set_audioChannel (ad);
+--- a/library/includes/dab-processor.h
++++ b/library/includes/dab-processor.h
+@@ -69,5 +69,6 @@
+ 	int32_t		get_SId			(const std::string &s);
+ 	std::string	get_serviceName		(int32_t);
+-	void		set_audioChannel        (audiodata &);
++	void set_monitorChannel(audiodata *data, API_struct *api, void *ctx) { my_mscHandler.set_monitorChannel(data, api, ctx); }
++        void set_audioChannel(audiodata &);
+ 	void		set_dataChannel         (packetdata &);
+ 	void		reset_msc		();
+--- a/library/includes/backend/msc-handler.h
++++ b/library/includes/backend/msc-handler.h
+@@ -50,4 +50,5 @@
+ 		~mscHandler		();
+ 	void	process_mscBlock	(std::vector<int16_t> &, int16_t);
++    void set_monitorChannel(audiodata *, API_struct *, void *);
+ 	void	set_audioChannel	(audiodata	&);
+ 	void	set_dataChannel		(packetdata     &);
+@@ -56,4 +57,5 @@
+ 	void	start			();
+ private:
++    virtualBackend *monitor = nullptr;
+ 	API_struct	*p;
+ 	dabParams	params;
+--- a/library/src/backend/msc-handler.cpp
++++ b/library/src/backend/msc-handler.cpp
+@@ -74,4 +74,5 @@
+ 	}
+ 
++    if (monitor) { monitor->stopRunning(); delete monitor; monitor = nullptr; }
+ 	theBackends. resize (0);
+ 	work_to_do. store (false);
+@@ -96,4 +97,11 @@
+ //	the actual changing of the settings is done in the
+ //	thread executing process_mscBlock
++void mscHandler::set_monitorChannel(audiodata *data, API_struct *api, void *ctx) {
++    std::lock_guard<std::mutex> guard(locker);
++    if (monitor) { monitor->stopRunning(); delete monitor; monitor = nullptr; }
++    if (data) monitor = new audioBackend(data, api, ctx);
++    if (monitor) work_to_do.store(true);
++}
++
+ void	mscHandler::set_audioChannel (audiodata &d) {
+ 	locker. lock ();
+@@ -143,4 +151,5 @@
+ 	   }
+ 	}
++	if (monitor) monitor->process(&cifVector[monitor->startAddr() * CUSize], monitor->Length() * CUSize);
+ 	locker. unlock ();
+ }
+--- a/library/includes/backend/audio-backend.h
++++ b/library/includes/backend/audio-backend.h
+@@ -54,4 +54,5 @@
+ 	int16_t		fragmentSize;
+ 	int16_t		bitRate;
++    bool metadataOnly;
+ 	bool		shortForm;
+ 	int16_t		protLevel;
+--- a/library/src/backend/audio-backend.cpp
++++ b/library/src/backend/audio-backend.cpp
+@@ -47,4 +47,5 @@
+ int32_t i, j;
+ 
++    metadataOnly = p->audioOut_Handler == nullptr;
+ 	this    -> dabModus             = d -> ASCTy == 077 ? DAB_PLUS : DAB;
+ 	this    -> fragmentSize         = d -> length * CUSize;
+@@ -104,7 +105,8 @@
+ 	if (running. load ()) {
+ 	   running. store (false);
++           usedSlots.Release();
+ 	   threadHandle. join ();
+ 	}
+-//	delete our_backendBase;
++	delete our_backendBase;
+ 	delete protectionHandler;
+ 	for (i = 0; i < 16; i ++) 
+@@ -125,5 +127,6 @@
+ 	if (!running. load ())
+ 	   return 0;
+-	while (!freeSlots. tryAcquire (200))
++    if (metadataOnly && !freeSlots.tryAcquire(0)) return 0;
++	while (!metadataOnly && !freeSlots. tryAcquire (200))
+ 	   if (!running. load ())
+ 	      return 0;
+@@ -171,5 +174,5 @@
+               if (!running. load ())
+                  return;
+-           processSegment (theData [nextOut]);
++           if (running.load()) processSegment (theData [nextOut]);
+         }
+ }
+@@ -180,4 +183,5 @@
+ 	if (running. load ()) {
+ 	   running. store (false);
++           usedSlots.Release();
+ 	   threadHandle. join ();
+ 	}
+--- a/library/src/backend/audio/mp4processor.cpp
++++ b/library/src/backend/audio/mp4processor.cpp
+@@ -314,4 +314,5 @@
+                  my_padHandler. processPAD (buffer, count - 3, L1, L0);
+               }
++              if (soundOut == nullptr) continue; // PAD was already decoded.
+ #ifdef	AAC_OUT
+ 	      std::vector<uint8_t> fileBuffer;
+--- a/library/src/backend/audio/mp2processor.cpp
++++ b/library/src/backend/audio/mp2processor.cpp
+@@ -597,4 +597,5 @@
+         }
+ 
++        if (soundOut == nullptr) return; // Only PAD is requested.
+ 	for (i = 0; i < amount; i ++) {
+ 	   if (MP2Header_OK == 2) {

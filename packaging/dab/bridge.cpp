@@ -20,6 +20,8 @@ struct Receiver final : deviceHandler {
     std::atomic<uint32_t> selected{0};
     std::atomic<Metadata> metadata{nullptr};
     std::atomic<Image> image{nullptr};
+    API_struct monitor_api{};
+    std::atomic<uint32_t> monitor_requested{0}, monitored{0};
     std::string ensemble;
     Station station;
     Audio audio;
@@ -61,6 +63,15 @@ struct Receiver final : deviceHandler {
                 self.audio(samples, count, rate);
         };
         api.programdata_Handler = [](audiodata *, void *) {};
+        monitor_api = api;
+        monitor_api.audioOut_Handler = nullptr;
+        monitor_api.motdata_Handler = nullptr;
+        monitor_api.dataOut_Handler = [](const char *label, void *ctx) {
+            auto &self = *static_cast<Receiver *>(ctx);
+            auto sid = self.monitored.load();
+            if (sid && sid == self.monitor_requested.load() && sid != self.requested.load())
+                if (auto cb = self.metadata.load()) cb(sid, label);
+        };
         decoder = dabInit(this, &api, nullptr, nullptr, this);
     }
 
@@ -75,6 +86,11 @@ struct Receiver final : deviceHandler {
         if (!ensemble.empty())
             if (auto callback = metadata.load()) callback(0, ensemble.c_str());
         const auto wanted = requested.load();
+        const auto other = monitor_requested.load();
+        if (monitored.load() && (monitored.load() != other || other == wanted)) {
+            monitored.store(0);
+            set_monitorChannel(decoder, nullptr, &monitor_api, this);
+        }
         for (const auto &entry : names) {
             if (!is_audioService(decoder, entry.second))
                 continue;
@@ -88,9 +104,13 @@ struct Receiver final : deviceHandler {
             }
             if (wanted == entry.first && wanted != selected.load()) {
                 selected.store(0);
+                monitored.store(0);
                 dabReset_msc(decoder);
                 set_audioChannel(decoder, data);
                 selected.store(wanted);
+            } else if (entry.first == other && other != wanted && monitored.load() != other) {
+                set_monitorChannel(decoder, &data, &monitor_api, this);
+                monitored.store(other);
             }
         }
     }
@@ -110,6 +130,10 @@ DAB_API void falcon_dab_close(void *handle) { delete static_cast<Receiver *>(han
 
 DAB_API int falcon_dab_push(void *handle, const void *samples, int count) {
     return static_cast<Receiver *>(handle)->iq.putDataIntoBuffer(samples, count);
+}
+
+DAB_API void alisdr_dab_monitor(void *handle, uint32_t sid) {
+    static_cast<Receiver *>(handle)->monitor_requested.store(sid);
 }
 
 DAB_API void falcon_dab_select(void *handle, uint32_t sid) {

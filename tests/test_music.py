@@ -79,7 +79,13 @@ class MusicHistoryTest(unittest.TestCase):
                 if not self.background:
                     selected.append(sid)
 
+            def monitor(self, sid):
+                self.other = sid
+                return True
+
             def push(self, iq):
+                if getattr(self, "other", 0):
+                    self.metadata(self.other, b"Artist - Song")
                 if self.sid:
                     self.metadata(self.sid, b"Artist - Song")
                 if len(heard) == 3:
@@ -103,5 +109,5 @@ class MusicHistoryTest(unittest.TestCase):
                 timer.cancel()
         self.assertEqual(selected, [1])
         self.assertEqual(heard, {str(i): ["Artist - Song"] for i in range(1, 4)})
-        self.assertCountEqual(closed, [True, False])
+        self.assertEqual(closed, [False])
 

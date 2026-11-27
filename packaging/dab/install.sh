@@ -6,7 +6,7 @@ src=$(CDPATH= cd "$(dirname "$0")" && pwd)
 dest="$1"
 commit=8b8230526a68d9ec52911dae0bd455cf1bb2fbad
 archive_hash=4a8e2ef4cd8caf80cceba80208f956c87eff6542d59c830bbaf93c9660929ac9
-stamp=$(cat "$src/install.sh" "$src/bridge.cpp" "$src/upstream-fixes.patch" | sha256sum | cut -d' ' -f1)
+stamp=$(cat "$src/install.sh" "$src/bridge.cpp" "$src/upstream-fixes.patch" "$src/monitor.patch" | sha256sum | cut -d' ' -f1)
 if [ -s "$dest/libalisdr_dab.so" ] && [ "$(cat "$dest/alisdr-dab.sha256" 2>/dev/null || true)" = "$stamp" ]; then
     exit 0
 fi
@@ -23,6 +23,7 @@ printf '%s  %s\n' "$archive_hash" "$tmp/source.tar.gz" | sha256sum -c -
 tar -xzf "$tmp/source.tar.gz" -C "$tmp"
 upstream="$tmp/dab-cmdline-$commit"
 git -C "$upstream" apply --unidiff-zero "$src/upstream-fixes.patch"
+git -C "$upstream" apply "$src/monitor.patch"
 cp "$src/bridge.cpp" "$upstream/library/alisdr-bridge.cpp"
 cat >> "$upstream/library/CMakeLists.txt" <<'EOF'
 
