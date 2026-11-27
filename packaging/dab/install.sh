@@ -23,6 +23,7 @@ printf '%s  %s\n' "$archive_hash" "$tmp/source.tar.gz" | sha256sum -c -
 tar -xzf "$tmp/source.tar.gz" -C "$tmp"
 upstream="$tmp/dab-cmdline-$commit"
 git -C "$upstream" apply --unidiff-zero "$src/upstream-fixes.patch"
+sed -i 's/\r$//' "$upstream/library/src/backend/audio/mp2processor.cpp"
 git -C "$upstream" apply "$src/monitor.patch"
 cp "$src/bridge.cpp" "$upstream/library/alisdr-bridge.cpp"
 cat >> "$upstream/library/CMakeLists.txt" <<'EOF'
