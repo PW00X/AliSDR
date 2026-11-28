@@ -363,7 +363,7 @@ class NotifyConfig:
 
 @dataclass
 class AppConfig:
-    dab_music_monitor: bool = False
+    dab_music_monitor: bool = True
     device: DeviceConfig = field(default_factory=DeviceConfig)
     # Bands scanned together with the Memory List: presets, custom ranges and
     # single frequencies (start_hz == stop_hz).
@@ -454,6 +454,7 @@ class AppConfig:
             memory_channel_bandwidth_hz=raw.get("memory_channel_bandwidth_hz", 12_500),
             channel_folders=list(raw.get("channel_folders", [])),
             manual_favourites=raw["manual_favourites"] if isinstance(raw.get("manual_favourites"), list) else [],
+            dab_music_monitor=raw.get("dab_music_monitor", True),
             memory_list_enabled=raw.get("memory_list_enabled", True),
             language=raw.get("language", "auto"),
             legal_disclaimer=_from_dict(LegalDisclaimerConfig, raw.get("legal_disclaimer", {})),
