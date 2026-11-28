@@ -5,6 +5,7 @@ from contextlib import closing
 
 from .config import CONFIG_DIR
 
+SIMULCAST_WINDOW_S = 60
 
 def track_label(text):
     text = " ".join(text.split())
@@ -24,9 +25,14 @@ class MusicStats:
             db.execute("BEGIN IMMEDIATE")
             db.execute("""CREATE TABLE IF NOT EXISTS music (
                 station_id TEXT, track_key TEXT, station TEXT, track TEXT,
-                plays INTEGER, last_heard REAL, last_seen REAL, PRIMARY KEY (station_id, track_key))""")
-            if "last_seen" not in {col[1] for col in db.execute("PRAGMA table_info(music)")}:
+                plays INTEGER, last_heard REAL, last_seen REAL, last_counted REAL, PRIMARY KEY (station_id, track_key))""")
+            columns = {col[1] for col in db.execute("PRAGMA table_info(music)")}
+            if "last_seen" not in columns:
                 db.execute("ALTER TABLE music ADD COLUMN last_seen REAL")
+            if "last_counted" not in columns:
+                db.execute("ALTER TABLE music ADD COLUMN last_counted REAL")
+                db.execute("UPDATE music SET last_counted=last_heard")
+            db.execute("CREATE INDEX IF NOT EXISTS music_counted ON music(track_key, last_counted)")
             if not self._has_history(db):
                 db.execute("""CREATE TABLE music_history (
                     id INTEGER PRIMARY KEY, track_key TEXT NOT NULL, station TEXT NOT NULL, heard REAL NOT NULL)""")
@@ -43,14 +49,20 @@ class MusicStats:
                 (heard, station_id, key, heard - 30 * 60))
             if repeat.rowcount:
                 return
+            # Anchor the window to the counted play. Delayed detections on
+            # successive stations must not keep extending the same play.
+            simulcast = db.execute("""SELECT 1 FROM music WHERE track_key=? AND station_id<>?
+                AND last_counted BETWEEN ? AND ? LIMIT 1""",
+                (key, station_id, heard - SIMULCAST_WINDOW_S, heard + SIMULCAST_WINDOW_S)).fetchone()
             db.execute("INSERT INTO music_history(track_key, station, heard) VALUES (?, ?, ?)", (key, station, heard))
             db.execute("""DELETE FROM music_history WHERE id IN
                 (SELECT id FROM music_history WHERE track_key=? ORDER BY heard DESC, id DESC LIMIT -1 OFFSET 50)""", (key,))
-            db.execute("""INSERT INTO music (station_id, track_key, station, track, plays, last_heard, last_seen)
-                VALUES (?, ?, ?, ?, 1, ?, ?)
+            db.execute("""INSERT INTO music (station_id, track_key, station, track, plays, last_heard, last_seen, last_counted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(station_id, track_key) DO UPDATE SET
-                station=excluded.station, plays=plays+1, last_heard=excluded.last_heard, last_seen=excluded.last_seen""",
-                (station_id, key, station, track, heard, heard))
+                station=excluded.station, plays=plays+excluded.plays, last_heard=excluded.last_heard,
+                last_seen=excluded.last_seen, last_counted=COALESCE(excluded.last_counted, music.last_counted)""",
+                (station_id, key, station, track, int(not simulcast), heard, heard, None if simulcast else heard))
 
     @staticmethod
     def _has_history(db):

@@ -351,6 +351,7 @@ class Controller:
         if scan_fm:
             body = {**body, "mode": "WFM", "frequency_hz": FM_FREQUENCIES[0]}
         tuning = Tuning.from_request(body)
+        favourites = self._music_station_ids(body.get("favourites", self.config.manual_favourites))
         rediscover = body.get("rediscover", False)
         wanted = body.get("station", 0)
         if type(rediscover) is not bool or (rediscover and (tuning.mode != "DAB" or wanted)):
@@ -376,6 +377,7 @@ class Controller:
             can_reuse = (old is not None and old.is_alive() and not old.stop_requested.is_set()
                          and old.device == device and old.fm_scan is None and not scan_fm)
             if can_reuse and old.tuning == tuning and not rediscover:
+                old.set_music_favourites(favourites)
                 if wanted:
                     if old.station != wanted:
                         self._stop_manual_recording()
@@ -383,6 +385,7 @@ class Controller:
                 return
             same_receiver = old is not None and old.tuning.receiver == k
             if can_reuse and same_receiver and tuning.mode != "DAB" and old.tuning.mode != "DAB":
+                old.set_music_favourites(favourites)
                 if "WFM" in (old.tuning.mode, tuning.mode):
                     self._stop_manual_recording()
                 old.state = "starting"
@@ -411,6 +414,7 @@ class Controller:
             self._manual_error = ""
             session = ManualSession(tuning, device, self.config.debug_mode, self._publish_manual_audio, self._manual_ended, library)
             session.pending_station = wanted
+            session.set_music_favourites(favourites)
             session.monitor_enabled = lambda: self.config.dab_music_monitor
             session.on_music = self._queue_music
             if scan_fm:
@@ -538,7 +542,7 @@ class Controller:
             except OSError as exc:
                 self._manual_recording_failed(recording.recorder, exc)
 
-    def select_dab_station(self, sid: int, channel: str | None = None, tune_id: str | None = None) -> None:
+    def select_dab_station(self, sid: int, channel: str | None = None, tune_id: str | None = None, favourites=None) -> None:
         if type(sid) is not int:
             raise ValueError("Invalid DAB service ID")
         with self._start_lock:
@@ -551,9 +555,24 @@ class Controller:
             if sid in session.stations and session.station != sid:
                 self._stop_manual_recording()
             session.select_station(sid)
+            if favourites is not None:
+                session.set_music_favourites(self._music_station_ids(favourites))
 
-    def _manual_favourites(self) -> list[dict]:
-        return [entry for entry in self.config.manual_favourites if isinstance(entry, dict)
+    def set_manual_music_favourites(self, tune_id, entries):
+        with self._start_lock:
+            session = self.manual_session
+            if session and session.tune_id == tune_id:
+                session.set_music_favourites(self._music_station_ids(entries))
+
+    def _music_station_ids(self, entries):
+        return {f"DAB:{e['channel']}:{e['id']}" if e["mode"] == "DAB" else f"FM:{e['frequency_hz']}"
+                for e in self._manual_favourites(entries)}
+
+    def _manual_favourites(self, entries=None) -> list[dict]:
+        entries = self.config.manual_favourites if entries is None else entries
+        if not isinstance(entries, list):
+            return []
+        return [entry for entry in entries if isinstance(entry, dict)
                 and isinstance(entry.get("name"), str) and (
                     entry.get("mode") == "DAB" and entry.get("channel") in DAB_CHANNELS
                     and type(entry.get("id")) is int

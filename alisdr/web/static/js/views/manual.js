@@ -83,7 +83,7 @@ export function manualView(root, modes) {
     showUnnamedFm = checked;
     updateStationCards();
   });
-  const monitor = toggle(t('Monitor DAB stations for track information'), cfg().dab_music_monitor,
+  const monitor = toggle(t('Monitor favourite DAB stations for track information'), cfg().dab_music_monitor,
     checked => patchConfig({ dab_music_monitor: checked }));
   const noFmStations = h('p.muted', { hidden: true }, t('No FM stations found.'));
   const stations = h('section.card.col', { hidden: true },
@@ -150,13 +150,14 @@ export function manualView(root, modes) {
     const label = saved ? t('Remove from favourites') : t('Add to favourites');
     return h('button.manual-star', {
       type: 'button', title: label, 'aria-label': label, 'aria-pressed': String(saved),
-      onclick: () => {
+      onclick: async () => {
         const entries = (readFavourites() ?? favourites).filter((fav) => !matches(entry, fav));
         if (!saved) entries.push(entry);
         try {
           writeFavourites(entries);
           favourites = entries;
           updateStationCards();
+          if (latest?.tune_id) await api.post('/api/manual/music-favourites', { tune_id: latest.tune_id, favourites: entries });
         } catch (e) { errorToast(e); }
       },
     }, saved ? '★' : '☆');
@@ -169,7 +170,9 @@ export function manualView(root, modes) {
   const playDab = async (request) => {
     if (destroyed || requestedStation !== request) return;
     const { entry, prepared, tuneId } = request;
-    const result = await change('/api/manual/dab-station', { sid: entry.id, channel: entry.channel, tune_id: tuneId });
+    const result = await change('/api/manual/dab-station', {
+      sid: entry.id, channel: entry.channel, tune_id: tuneId, favourites: readFavourites() ?? favourites,
+    });
     if (requestedStation !== request) return;
     if (!result) {
       cancelDab();
@@ -492,6 +495,7 @@ export function manualView(root, modes) {
     updateControls();
     try {
       if (path === '/api/manual/tune' || path === '/api/manual/fm-scan') {
+        body = { ...body, favourites: readFavourites() ?? favourites };
         if ([...(S.live?.addons || []), ...(S.live?.idle_decoders || [])]
           .some(a => a.id === 'vdl2' && a.receiver === (body.receiver ?? 0))) toast(t('VDL2 scan stopping'));
         await syncConfig();

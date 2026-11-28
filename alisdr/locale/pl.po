@@ -3437,8 +3437,8 @@ msgstr "Dotąd zapisano: {n} dni."
 msgid "Click to see its messages"
 msgstr "Kliknij, żeby zobaczyć jego wiadomości"
 
-msgid "Monitor DAB stations for track information"
-msgstr "Monitoruj stacje DAB, aby zbierać informacje o utworach"
+msgid "Monitor favourite DAB stations for track information"
+msgstr "Monitoruj ulubione stacje DAB, aby zbierać informacje o utworach"
 
 msgid "({seconds}s)"
 msgstr "({seconds}s)"

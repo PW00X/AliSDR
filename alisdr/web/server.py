@@ -348,9 +348,12 @@ def make_handler(app: App):
                 ctl.tune_manual(self._body(), scan_fm=True)
             elif path == "/api/manual/dab-station":
                 body = self._body()
-                ctl.select_dab_station(body.get("sid"), body.get("channel"), body.get("tune_id"))
+                ctl.select_dab_station(body.get("sid"), body.get("channel"), body.get("tune_id"), body.get("favourites"))
             elif path == "/api/manual/record":
                 ctl.record_manual(self._body().get("enabled"))
+            elif path == "/api/manual/music-favourites":
+                body = self._body()
+                ctl.set_manual_music_favourites(body.get("tune_id"), body.get("favourites", []))
             elif path == "/api/manual/stop":
                 self._body()
                 ctl.stop_manual()
@@ -780,6 +783,7 @@ def make_handler(app: App):
         ("GET", "/api/audio"): Handler.audio,
         ("GET", "/api/manual"): Handler.manual,
         ("POST", "/api/manual/tune"): Handler.manual,
+        ("POST", "/api/manual/music-favourites"): Handler.manual,
         ("POST", "/api/manual/record"): Handler.manual,
         ("POST", "/api/manual/stop"): Handler.manual,
         ("POST", "/api/manual/fm-scan"): Handler.manual,

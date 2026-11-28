@@ -16,6 +16,7 @@ class MusicHistoryTest(unittest.TestCase):
             self.assertEqual(stats.snapshot(), [])
             session = ManualSession(Tuning(0, "DAB", 223936000, "12A"), {}, False, None, None)
             session.on_music = stats.record
+            session.set_music_favourites({"FM:100000000", "DAB:12A:1"})
             session._dab_station(1, b"StuBru", 63)
             session.select_station(1)
             for sid, text in [(0, "Ensemble"), (2, "Other - Service"), (1, "Station slogan"),
@@ -28,7 +29,7 @@ class MusicHistoryTest(unittest.TestCase):
             clock.return_value += 3
             session._confirm_music({"FM:100000000"})
             counts = {(r["station"], r["track"]): r["plays"] for r in MusicStats(path).snapshot()}
-            self.assertEqual(counts, {("FM station, StuBru", "Artist - First"): 2,
+            self.assertEqual(counts, {("FM station, StuBru", "Artist - First"): 1,
                                       ("StuBru", "Artist - Second"): 1})
             stats.clear()
             self.assertEqual(MusicStats(path).snapshot(), [])
@@ -42,6 +43,7 @@ class MusicHistoryTest(unittest.TestCase):
 
         session = ManualSession(Tuning(0, "WFM"), {}, False, None, None)
         heard = []
+        session.set_music_favourites({"fm", "dab"})
         session.on_music = lambda sid, name, track, ts: heard.append((sid, track))
         with patch("alisdr.manual_tuning.time.monotonic") as clock:
             clock.return_value = 0
@@ -58,8 +60,11 @@ class MusicHistoryTest(unittest.TestCase):
             session._confirm_music({"fm"})
             session._music_text("fm", "FM", "Band - Noise")
             session._music_text("fm", "FM", "")
+            session._music_text("dab", "DAB", "Artist - Removed")
+            session.set_music_favourites({"fm"})
+            session._music_text("dab", "DAB", "Artist - Removed")
             clock.return_value = 20
-            session._confirm_music({"fm"})
+            session._confirm_music({"fm", "dab"})
             self.assertEqual(heard, [("fm", "Band - Song")])
 
     def test_history_retention_and_legacy_rows(self):
@@ -86,6 +91,15 @@ class MusicHistoryTest(unittest.TestCase):
             self.assertEqual(stats.latest_tracks(["0"]), {})
             self.assertEqual(stats.history("track"), [])
 
+    def test_simulcast_is_logged_for_each_station_but_counts_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stats = MusicStats(Path(tmp) / "music.sqlite3")
+            for sid, heard in [("a", 100), ("b", 160), ("c", 161)]:
+                stats.record(sid, sid.upper(), "Artist - Song", heard)
+            self.assertEqual(stats.snapshot()[0]["plays"], 2)
+            self.assertEqual(len(stats.history("Artist - Song")), 3)
+            self.assertEqual(stats.latest_tracks(["b"])["b"]["heard"], 160)
+
     def test_repeat_window_survives_restart_and_runs_from_latest_sighting(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "music.sqlite3"
@@ -111,6 +125,7 @@ class MusicHistoryTest(unittest.TestCase):
                                  "async_read": False}, False, lambda _: None, lambda *_: None)
         session.pending_station = 1
         session.monitor_enabled = lambda: True
+        session.set_music_favourites({"DAB:12A:1", "DAB:12A:3", "DAB:12A:4"})
         heard = {}
         session.on_music = lambda sid, name, track, ts: heard.setdefault(name, []).append(track)
         selected = []
@@ -121,7 +136,7 @@ class MusicHistoryTest(unittest.TestCase):
                 self.metadata = metadata
                 self.sid = 0
                 if not metadata_only:
-                    for sid in range(1, 4):
+                    for sid in range(1, 5):
                         station(sid, str(sid).encode(), 63)
 
             def select(self, sid):
@@ -130,6 +145,7 @@ class MusicHistoryTest(unittest.TestCase):
                     selected.append(sid)
 
             def monitor(self, sid):
+                assert sid in (3, 4)
                 self.other = sid
                 return True
 
@@ -159,6 +175,6 @@ class MusicHistoryTest(unittest.TestCase):
             finally:
                 timer.cancel()
         self.assertEqual(selected, [1])
-        self.assertEqual(heard, {str(i): ["Artist - Song"] for i in range(1, 4)})
+        self.assertEqual(heard, {str(i): ["Artist - Song"] for i in (1, 3, 4)})
         self.assertEqual(closed, [False])
 
