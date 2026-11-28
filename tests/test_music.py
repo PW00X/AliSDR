@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from alisdr.music import MusicStats
 
@@ -8,7 +9,8 @@ from alisdr.music import MusicStats
 class MusicHistoryTest(unittest.TestCase):
     def test_repeated_labels_station_selection_and_restart(self):
         from alisdr.manual_tuning import ManualSession, Tuning
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, patch("alisdr.manual_tuning.time.monotonic") as clock:
+            clock.return_value = 0
             path = Path(tmp) / "music.sqlite3"
             stats = MusicStats(path)
             self.assertEqual(stats.snapshot(), [])
@@ -20,14 +22,45 @@ class MusicHistoryTest(unittest.TestCase):
                               (1, "Artist - First"), (1, "now playing: Artist - First"),
                               (1, "Artist - Second"), (1, "Artist - First")]:
                 session._dab_metadata(sid, text.encode())
+                clock.return_value += 5
+                session._confirm_music({"DAB:12A:1"})
             session._music_text("FM:100000000", "FM station", "Artist - First")
+            clock.return_value += 5
+            session._confirm_music({"FM:100000000"})
             counts = {(r["station"], r["track"]): r["plays"] for r in MusicStats(path).snapshot()}
             self.assertEqual(counts, {("FM station, StuBru", "Artist - First"): 2,
                                       ("StuBru", "Artist - Second"): 1})
             stats.clear()
             self.assertEqual(MusicStats(path).snapshot(), [])
             session._music_text("FM:100000000", "FM station", "Artist - New")
+            clock.return_value += 5
+            session._confirm_music({"FM:100000000"})
             self.assertEqual(stats.snapshot()[0]["plays"], 1)
+
+    def test_only_stable_track_text_is_confirmed(self):
+        from alisdr.manual_tuning import ManualSession, Tuning
+
+        session = ManualSession(Tuning(0, "WFM"), {}, False, None, None)
+        heard = []
+        session.on_music = lambda sid, name, track, ts: heard.append((sid, track))
+        with patch("alisdr.manual_tuning.time.monotonic") as clock:
+            clock.return_value = 0
+            session._music_text("fm", "FM", "Band - S?ng")
+            session._music_text("dab", "DAB", "Another - Station")
+            clock.return_value = 4
+            session._music_text("fm", "FM", "Band - Song")
+            session._confirm_music({"fm"})  # DAB monitor moved away
+            clock.return_value = 8.99
+            session._music_text("fm", "FM", "Now playing: Band - Song")
+            session._confirm_music({"fm", "dab"})
+            self.assertEqual(heard, [])
+            clock.return_value = 9
+            session._confirm_music({"fm"})
+            session._music_text("fm", "FM", "Band - Noise")
+            session._music_text("fm", "FM", "")
+            clock.return_value = 20
+            session._confirm_music({"fm"})
+            self.assertEqual(heard, [("fm", "Band - Song")])
 
     def test_history_retention_and_legacy_rows(self):
         import sqlite3
@@ -117,7 +150,8 @@ class MusicHistoryTest(unittest.TestCase):
 
         with patch.object(manual_tuning, "Decoder", FakeDecoder), \
                 patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2048000)), \
-                patch.object(manual_tuning, "DAB_MONITOR_DWELL_S", .1):
+                patch.object(manual_tuning, "DAB_MONITOR_DWELL_S", .3), \
+                patch.object(manual_tuning, "TRACK_CONFIRM_S", .05):
             timer = threading.Timer(4, session.stop_requested.set)
             timer.start()
             try:

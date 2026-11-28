@@ -28,6 +28,7 @@ FM_FREQUENCIES = tuple(range(87_500_000, 108_000_001, 100_000))
 FM_SCAN_WIDTH_HZ = 90_000
 FM_SCAN_SNR_DB = 10
 FM_RDS_DWELL_S = 4
+TRACK_CONFIRM_S = 5
 DAB_DISCOVERY_TIMEOUT = 20
 DAB_RETRY_AFTER_S = 8
 DAB_MONITOR_DWELL_S = 15
@@ -82,6 +83,7 @@ class ManualSession(threading.Thread):
         self.on_music = None
         self.monitor_enabled = lambda: False
         self._last_tracks = {}
+        self._pending_tracks = {}
         self._music_lock = threading.Lock()
         self.on_broadcast_audio = lambda _pcm: None
         self.fm_scan = None
@@ -109,12 +111,28 @@ class ManualSession(threading.Thread):
 
     def _music_text(self, station_id, station, text):
         track = track_label(text)
-        if track and self.on_music:
-            with self._music_lock:
-                if self._last_tracks.get(station_id) == track.casefold():
-                    return
-                self._last_tracks[station_id] = track.casefold()
-                self.on_music(station_id, station, track, time.time())
+        key = track.casefold()
+        with self._music_lock:
+            if not track or self._last_tracks.get(station_id) == key:
+                self._pending_tracks.pop(station_id, None)
+                return
+            pending = self._pending_tracks.get(station_id)
+            if not pending or pending[1].casefold() != key:
+                self._pending_tracks[station_id] = (station, track, time.monotonic() + TRACK_CONFIRM_S)
+
+    def _confirm_music(self, listening):
+        # Decoders can report a label only when it changes. Advance its timer
+        # from the receive loop while the station is still being decoded.
+        with self._music_lock:
+            now = time.monotonic()
+            for station_id, (station, track, deadline) in list(self._pending_tracks.items()):
+                if station_id not in listening or self.stop_requested.is_set():
+                    del self._pending_tracks[station_id]
+                elif now >= deadline:
+                    del self._pending_tracks[station_id]
+                    self._last_tracks[station_id] = track.casefold()
+                    if self.on_music:
+                        self.on_music(station_id, station, track, time.time())
 
     def _update_spectrum(self, freqs, db, _trigger, _custom):
         self.spectrum = {"f0": float(freqs[0]), "f1": float(freqs[-1]), "db": np.round(db, 1).tolist()}
@@ -262,6 +280,7 @@ class ManualSession(threading.Thread):
                     demod = Demodulator(rate, AUDIO_RATE)
                     self.station_info = {}
                     self._last_tracks.clear()
+                    self._pending_tracks.clear()
                     previous_text = None
                     fm_audio = None
                     if mode == Modulation.WFM:
@@ -285,9 +304,11 @@ class ManualSession(threading.Thread):
                     if fm_rate > 120_000:
                         rds.feed(composite, fm_rate)
                         text = rds.info.get("text")
-                        if text and text != previous_text:
+                        station_id = f"FM:{freq}"
+                        if text != previous_text:
                             previous_text = text
-                            self._music_text(f"FM:{freq}", rds.info.get("name") or f"{freq / 1e6:g} MHz", text)
+                            self._music_text(station_id, rds.info.get("name") or f"{freq / 1e6:g} MHz", text or "")
+                        self._confirm_music((station_id,))
                     stereo = fm_audio.process(composite)
                     if stereo.size:
                         self.on_broadcast_audio((np.clip(stereo, -1.0, 1.0) * 32767).astype("<i2").tobytes())
@@ -308,6 +329,8 @@ class ManualSession(threading.Thread):
             raise ValueError(tr("DAB station is unavailable."))
         self.pending_station = 0
         if self.station != sid:
+            with self._music_lock:
+                self._pending_tracks.pop(f"DAB:{self.tuning.channel}:{self.station}", None)
             self.station = sid
             self.station_info.pop("text", None)
             self.station_image = None
@@ -318,12 +341,15 @@ class ManualSession(threading.Thread):
 
     def _dab_reception(self, synced, _snr, _offset):
         self.synced = synced
+        if not synced:
+            with self._music_lock:
+                self._pending_tracks.clear()
 
     def _dab_metadata(self, sid, label):
         if sid and sid != self.station:
             self._monitor_label(sid, label)
             return
-        if label:
+        if label is not None:
             text = label.decode("utf-8", errors="replace").strip()
             self.station_info["ensemble" if sid == 0 else "text"] = text
             if sid:
@@ -331,7 +357,7 @@ class ManualSession(threading.Thread):
 
     def _monitor_label(self, sid, label):
         station = self.stations.get(sid)
-        if station and sid != self.station and label and self.monitor_enabled():
+        if station and sid != self.station and label is not None and self.monitor_enabled():
             self._music_text(f"DAB:{self.tuning.channel}:{sid}", station["name"],
                              label.decode("utf-8", errors="replace").strip())
 
@@ -422,6 +448,10 @@ class ManualSession(threading.Thread):
                     next_meter = now + 0.35
                 decoder.push(conditioned)
                 enabled = self.monitor_enabled()
+                listening = {f"DAB:{self.tuning.channel}:{self.station}"}
+                if enabled and monitor_sid and not monitor_failed:
+                    listening.add(f"DAB:{self.tuning.channel}:{monitor_sid}")
+                self._confirm_music(listening)
                 if enabled and not monitor_failed and len(self.stations) > 1:
                     if now >= next_monitor or monitor_sid == self.station:
                         choices = sorted(self.stations.keys() - {self.station})
