@@ -22,10 +22,10 @@ class MusicHistoryTest(unittest.TestCase):
                               (1, "Artist - First"), (1, "now playing: Artist - First"),
                               (1, "Artist - Second"), (1, "Artist - First")]:
                 session._dab_metadata(sid, text.encode())
-                clock.return_value += 5
+                clock.return_value += 3
                 session._confirm_music({"DAB:12A:1"})
             session._music_text("FM:100000000", "FM station", "Artist - First")
-            clock.return_value += 5
+            clock.return_value += 3
             session._confirm_music({"FM:100000000"})
             counts = {(r["station"], r["track"]): r["plays"] for r in MusicStats(path).snapshot()}
             self.assertEqual(counts, {("FM station, StuBru", "Artist - First"): 2,
@@ -33,7 +33,7 @@ class MusicHistoryTest(unittest.TestCase):
             stats.clear()
             self.assertEqual(MusicStats(path).snapshot(), [])
             session._music_text("FM:100000000", "FM station", "Artist - New")
-            clock.return_value += 5
+            clock.return_value += 3
             session._confirm_music({"FM:100000000"})
             self.assertEqual(stats.snapshot()[0]["plays"], 1)
 
@@ -47,14 +47,14 @@ class MusicHistoryTest(unittest.TestCase):
             clock.return_value = 0
             session._music_text("fm", "FM", "Band - S?ng")
             session._music_text("dab", "DAB", "Another - Station")
-            clock.return_value = 4
+            clock.return_value = 2
             session._music_text("fm", "FM", "Band - Song")
             session._confirm_music({"fm"})  # DAB monitor moved away
-            clock.return_value = 8.99
+            clock.return_value = 4.99
             session._music_text("fm", "FM", "Now playing: Band - Song")
             session._confirm_music({"fm", "dab"})
             self.assertEqual(heard, [])
-            clock.return_value = 9
+            clock.return_value = 5
             session._confirm_music({"fm"})
             session._music_text("fm", "FM", "Band - Noise")
             session._music_text("fm", "FM", "")
