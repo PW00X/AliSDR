@@ -31,7 +31,7 @@ FM_RDS_DWELL_S = 4
 TRACK_CONFIRM_S = 5
 DAB_DISCOVERY_TIMEOUT = 20
 DAB_RETRY_AFTER_S = 8
-DAB_MONITOR_DWELL_S = 15
+DAB_MONITOR_DWELL_S = 10  # Time to acquire a label before trying the next service.
 DAB_TUNER_SETTLE_S = 0.35
 DAB_GAIN_SETTLE_S = 5
 ANALOG_MODES = ("AM", "NFM", "WFM", "SSB", "USB", "LSB")
@@ -84,6 +84,7 @@ class ManualSession(threading.Thread):
         self.monitor_enabled = lambda: False
         self._last_tracks = {}
         self._pending_tracks = {}
+        self._monitor_track_station = None
         self._music_lock = threading.Lock()
         self.on_broadcast_audio = lambda _pcm: None
         self.fm_scan = None
@@ -109,10 +110,12 @@ class ManualSession(threading.Thread):
         acquisition.set_gain("manual" if software else mode, gain)
         return gain, software
 
-    def _music_text(self, station_id, station, text):
+    def _music_text(self, station_id, station, text, *, monitored=False):
         track = track_label(text)
         key = track.casefold()
         with self._music_lock:
+            if monitored:
+                self._monitor_track_station = station_id if track else None
             if not track or self._last_tracks.get(station_id) == key:
                 self._pending_tracks.pop(station_id, None)
                 return
@@ -344,6 +347,7 @@ class ManualSession(threading.Thread):
         if not synced:
             with self._music_lock:
                 self._pending_tracks.clear()
+                self._monitor_track_station = None
 
     def _dab_metadata(self, sid, label):
         if sid and sid != self.station:
@@ -359,7 +363,7 @@ class ManualSession(threading.Thread):
         station = self.stations.get(sid)
         if station and sid != self.station and label is not None and self.monitor_enabled():
             self._music_text(f"DAB:{self.tuning.channel}:{sid}", station["name"],
-                             label.decode("utf-8", errors="replace").strip())
+                             label.decode("utf-8", errors="replace").strip(), monitored=True)
 
     def _dab_image(self, sid, data):
         if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -453,15 +457,26 @@ class ManualSession(threading.Thread):
                     listening.add(f"DAB:{self.tuning.channel}:{monitor_sid}")
                 self._confirm_music(listening)
                 if enabled and not monitor_failed and len(self.stations) > 1:
-                    if now >= next_monitor or monitor_sid == self.station:
+                    monitor_key = f"DAB:{self.tuning.channel}:{monitor_sid}"
+                    with self._music_lock:
+                        pending = monitor_key in self._pending_tracks
+                        ready = self._monitor_track_station == monitor_key and not pending
+                    # A new title gets its confirmation time even late in the visit.
+                    # Bound the extension so unstable text cannot stall the rotation.
+                    expired = now >= next_monitor and (not pending or now >= next_monitor + TRACK_CONFIRM_S)
+                    if expired or ready or monitor_sid == self.station:
                         choices = sorted(self.stations.keys() - {self.station})
                         monitor_sid = next((sid for sid in choices if sid > monitor_sid), choices[0])
+                        with self._music_lock:
+                            self._monitor_track_station = None
                         monitor_failed = not decoder.monitor(monitor_sid)
                         if monitor_failed:
                             _log.warning("Update the native DAB library to enable shared music monitoring")
                         next_monitor = now + DAB_MONITOR_DWELL_S
                 elif not enabled and monitor_sid:
                     decoder.monitor(0)
+                    with self._music_lock:
+                        self._monitor_track_station = None
                     monitor_sid = 0
                     next_monitor = 0.0
                     monitor_failed = False

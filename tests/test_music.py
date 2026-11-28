@@ -150,7 +150,7 @@ class MusicHistoryTest(unittest.TestCase):
 
         with patch.object(manual_tuning, "Decoder", FakeDecoder), \
                 patch.object(manual_tuning, "open_real_backend", return_value=SimulatedBackend(2048000)), \
-                patch.object(manual_tuning, "DAB_MONITOR_DWELL_S", .3), \
+                patch.object(manual_tuning, "DAB_MONITOR_DWELL_S", 60), \
                 patch.object(manual_tuning, "TRACK_CONFIRM_S", .05):
             timer = threading.Timer(4, session.stop_requested.set)
             timer.start()
