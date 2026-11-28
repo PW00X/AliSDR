@@ -351,9 +351,10 @@ export function manualView(root, modes) {
         }, icon(playing ? 'stop' : 'play'), h('span.col', h('strong', label),
           sub ? h('small.muted', sub) : null,
           detected ? h('small.muted', { title: `${t('Last heard')} · ${fmtDateShort(when)} ${fmtTime(when)}` },
-            t('Last track: {track}', { track: detected.track })) : null)), favouriteButton(entry), index >= 0 ? dragHandle(entry, index) : null);
+            detected.track, ' ', h('span', { 'data-track-heard': detected.heard })) : null)), favouriteButton(entry), index >= 0 ? dragHandle(entry, index) : null);
       };
       mount(favouriteRows, ...saved.map(row));
+      updateTrackAges();
       mount(stationRows, ...found.map((entry) => row(entry)));
     }
     const dab = active?.mode === 'DAB';
@@ -558,11 +559,19 @@ export function manualView(root, modes) {
       h('div.controls', tune, audio, scanFm, stop, record))),
     spectrumCard, stations),
     h('div.col', favouritesCard, deviceCard))));
+  function updateTrackAges() {
+    const now = Date.now() / 1000;
+    for (const age of favouriteRows.querySelectorAll('[data-track-heard]')) {
+      const seconds = Math.max(0, Math.floor(now - Number(age.dataset.trackHeard)));
+      age.textContent = t('({seconds}s)', { seconds });
+    }
+  }
+  const ageTimer = setInterval(updateTrackAges, 1000);
   updateMode();
   devicePanel.renderDevice();
   const offAudio = on('audio', updateListen);
   const offSettings = on('settings', () => { devicePanel.renderDevice(); updateGain(); });
   const offLive = on('live', (live) => devicePanel.lockDevice(active || live.running));
   refresh();
-  return { destroy() { destroyed = true; clearTimeout(timer); offAudio(); offSettings(); offLive(); spectrum.destroy(); } };
+  return { destroy() { destroyed = true; clearTimeout(timer); clearInterval(ageTimer); offAudio(); offSettings(); offLive(); spectrum.destroy(); } };
 }

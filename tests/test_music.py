@@ -2,12 +2,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from alisdr.manual_tuning import ManualSession, Tuning
 from alisdr.music import MusicStats
 
 
 class MusicHistoryTest(unittest.TestCase):
     def test_repeated_labels_station_selection_and_restart(self):
+        from alisdr.manual_tuning import ManualSession, Tuning
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "music.sqlite3"
             stats = MusicStats(path)
@@ -22,7 +22,7 @@ class MusicHistoryTest(unittest.TestCase):
                 session._dab_metadata(sid, text.encode())
             session._music_text("FM:100000000", "FM station", "Artist - First")
             counts = {(r["station"], r["track"]): r["plays"] for r in MusicStats(path).snapshot()}
-            self.assertEqual(counts, {("FM station, StuBru", "Artist - First"): 3,
+            self.assertEqual(counts, {("FM station, StuBru", "Artist - First"): 2,
                                       ("StuBru", "Artist - Second"): 1})
             stats.clear()
             self.assertEqual(MusicStats(path).snapshot(), [])
@@ -40,23 +40,37 @@ class MusicHistoryTest(unittest.TestCase):
                 db.execute("DROP TABLE music_history")
             self.assertEqual(stats.history("track"), [{"station": "One", "heard": 0}])
             for i in range(1, 55):
-                stats.record(str(i % 2), str(i % 2), "Track", i)
+                stats.record(str(i % 2), str(i % 2), "Track", i * 1800)
             self.assertEqual(stats.history("TRACK"), [
-                {"station": str(i % 2), "heard": i} for i in range(54, 4, -1)])
+                {"station": str(i % 2), "heard": i * 1800} for i in range(54, 4, -1)])
             self.assertEqual(stats.snapshot()[0]["plays"], 55)
             self.assertEqual(len(stats.history("Another track")), 1)
             with closing(sqlite3.connect(stats.path)) as db:
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM music_history").fetchone()[0], 51)
             self.assertEqual(stats.latest_tracks(["0", "1", "unknown"]), {
-                "0": {"track": "Track", "heard": 54}, "1": {"track": "Track", "heard": 53}})
+                "0": {"track": "Track", "heard": 54 * 1800}, "1": {"track": "Track", "heard": 53 * 1800}})
             stats.clear()
             self.assertEqual(stats.latest_tracks(["0"]), {})
             self.assertEqual(stats.history("track"), [])
+
+    def test_repeat_window_survives_restart_and_runs_from_latest_sighting(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "music.sqlite3"
+            stats = MusicStats(path)
+            stats.record("one", "One", "Artist - Song", 0)
+            stats.record("one", "One", "Other - Song", 60)
+            for heard in (1799, 3500):
+                MusicStats(path).record("one", "One", "ARTIST - SONG", heard)
+            self.assertEqual(stats.latest_tracks(["one"])["one"], {"track": "Other - Song", "heard": 60})
+            self.assertEqual(stats.history("Artist - Song"), [{"station": "One", "heard": 0}])
+            stats.record("one", "One", "Artist - Song", 5300)
+            self.assertEqual(stats.snapshot()[0]["plays"], 2)
 
     def test_monitor_rotates_without_selecting_foreground_or_emitting_audio(self):
         import threading
         from unittest.mock import patch
         from alisdr import manual_tuning
+        from alisdr.manual_tuning import ManualSession, Tuning
         from alisdr.sdr_backend import SimulatedBackend
 
         session = ManualSession(Tuning(0, "DAB", 223936000, "12A"),

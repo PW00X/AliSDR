@@ -3440,8 +3440,8 @@ msgstr "Kliknij, żeby zobaczyć jego wiadomości"
 msgid "Monitor DAB stations for track information"
 msgstr "Monitoruj stacje DAB, aby zbierać informacje o utworach"
 
-msgid "Last track: {track}"
-msgstr "Ostatni utwór: {track}"
+msgid "({seconds}s)"
+msgstr "({seconds}s)"
 
 msgid "Clear statistics"
 msgstr "Wyczyść statystyki"

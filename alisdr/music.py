@@ -24,7 +24,9 @@ class MusicStats:
             db.execute("BEGIN IMMEDIATE")
             db.execute("""CREATE TABLE IF NOT EXISTS music (
                 station_id TEXT, track_key TEXT, station TEXT, track TEXT,
-                plays INTEGER, last_heard REAL, PRIMARY KEY (station_id, track_key))""")
+                plays INTEGER, last_heard REAL, last_seen REAL, PRIMARY KEY (station_id, track_key))""")
+            if "last_seen" not in {col[1] for col in db.execute("PRAGMA table_info(music)")}:
+                db.execute("ALTER TABLE music ADD COLUMN last_seen REAL")
             if not self._has_history(db):
                 db.execute("""CREATE TABLE music_history (
                     id INTEGER PRIMARY KEY, track_key TEXT NOT NULL, station TEXT NOT NULL, heard REAL NOT NULL)""")
@@ -35,13 +37,20 @@ class MusicStats:
                         SELECT *, row_number() OVER (PARTITION BY track_key ORDER BY last_heard DESC, station_id) AS n
                         FROM music) WHERE n <= 50""")
             key = track.casefold()
+            # A repeat extends the quiet period without refreshing the displayed play.
+            repeat = db.execute("""UPDATE music SET last_seen=MAX(COALESCE(last_seen, last_heard), ?)
+                WHERE station_id=? AND track_key=? AND COALESCE(last_seen, last_heard)>?""",
+                (heard, station_id, key, heard - 30 * 60))
+            if repeat.rowcount:
+                return
             db.execute("INSERT INTO music_history(track_key, station, heard) VALUES (?, ?, ?)", (key, station, heard))
             db.execute("""DELETE FROM music_history WHERE id IN
                 (SELECT id FROM music_history WHERE track_key=? ORDER BY heard DESC, id DESC LIMIT -1 OFFSET 50)""", (key,))
-            db.execute("""INSERT INTO music VALUES (?, ?, ?, ?, 1, ?)
+            db.execute("""INSERT INTO music (station_id, track_key, station, track, plays, last_heard, last_seen)
+                VALUES (?, ?, ?, ?, 1, ?, ?)
                 ON CONFLICT(station_id, track_key) DO UPDATE SET
-                station=excluded.station, plays=plays+1, last_heard=excluded.last_heard""",
-                (station_id, track.casefold(), station, track, heard))
+                station=excluded.station, plays=plays+1, last_heard=excluded.last_heard, last_seen=excluded.last_seen""",
+                (station_id, key, station, track, heard, heard))
 
     @staticmethod
     def _has_history(db):
